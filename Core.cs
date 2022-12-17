@@ -139,8 +139,7 @@ public partial class MainWindow : Window
         BoxConnectors.ItemsSource = MyConnectors;
         BoxConnectors.SelectedIndex = 0;
         ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
-        ComboBox.ItemsSource = 
-            new string[] { "GetPortfolio", "SendEmail", "UpdateLastValueEquity", "RecoveryToolsByPriority", "Test" };
+        ComboBox.ItemsSource = new string[] { "SendEmail", "Test" };
 
         // Подписка на события
         Orders.CollectionChanged += UpdateOrders;

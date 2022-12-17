@@ -26,17 +26,7 @@ public partial class MainWindow : Window
     }
     private async void SendCommand(object sender, RoutedEventArgs e)
     {
-        if (ComboBox.Text == "GetPortfolio") await Task.Run(() => GetPortfolio(Clients[0].Union));
-        else if (ComboBox.Text == "SendEmail") SendEmail("Проблема на сервере.");
-        else if (ComboBox.Text == "UpdateLastValueEquity") MySettings.LastValueEquity = (int)Portfolio.Saldo;
-        else if (ComboBox.Text == "RecoveryToolsByPriority")
-        {
-            MySettings.ToolsByPriority = new();
-            foreach (Tool MyTool in Tools) MySettings.ToolsByPriority.Add(MyTool.Name);
-            ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
-            ToolsByPriorityView.Items.Refresh();
-            AddInfo("Восстановлена приоритетность инструментов по умолчанию.");
-        }
+        if (ComboBox.Text == "SendEmail") SendEmail("Проблема на сервере.");
         else if (ComboBox.Text == "Test")
         {
             SendEmail("Test");
