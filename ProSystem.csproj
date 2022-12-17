@@ -1,0 +1,99 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows10.0.17763.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Platforms>AnyCPU;x64;x86</Platforms>
+    <StartupObject></StartupObject>
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Algorhitms\**" />
+    <Compile Remove="NUnitTest\**" />
+    <Compile Remove="TestProSystem\**" />
+    <Compile Remove="Доработки\**" />
+    <EmbeddedResource Remove="Algorhitms\**" />
+    <EmbeddedResource Remove="NUnitTest\**" />
+    <EmbeddedResource Remove="TestProSystem\**" />
+    <EmbeddedResource Remove="Доработки\**" />
+    <None Remove="Algorhitms\**" />
+    <None Remove="NUnitTest\**" />
+    <None Remove="TestProSystem\**" />
+    <None Remove="Доработки\**" />
+    <Page Remove="Algorhitms\**" />
+    <Page Remove="NUnitTest\**" />
+    <Page Remove="TestProSystem\**" />
+    <Page Remove="Доработки\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Algorithms\ATRL.cs" />
+    <Compile Remove="Algorithms\BBL.cs" />
+    <Compile Remove="IndicatorsOLD.cs" />
+    <Compile Remove="IScript.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="3.13.3" />
+    <PackageReference Include="OxyPlot.SkiaSharp.Wpf" Version="2.1.0" />
+    <PackageReference Include="OxyPlot.Wpf" Version="2.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="OxyPlot.SkiaSharp">
+      <HintPath>bin\x64\Debug\net5.0-windows\OxyPlot.SkiaSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="OxyPlot.SkiaSharp.Wpf">
+      <HintPath>bin\x64\Debug\net5.0-windows\OxyPlot.SkiaSharp.Wpf.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Properties\Settings.settings">
+      <Generator>PublicSettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>
