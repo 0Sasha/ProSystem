@@ -872,6 +872,12 @@ internal static class TXmlConnector
     #region Methods for sending commands
     public static void Connect()
     {
+        if (!Window.ConnectorInitialized)
+        {
+            AddInfo("Коннектор не инициализирован.");
+            return;
+        }
+
         // Очистка данных
         AllSecurities.Clear(); Markets.Clear();
         TimeFrames.Clear(); Clients.Clear();

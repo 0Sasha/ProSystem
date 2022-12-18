@@ -57,6 +57,7 @@ public partial class MainWindow : Window
     #region Properties
     public static MainWindow Window { get; private set; }
     public static Settings MySettings { get; set; }
+    public bool ConnectorInitialized { get; set; }
     public static ConnectionState Connection
     {
         get => ConnectionSt;
@@ -150,7 +151,7 @@ public partial class MainWindow : Window
         if (File.Exists("txmlconnector64.dll"))
         {
             ConnectorSetCallback();
-            ConnectorInitialize(MySettings.LogLevelConnector);
+            if (ConnectorInitialize(MySettings.LogLevelConnector)) ConnectorInitialized = true;
         }
         else AddInfo("Не найден коннектор txmlconnector64.dll");
 
