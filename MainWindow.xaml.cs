@@ -24,14 +24,6 @@ public partial class MainWindow : Window
         }
         else AddInfo("Введите логин и пароль.");
     }
-    private async void SendCommand(object sender, RoutedEventArgs e)
-    {
-        if (ComboBox.Text == "SendEmail") SendEmail("Проблема на сервере.");
-        else if (ComboBox.Text == "Test")
-        {
-            SendEmail("Test");
-        }
-    }
     private async void ClosingMainWindow(object sender, System.ComponentModel.CancelEventArgs e)
     {
         // Подтверждение выхода и сохранение данных
@@ -52,6 +44,14 @@ public partial class MainWindow : Window
         // Выход
         if (!Window.ConnectorInitialized || ConnectorUnInitialize()) { Logger.StopLogging(); return; }
         else MessageBox.Show("UnInitialization failed.");
+    }
+    private void SendCommand(object sender, RoutedEventArgs e)
+    {
+        if (ComboBox.Text == "SendEmail") SendEmail("Проблема на сервере.");
+        else if (ComboBox.Text == "Test")
+        {
+            SendEmail("Test");
+        }
     }
 
     private void ClearOutdatedData()
