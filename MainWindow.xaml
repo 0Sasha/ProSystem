@@ -249,6 +249,11 @@
                         <RowDefinition Height="7*"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
+                    <Grid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Update distribution info" Click="ShowDistributionInfo"></MenuItem>
+                        </ContextMenu>
+                    </Grid.ContextMenu>
                     <oxyWpf:PlotView Name="DistributionPlot" Grid.Row="0"/>
                     <oxyWpf:PlotView Name="PortfolioPlot" Grid.Row="1"/>
                 </Grid>
@@ -324,11 +329,10 @@
         <Menu VerticalAlignment="Top" HorizontalAlignment="Left" FontSize="13">
             <MenuItem Header="Menu" Margin="0, 2, 0, 0" BorderBrush="Gray" Height="22" Width="47">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
-                <MenuItem Header="Show distribution info" Click="ShowDistributionInfo"></MenuItem>
                 <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
                 <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
                 <Separator/>
-                <MenuItem Header="Resize the control panel" Click="ResizeControlPanel"></MenuItem>
+                <MenuItem Header="Resize control panel" Click="ResizeControlPanel"></MenuItem>
             </MenuItem>
         </Menu>
         <TextBox Name="TxtBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontSize="11" FontWeight="Bold" Grid.Row="1">
