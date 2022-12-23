@@ -200,7 +200,7 @@ public partial class MainWindow : Window
                 new Binding() { Source = MySettings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
 
             AverageEquityTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("AverageValueEquity"), Mode = BindingMode.TwoWay });
+                new Binding() { Source = MySettings, Path = new PropertyPath("AverageValueEquity"), Mode = BindingMode.OneWay });
             ToleranceEquityTxt.SetBinding(TextBox.TextProperty,
                 new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceEquity"), Mode = BindingMode.TwoWay });
             TolerancePositionTxt.SetBinding(TextBox.TextProperty,
@@ -234,12 +234,8 @@ public partial class MainWindow : Window
                 MySettings.SessionTM = 180;
                 AddInfo("SessionTM по умолчанию.");
             }
-            if (MySettings.EquityCurve == null || MySettings.EquityCurve.Count < 3)
-            {
-                MySettings.EquityCurve = new() { 650000, 650000, 650000 };
-                MySettings.LastValueEquity = 650000;
-                AddInfo("EquityCurve по умолчанию.");
-            }
+
+            if (MySettings.Equity == null) MySettings.Equity = new();
             if (MySettings.ToleranceEquity < 10)
             {
                 MySettings.ToleranceEquity = 40;
@@ -479,10 +475,11 @@ public partial class MainWindow : Window
                     Logger.StartLogging();
                     BackupServer = false;
 
+                    MySettings.LastValueEquity = (DateTime.Today.AddDays(-1), (int)Portfolio.Saldo);
                     int Range = MySettings.AverageValueEquity / 100 * MySettings.ToleranceEquity;
-                    if (Portfolio.Saldo > MySettings.AverageValueEquity - Range && Portfolio.Saldo < MySettings.AverageValueEquity + Range)
-                        MySettings.LastValueEquity = (int)Portfolio.Saldo;
-                    else AddInfo("Стоимость портфеля за пределами допустимого отклонения.", SendEmail: true);
+                    if (Portfolio.Saldo < MySettings.AverageValueEquity - Range ||
+                        Portfolio.Saldo > MySettings.AverageValueEquity + Range)
+                        AddInfo("Стоимость портфеля за пределами допустимого отклонения.", SendEmail: true);
                 }
             }
             else System.Threading.Thread.Sleep(10);

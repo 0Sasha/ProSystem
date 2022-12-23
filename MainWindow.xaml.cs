@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         if (ComboBox.Text == "SendEmail") SendEmail("Проблема на сервере.");
         else if (ComboBox.Text == "Test")
         {
-            SendEmail("Test");
+            if (Portfolio != null) MySettings.LastValueEquity = (DateTime.Today, (int)Portfolio.Saldo);
         }
     }
 

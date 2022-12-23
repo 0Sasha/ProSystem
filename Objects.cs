@@ -520,19 +520,24 @@ public enum OrderType
     public string Email { get; set; } // Email для уведомлений
     public string EmailPassword { get; set; }
 
-    public List<int> EquityCurve { get; set; } = new() { 500000, 500000, 500000 };
-    public int LastValueEquity
+    public Dictionary<DateTime, int> Equity { get; set; } = new();
+    public (DateTime, int) LastValueEquity
     {
-        get => EquityCurve[^1];
         set
         {
-            if (value < 1000) { AddInfo("LastValueEquity не может быть меньше 1000."); NotifyChanged(); return; }
-            EquityCurve.Add(value);
-            AverageValueEquity = (int)EquityCurve.GetRange(EquityCurve.Count - 3, 3).Average();
+            Equity[value.Item1] = value.Item2;
             NotifyChanged();
         }
-    } // Последняя стоимость портфеля
-    public int AverageValueEquity { get; set; } = 500000; // Средняя стоимость портфеля за последние 3 дня
+    }
+    public int AverageValueEquity
+    {
+        get
+        {
+            if (Equity == null || Equity.Count == 0) return 500000;
+            if (Equity.Count > 2) return (int)Equity.TakeLast(3).Select(x => x.Value).Average();
+            return Equity.Last().Value;
+        }
+    }
 
     public int ToleranceEquity
     {
