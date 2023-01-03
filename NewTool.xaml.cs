@@ -109,25 +109,33 @@ public partial class NewTool : Window
         if (Scripts.SingleOrDefault(x => x.Name == ScriptName.Text) == null && BoxScripts.SelectedItem != null)
         {
             string Name = BoxScripts.SelectedItem.ToString();
-            if (Name == "ATRS") Scripts.Add(new Algorithms.ATRS(ScriptName.Text));
-            else if (Name == "PARS") Scripts.Add(new Algorithms.PARS(ScriptName.Text));
-            else if (Name == "CrossEMA") Scripts.Add(new Algorithms.CrossEMA(ScriptName.Text));
-            else if (Name == "RSI") Scripts.Add(new Algorithms.RSI(ScriptName.Text));
-            else if (Name == "Stochastic") Scripts.Add(new Algorithms.Stochastic(ScriptName.Text));
-            else if (Name == "MACD") Scripts.Add(new Algorithms.MACD(ScriptName.Text));
-            else if (Name == "ROC") Scripts.Add(new Algorithms.ROC(ScriptName.Text));
-            else if (Name == "MFI") Scripts.Add(new Algorithms.MFI(ScriptName.Text));
-            else if (Name == "OBV") Scripts.Add(new Algorithms.OBV(ScriptName.Text));
-            else if (Name == "AD") Scripts.Add(new Algorithms.AD(ScriptName.Text));
-            else if (Name == "CHO") Scripts.Add(new Algorithms.CHO(ScriptName.Text));
-            else if (Name == "CMF") Scripts.Add(new Algorithms.CMF(ScriptName.Text));
-            else if (Name == "DeMarker") Scripts.Add(new Algorithms.DeMarker(ScriptName.Text));
-            else if (Name == "StochRSI") Scripts.Add(new Algorithms.StochRSI(ScriptName.Text));
-            else if (Name == "Channel") Scripts.Add(new Algorithms.Channel(ScriptName.Text));
-            else if (Name == "CCI") Scripts.Add(new Algorithms.CCI(ScriptName.Text));
-            else if (Name == "CMO") Scripts.Add(new Algorithms.CMO(ScriptName.Text));
-            else if (Name == "MA") Scripts.Add(new Algorithms.MA(ScriptName.Text));
-            else if (Name == "SumLine") Scripts.Add(new Algorithms.SumLine(ScriptName.Text));
+
+            IScript newScript = Name switch
+            {
+                "ATRS" => new Algorithms.ATRS(ScriptName.Text),
+                "PARS" => new Algorithms.PARS(ScriptName.Text),
+                "CrossEMA" => new Algorithms.CrossEMA(ScriptName.Text),
+                "RSI" => new Algorithms.RSI(ScriptName.Text),
+                "Stochastic" => new Algorithms.Stochastic(ScriptName.Text),
+                "MACD" => new Algorithms.MACD(ScriptName.Text),
+                "ROC" => new Algorithms.ROC(ScriptName.Text),
+                "MFI" => new Algorithms.MFI(ScriptName.Text),
+                "OBV" => new Algorithms.OBV(ScriptName.Text),
+                "AD" => new Algorithms.AD(ScriptName.Text),
+                "CHO" => new Algorithms.CHO(ScriptName.Text),
+                "CMF" => new Algorithms.CMF(ScriptName.Text),
+                "DeMarker" => new Algorithms.DeMarker(ScriptName.Text),
+                "StochRSI" => new Algorithms.StochRSI(ScriptName.Text),
+                "Channel" => new Algorithms.Channel(ScriptName.Text),
+                "CCI" => new Algorithms.CCI(ScriptName.Text),
+                "CMO" => new Algorithms.CMO(ScriptName.Text),
+                "RVI" => new Algorithms.RVI(ScriptName.Text),
+                "MA" => new Algorithms.MA(ScriptName.Text),
+                "SumLine" => new Algorithms.SumLine(ScriptName.Text),
+                _ => null
+            };
+
+            if (newScript != null) Scripts.Add(newScript);
             ScriptsView.Items.Refresh();
         }
     }
