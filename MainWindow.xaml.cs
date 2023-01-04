@@ -848,29 +848,33 @@ public partial class MainWindow : Window
             ExtraGridlineColor = OxyPlot.OxyColors.LightGray
         };
 
-        double Req;
-        double SumFactVol = 0;
+        double FactReq, MaxReq;
         double SumMaxVol = 0;
+        string Filter = (string)ComboBoxDistrib.SelectedItem;
         for (int i = Tools.Count - 1; i >= 0; i--)
         {
-            Assets.Labels.Add(Tools[i].Name);
-            Position Pos = Positions.SingleOrDefault(x => x.Seccode == Tools[i].MySecurity.Seccode);
-            if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
-            {
-                Req = Pos.Saldo > 0 ? Pos.Saldo * Tools[i].MySecurity.InitReqLong : Req = -Pos.Saldo * Tools[i].MySecurity.InitReqShort;
-                Req = Req / Portfolio.Saldo * 100;
-                FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = Req });
-                SumFactVol += Req;
-            }
-            else FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
-
-            if (Tools[i].BaseBalance == 0) Req = Tools[i].ShareOfFunds;
-            else Req = Tools[i].BaseBalance > 0 ?
+            if (Tools[i].BaseBalance == 0) MaxReq = Tools[i].ShareOfFunds;
+            else MaxReq = Tools[i].BaseBalance > 0 ?
                 Tools[i].ShareOfFunds + (Tools[i].BaseBalance * Tools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
                 Tools[i].ShareOfFunds + (-Tools[i].BaseBalance * Tools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100);
 
-            MaxVol.Items.Add(new OxyPlot.Series.BarItem { Value = Req });
-            SumMaxVol += Req;
+            SumMaxVol += MaxReq;
+            if (Filter == "All tools" ||
+                Filter == "First part" && i < Tools.Count / 2 || Filter == "Second part" && i >= Tools.Count / 2)
+            {
+                Position Pos = Positions.SingleOrDefault(x => x.Seccode == Tools[i].MySecurity.Seccode);
+                if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
+                {
+                    FactReq = (Pos.Saldo > 0 ? Pos.Saldo * Tools[i].MySecurity.InitReqLong :
+                        -Pos.Saldo * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100;
+                    FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = FactReq });
+                }
+                else if ((bool)!OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
+                else continue;
+                
+                Assets.Labels.Add(Tools[i].Name);
+                MaxVol.Items.Add(new OxyPlot.Series.BarItem { Value = MaxReq });
+            }
         }
 
         var Model = new OxyPlot.PlotModel();
@@ -899,7 +903,7 @@ public partial class MainWindow : Window
         };
 
         AssetsPorfolio.Labels.Add("Portfolio");
-        FactVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = SumFactVol });
+        FactVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.InitReqs / Portfolio.Saldo * 100 });
         MaxVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = SumMaxVol });
 
         Model = new OxyPlot.PlotModel();

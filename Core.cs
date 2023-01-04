@@ -137,6 +137,8 @@ public partial class MainWindow : Window
         TradesView.ItemsSource = Trades;
         ToolsView.ItemsSource = Tools;
         ComboBoxTool.ItemsSource = Tools;
+        ComboBoxDistrib.ItemsSource = new string[] { "All tools", "First part", "Second part" };
+        ComboBoxDistrib.SelectedIndex = 0;
         BoxConnectors.ItemsSource = MyConnectors;
         BoxConnectors.SelectedIndex = 0;
         ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
@@ -468,6 +470,8 @@ public partial class MainWindow : Window
                         Task TaskConnect = Task.Run(() => Connect());
                         if (!TaskConnect.Wait(300000)) AddInfo("CheckConditions: Превышено время ожидания TaskConnect.", SendEmail: true);
                     }
+                    else if (!MySettings.ScheduledConnection && DateTime.Now.Minute is 0 or 30)
+                        MySettings.ScheduledConnection = true;
                 }
                 else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0 && DateTime.Now.Second < 2)
                 {

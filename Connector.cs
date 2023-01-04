@@ -165,7 +165,7 @@ internal static class TXmlConnector
                 sLow.Clear(); sClose.Clear(); sVolume.Clear();
 
                 // Обработка данных
-                bool Filter = MySecurity.Market == "1";
+                bool Filter = MySecurity.Market != "4";
                 while (XR.Read())
                 {
                     if (Filter && XR.HasAttributes && sDateTime.Count > 0 &&

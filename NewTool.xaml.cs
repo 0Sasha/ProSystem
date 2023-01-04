@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Windows;
 using static ProSystem.MainWindow;
+
 namespace ProSystem;
 
 public partial class NewTool : Window
@@ -108,9 +109,7 @@ public partial class NewTool : Window
     {
         if (Scripts.SingleOrDefault(x => x.Name == ScriptName.Text) == null && BoxScripts.SelectedItem != null)
         {
-            string Name = BoxScripts.SelectedItem.ToString();
-
-            IScript newScript = Name switch
+            IScript newScript = BoxScripts.SelectedItem.ToString() switch
             {
                 "ATRS" => new Algorithms.ATRS(ScriptName.Text),
                 "PARS" => new Algorithms.PARS(ScriptName.Text),
@@ -135,7 +134,8 @@ public partial class NewTool : Window
                 _ => null
             };
 
-            if (newScript != null) Scripts.Add(newScript);
+            if (newScript == null) return;
+            Scripts.Add(newScript);
             ScriptsView.Items.Refresh();
         }
     }

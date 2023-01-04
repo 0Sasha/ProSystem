@@ -7,7 +7,7 @@
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
         Closing="ClosingMainWindow"
-        Title="ProSystem" Height="1020" Width="1250"
+        Title="ProSystem" Height="900" Width="1350"
         MinHeight="500" MinWidth="1000" FontSize="13">
     <Grid>
         <Grid.RowDefinitions>
@@ -246,16 +246,23 @@
             <TabItem Header="Distribution" Width="80" Margin="45,0,-45,0">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="7*"/>
+                        <RowDefinition MinHeight="26" Height="26"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
-                    <Grid.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Update distribution info" Click="ShowDistributionInfo"></MenuItem>
-                        </ContextMenu>
-                    </Grid.ContextMenu>
-                    <oxyWpf:PlotView Name="DistributionPlot" Grid.Row="0"/>
-                    <oxyWpf:PlotView Name="PortfolioPlot" Grid.Row="1"/>
+                    <Border Grid.Row="0" BorderThickness="0.5" BorderBrush="Black"></Border>
+                    <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ShowDistributionInfo"/>
+                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" HorizontalAlignment="Left" Margin="115,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+                    
+                    <Border Grid.Row="1" BorderThickness="0.5" BorderBrush="Black">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="6*"/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <oxyWpf:PlotView Name="DistributionPlot" Grid.Row="0"/>
+                            <oxyWpf:PlotView Name="PortfolioPlot" Grid.Row="1"/>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
             <TabItem Header="Info" Width="80" Margin="45,0,-45,0">
@@ -265,13 +272,15 @@
                         <ColumnDefinition/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="24"/>
+                        <RowDefinition Height="26" MinHeight="26"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
+                    <Border Grid.Row="0" BorderThickness="0.5" BorderBrush="Black" Grid.ColumnSpan="2"></Border>
+                    
                     <ComboBox Name="ComboBoxTool" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ComboBoxToolChanged"/>
-                    <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="113,1,0,0" VerticalAlignment="Top" Width="110"/>
-                    <Button Content="Show script info" HorizontalAlignment="Left" Margin="225,1,0,0" VerticalAlignment="Top" Height="22" Width="110" Click="ShowScriptInfo"/>
-                    <Button Content="Show system info" HorizontalAlignment="Left" Margin="337,1,0,0" VerticalAlignment="Top" Height="22" Width="110" Click="ShowSystemInfo"/>
+                    <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="112,1,0,0" VerticalAlignment="Top" Width="110"/>
+                    <Button Content="Show script info" HorizontalAlignment="Left" Margin="224,1,0,0" VerticalAlignment="Top" Height="23" Width="110" Click="ShowScriptInfo"/>
+                    <Button Content="Show system info" HorizontalAlignment="Left" Margin="336,1,0,0" VerticalAlignment="Top" Height="23" Width="110" Click="ShowSystemInfo"/>
                     <ListView Name="OrdersInfo" Grid.Row="1" FontWeight="Bold">
                         <ListView.View>
                             <GridView>
