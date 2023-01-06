@@ -251,7 +251,8 @@
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" BorderThickness="0.5" BorderBrush="Black"></Border>
                     <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ShowDistributionInfo"/>
-                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" HorizontalAlignment="Left" Margin="115,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" IsChecked="True" HorizontalAlignment="Left" Margin="115,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+                    <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" HorizontalAlignment="Left" Margin="248,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
                     
                     <Border Grid.Row="1" BorderThickness="0.5" BorderBrush="Black">
                         <Grid>

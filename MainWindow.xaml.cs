@@ -865,15 +865,17 @@ public partial class MainWindow : Window
                 Position Pos = Positions.SingleOrDefault(x => x.Seccode == Tools[i].MySecurity.Seccode);
                 if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
                 {
-                    FactReq = (Pos.Saldo > 0 ? Pos.Saldo * Tools[i].MySecurity.InitReqLong :
-                        -Pos.Saldo * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100;
+                    int shift = (bool)ExcludeBaseCheckBox.IsChecked ? Tools[i].BaseBalance : 0;
+                    FactReq = (Pos.Saldo > 0 ? (Pos.Saldo - shift) * Tools[i].MySecurity.InitReqLong :
+                        (-Pos.Saldo - shift) * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100;
                     FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = FactReq });
                 }
-                else if ((bool)!OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
+                else if (!(bool)OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
                 else continue;
                 
                 Assets.Labels.Add(Tools[i].Name);
-                MaxVol.Items.Add(new OxyPlot.Series.BarItem { Value = MaxReq });
+                MaxVol.Items.Add(new OxyPlot.Series.BarItem{
+                    Value = (bool)ExcludeBaseCheckBox.IsChecked ? Tools[i].ShareOfFunds : MaxReq });
             }
         }
 
