@@ -826,12 +826,12 @@ public partial class MainWindow : Window
         TradesInfo.ItemsSource = SystemTrades;
         TradesInfo.Items.Refresh();
     }
-    public void ShowDistributionInfo(object sender, RoutedEventArgs e)
+    private void ShowDistributionInfo(object sender, RoutedEventArgs e)
     {
         if (Tools.Count < 1 || Portfolio.Saldo < 1) return;
 
         var Assets = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVol = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.DarkGoldenrod, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+        var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 3, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
         var MaxVol = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
         var Axis = new OxyPlot.Axes.LinearAxis
         {
@@ -868,7 +868,11 @@ public partial class MainWindow : Window
                     int shift = (bool)ExcludeBaseCheckBox.IsChecked ? Tools[i].BaseBalance : 0;
                     FactReq = (Pos.Saldo > 0 ? (Pos.Saldo - shift) * Tools[i].MySecurity.InitReqLong :
                         (-Pos.Saldo - shift) * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100;
-                    FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = FactReq });
+                    FactVol.Items.Add(new OxyPlot.Series.BarItem
+                    {
+                        Value = FactReq,
+                        Color = Pos.Saldo - shift > 0 ? OxyPlot.OxyColors.Green : OxyPlot.OxyColors.DarkGoldenrod
+                    });
                 }
                 else if (!(bool)OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
                 else continue;
@@ -888,8 +892,8 @@ public partial class MainWindow : Window
         DistributionPlot.Model = Model;
 
         var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 25, FillColor = OxyPlot.OxyColors.DarkGoldenrod, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
-        var MaxVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 25, FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+        var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 2, FillColor = OxyPlot.OxyColors.DarkGoldenrod, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+        var MaxVolPorfolio = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
         var AxisPorfolio = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
