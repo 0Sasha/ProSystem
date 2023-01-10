@@ -866,8 +866,8 @@ public partial class MainWindow : Window
                 if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
                 {
                     int shift = (bool)ExcludeBaseCheckBox.IsChecked ? Tools[i].BaseBalance : 0;
-                    FactReq = (Pos.Saldo > 0 ? (Pos.Saldo - shift) * Tools[i].MySecurity.InitReqLong :
-                        (-Pos.Saldo - shift) * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100;
+                    FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * Tools[i].MySecurity.InitReqLong :
+                        (-Pos.Saldo - shift) * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100);
                     FactVol.Items.Add(new OxyPlot.Series.BarItem
                     {
                         Value = FactReq,

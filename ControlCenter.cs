@@ -345,8 +345,22 @@ public partial class Tool
             {
                 string Path = "Logs/LogsTools/" + Name + ".txt";
                 if (!System.IO.File.Exists(Path)) System.IO.File.Create(Path).Close();
-                System.IO.File.AppendAllText(Path, DateTime.Now.ToString(IC) + ": /////////////////// RECOUNT SCRIPTS" +
-                    "\nLastTrade " + MySecurity.LastTrade.Price.ToString(IC) + "\nDateLastTrade " + MySecurity.LastTrade.DateTime.ToString(IC) + "\n");
+
+                string Data = DateTime.Now.ToString(IC) + ": /////////////////// RECOUNT SCRIPTS" +
+                    "\nLastTrade " + MySecurity.LastTrade.Price.ToString(IC) +
+                    "\nDateLastTrade " + MySecurity.LastTrade.DateTime.ToString(IC) + "\n";
+
+                if (MySecurity.Bars != null)
+                    Data += "OHLCV[^1] " + MySecurity.Bars.DateTime[^1] + "/" +
+                        MySecurity.Bars.Open[^1] + "/" + MySecurity.Bars.High[^1] + "/" +
+                        MySecurity.Bars.Low[^1] + "/" + MySecurity.Bars.Close[^1] + "/" + MySecurity.Bars.Volume[^1] + "\n";
+
+                if (BasicSecurity != null && BasicSecurity.Bars != null)
+                    Data += "BasicOHLCV[^1] " + BasicSecurity.Bars.DateTime[^1] + "/" +
+                        BasicSecurity.Bars.Open[^1] + "/" + BasicSecurity.Bars.High[^1] + "/" +
+                        BasicSecurity.Bars.Low[^1] + "/" + BasicSecurity.Bars.Close[^1] + "/" + BasicSecurity.Bars.Volume[^1] + "\n";
+
+                System.IO.File.AppendAllText(Path, Data);
                 return true;
             }
             catch (Exception e) { AddInfo(Name + ": Исключение логирования: " + e.Message); }
