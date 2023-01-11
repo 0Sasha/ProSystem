@@ -46,7 +46,7 @@ public partial class MainWindow : Window
     public static readonly string[] MyAlgorithms = new string[]
     {
         "RSI", "StochRSI", "MFI", "DeMarker", "Stochastic",
-        "CMO", "CMF", "RVI", "CCI", "OBV", "AD", "SumLine",
+        "CMO", "CMF", "RVI", "CCI", "FRC", "OBV", "AD", "SumLine",
         "CHO", "ROC", "MACD", "MA", "Channel", "CrossEMA",
         "ATRS", "PARS"
     };

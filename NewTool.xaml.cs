@@ -127,6 +127,7 @@ public partial class NewTool : Window
                 "StochRSI" => new Algorithms.StochRSI(ScriptName.Text),
                 "Channel" => new Algorithms.Channel(ScriptName.Text),
                 "CCI" => new Algorithms.CCI(ScriptName.Text),
+                "FRC" => new Algorithms.FRC(ScriptName.Text),
                 "CMO" => new Algorithms.CMO(ScriptName.Text),
                 "RVI" => new Algorithms.RVI(ScriptName.Text),
                 "MA" => new Algorithms.MA(ScriptName.Text),
