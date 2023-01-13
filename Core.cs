@@ -744,7 +744,7 @@ public partial class MainWindow : Window
         if (maxReqs > Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio)
             AddInfo("CheckMaxReqsTools: Потенциальные требования портфеля превышают норму: " +
                 MySettings.MaxShareInitReqsPortfolio.ToString(IC) + "%. PotentialInitReqs: " +
-                Math.Abs(maxReqs / (Portfolio.Saldo / 100), 2) + "%", SendEmail: true);
+                Math.Round(maxReqs / (Portfolio.Saldo / 100), 2) + "%", SendEmail: true);
     }
     private static void RequestInfo()
     {

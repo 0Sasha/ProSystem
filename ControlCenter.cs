@@ -206,7 +206,7 @@ public partial class Tool
             {
                 foreach (IScript MyScript in Scripts) MyScript.UpdateOrdersAndPosition();
                 if (!CheckPositionMatching(Balance, PosVolumes, NowBidding, NormalPrice)) return;
-                NormalizePosition(Balance, PosVolumes, NowBidding);
+                NormalizePosition(Balance, PosVolumes, ClearVolumes, NowBidding);
             }
         }
         else if (!CancelActiveOrders()) return;
@@ -524,7 +524,7 @@ public partial class Tool
         else if (TriggerPosition != DateTime.MinValue) TriggerPosition = DateTime.MinValue;
         return Balance;
     }
-    private void NormalizePosition(int Balance, (int, int) PosVolumes, bool NowBidding)
+    private void NormalizePosition(int Balance, (int, int) PosVolumes, (double, double) ClearVolumes, bool NowBidding)
     {
         Order[] ActiveOrders = Orders.ToArray()
             .Where(x => x.Sender == "System" && x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
@@ -555,7 +555,7 @@ public partial class Tool
                 if (Math.Abs(ActiveOrder.Price - MySecurity.Bars.Close[^2]) > 0.00001 &&
                     DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || ActiveOrder.Balance != Volume)
                     ReplaceOrder(ActiveOrder, MySecurity, OrderType.Limit,
-                        MySecurity.Bars.Close[^2], Volume, "Normalisation", null, "NM");
+                        MySecurity.Bars.Close[^2], Volume, "Normalization", null, "NM");
             }
             else if ((ActiveOrder.BuySell == "B") == Balance > 0 &&
                 (Balance > 0 && Balance + 1 < PosVolumes.Item1 || Balance < 0 && -Balance + 1 < PosVolumes.Item2))
@@ -573,7 +573,7 @@ public partial class Tool
                 if (Math.Abs(ActiveOrder.Price - MySecurity.Bars.Close[^2]) > 0.00001 &&
                     DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || ActiveOrder.Balance != Volume)
                     ReplaceOrder(ActiveOrder, MySecurity,
-                        OrderType.Limit, MySecurity.Bars.Close[^2], Volume, "NormalisationUp", null, "NM");
+                        OrderType.Limit, MySecurity.Bars.Close[^2], Volume, "NormalizationUp", null, "NM");
             }
             else CancelOrder(ActiveOrder);
         }
@@ -588,10 +588,11 @@ public partial class Tool
                 }
 
             int Volume = Balance > PosVolumes.Item1 ? Balance - PosVolumes.Item1 : -Balance - PosVolumes.Item2;
-            SendOrder(MySecurity, OrderType.Limit, Balance < 0, MySecurity.Bars.Close[^2], Volume, "Normalisation", null, "NM");
+            SendOrder(MySecurity, OrderType.Limit, Balance < 0, MySecurity.Bars.Close[^2], Volume, "Normalization", null, "NM");
             WriteLogNM(Balance, PosVolumes);
         }
-        else if (Balance > 0 && Balance + 1 < PosVolumes.Item1 || Balance < 0 && -Balance + 1 < PosVolumes.Item2)
+        else if (Balance > 0 && Balance + Math.Ceiling(Balance * 0.04) + 0.2 < ClearVolumes.Item1 ||
+            Balance < 0 && -Balance + Math.Ceiling(-Balance * 0.04) + 0.2 < ClearVolumes.Item2)
         {
             foreach (IScript MyScript in Scripts)
                 if (MyScript.ActiveOrder != null && (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 ||
@@ -605,7 +606,7 @@ public partial class Tool
                 {
                     int Volume = Balance > 0 ? PosVolumes.Item1 - Balance : PosVolumes.Item2 + Balance;
                     SendOrder(MySecurity, OrderType.Limit,
-                        Balance > 0, MySecurity.Bars.Close[^2], Volume, "NormalisationUp", null, "NM");
+                        Balance > 0, MySecurity.Bars.Close[^2], Volume, "NormalizationUp", null, "NM");
                     WriteLogNM(Balance, PosVolumes);
                     return;
                 }
