@@ -175,7 +175,7 @@ public partial class Tool
 
         // Вычисление универсальных индикаторов
         double[] SmallATR = Indicators.ATR(Symbol.Bars.High, Symbol.Bars.Low, Symbol.Bars.Close, 150);
-        double Average = Math.Round(Close[(Close.Length - 1 - 30)..(Close.Length - 1)].Sum() / 30, Symbol.Decimals);
+        double Average = Math.Round(Close[(Close.Length - 1 - 30)..(Close.Length - 1)].Average(), Symbol.Decimals);
         bool NormalPrice = Math.Abs(Average - Close[^1]) < SmallATR[^2] * 10;
 
         // Ожидание определённости заявок и позиции
@@ -192,8 +192,10 @@ public partial class Tool
             (Math.Abs(Balance) + PosVolumes.Long, Math.Abs(Balance) + PosVolumes.Short) : (Math.Abs(Balance), Math.Abs(Balance));
 
         // Обновление информации на контрольной панели и логирование риск-параметров
-        UpdateControlPanel(Balance, RealBalance, NowBidding, ReadyToTrade, RubReqs, ClearVolumes, PosVolumes, OrderVolumes, Average, SmallATR[^2]);
-        if (NowLogging) WriteLogRisks(Balance, RealBalance, StopTrading, NowBidding, ReadyToTrade, RubReqs, ClearVolumes, PosVolumes, OrderVolumes);
+        UpdateControlPanel(Balance, RealBalance, NowBidding, ReadyToTrade,
+            RubReqs, ClearVolumes, PosVolumes, OrderVolumes, Average, SmallATR[^2]);
+        if (NowLogging) WriteLogRisks(Balance, RealBalance, StopTrading,
+            NowBidding, ReadyToTrade, RubReqs, ClearVolumes, PosVolumes, OrderVolumes);
 
         // Идентификация заявок, проверка соответствия общей позиции позициям скриптов и нормализация общей позиции
         IdentifyOrdersAndTrades();
@@ -227,7 +229,8 @@ public partial class Tool
             // Работа с заявками
             if (MyScript.Result.Type is ScriptType.OSC or ScriptType.Line) ProcessOrders(MyScript, OrderVolumes, NormalPrice);
             else if (MyScript.Result.Type is ScriptType.LimitLine) ProcessOrdersLimitLine(MyScript, OrderVolumes);
-            else if (MyScript.Result.Type is ScriptType.StopLine) ProcessOrdersStopLine(MyScript, OrderVolumes, NormalPrice, NowBidding, SmallATR);
+            else if (MyScript.Result.Type is ScriptType.StopLine)
+                ProcessOrdersStopLine(MyScript, OrderVolumes, NormalPrice, NowBidding, SmallATR);
             else AddInfo(MyScript.Name + ": Неизвестный тип скрипта: " + MyScript.Result.Type);
         }
     }
@@ -369,7 +372,8 @@ public partial class Tool
     }
     private void WaitCertainty()
     {
-        Order[] Undefined = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "forwarding" or "inactive")).ToArray();
+        Order[] Undefined =
+            Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "forwarding" or "inactive")).ToArray();
         if (Undefined.Length > 0)
         {
             AddInfo(Name + ": Неопределённый статус заявки: " + Undefined[0].Status);
@@ -425,7 +429,8 @@ public partial class Tool
 
         if (RubReqs.Item1 < 10 || RubReqs.Item2 < 10 || MySecurity.SellDeposit < 10 || RubReqs.Item1 < MySecurity.SellDeposit / 2)
         {
-            AddInfo(Name + ": Требования за пределами нормы: " + RubReqs.Item1 + "/" + RubReqs.Item2 + " SellDep: " + MySecurity.SellDeposit, true, true);
+            AddInfo(Name + ": Требования за пределами нормы: " +
+                RubReqs.Item1 + "/" + RubReqs.Item2 + " SellDep: " + MySecurity.SellDeposit, true, true);
             GetSecurityInfo(MySecurity.Market, MySecurity.Seccode);
             GetClnSecPermissions(MySecurity.Board, MySecurity.Seccode, MySecurity.Market);
             ReadyToTrade = false;
@@ -480,8 +485,8 @@ public partial class Tool
             ShortVolume = NumberOfLots;
         }
 
-        ClearVolumes =
-            (Math.Round(Portfolio.Saldo * 0.01 * ShareOfFunds / RubReqs.Item1, 2), Math.Round(Portfolio.Saldo * 0.01 * ShareOfFunds / RubReqs.Item2, 2));
+        ClearVolumes = (Math.Round(Portfolio.Saldo * 0.01 * ShareOfFunds / RubReqs.Item1, 2),
+            Math.Round(Portfolio.Saldo * 0.01 * ShareOfFunds / RubReqs.Item2, 2));
         return (LongVolume, ShortVolume);
     }
     private int GetAndCheckBalance((int, int) PosVolumes, ref bool ReadyToTrade, ref DateTime TriggerPosition, out int RealBalance)
@@ -521,8 +526,8 @@ public partial class Tool
     }
     private void NormalizePosition(int Balance, (int, int) PosVolumes, bool NowBidding)
     {
-        Order[] ActiveOrders =
-            Orders.ToArray().Where(x => x.Sender == "System" && x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+        Order[] ActiveOrders = Orders.ToArray()
+            .Where(x => x.Sender == "System" && x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
 
         if (ActiveOrders.Length == 0 && !UseNormalization || !NowBidding) return;
         if (ActiveOrders.Length > 1)
@@ -540,7 +545,8 @@ public partial class Tool
                 foreach (IScript MyScript in Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                     {
-                        AddInfo(Name + ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
+                        AddInfo(Name +
+                            ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
                         CancelOrder(ActiveOrder);
                         return;
                     }
@@ -548,7 +554,8 @@ public partial class Tool
                 int Volume = Balance > PosVolumes.Item1 ? Balance - PosVolumes.Item1 : -Balance - PosVolumes.Item2;
                 if (Math.Abs(ActiveOrder.Price - MySecurity.Bars.Close[^2]) > 0.00001 &&
                     DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || ActiveOrder.Balance != Volume)
-                    ReplaceOrder(ActiveOrder, MySecurity, OrderType.Limit, MySecurity.Bars.Close[^2], Volume, "Normalisation", null, "NM");
+                    ReplaceOrder(ActiveOrder, MySecurity, OrderType.Limit,
+                        MySecurity.Bars.Close[^2], Volume, "Normalisation", null, "NM");
             }
             else if ((ActiveOrder.BuySell == "B") == Balance > 0 &&
                 (Balance > 0 && Balance + 1 < PosVolumes.Item1 || Balance < 0 && -Balance + 1 < PosVolumes.Item2))
@@ -556,7 +563,8 @@ public partial class Tool
                 foreach (IScript MyScript in Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                     {
-                        AddInfo(Name + ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
+                        AddInfo(Name +
+                            ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
                         CancelOrder(ActiveOrder);
                         return;
                     }
@@ -564,7 +572,8 @@ public partial class Tool
                 int Volume = Balance > 0 ? PosVolumes.Item1 - Balance : PosVolumes.Item2 + Balance;
                 if (Math.Abs(ActiveOrder.Price - MySecurity.Bars.Close[^2]) > 0.00001 &&
                     DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || ActiveOrder.Balance != Volume)
-                    ReplaceOrder(ActiveOrder, MySecurity, OrderType.Limit, MySecurity.Bars.Close[^2], Volume, "NormalisationUp", null, "NM");
+                    ReplaceOrder(ActiveOrder, MySecurity,
+                        OrderType.Limit, MySecurity.Bars.Close[^2], Volume, "NormalisationUp", null, "NM");
             }
             else CancelOrder(ActiveOrder);
         }
@@ -573,7 +582,8 @@ public partial class Tool
             foreach (IScript MyScript in Scripts)
                 if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                 {
-                    AddInfo(Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.", MySettings.DisplaySpecialInfo);
+                    AddInfo(Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.",
+                        MySettings.DisplaySpecialInfo);
                     return;
                 }
 
@@ -585,7 +595,8 @@ public partial class Tool
         {
             foreach (IScript MyScript in Scripts)
                 if (MyScript.ActiveOrder != null && (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 ||
-                    MyScript.ActiveOrder.Note == "PartEx" || Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)) return;
+                    MyScript.ActiveOrder.Note == "PartEx" ||
+                    Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)) return;
 
             foreach (IScript MyScript in Scripts)
             {
@@ -593,7 +604,8 @@ public partial class Tool
                 if (LastExecuted != null && LastExecuted.DateTime.AddDays(4) > DateTime.Now)
                 {
                     int Volume = Balance > 0 ? PosVolumes.Item1 - Balance : PosVolumes.Item2 + Balance;
-                    SendOrder(MySecurity, OrderType.Limit, Balance > 0, MySecurity.Bars.Close[^2], Volume, "NormalisationUp", null, "NM");
+                    SendOrder(MySecurity, OrderType.Limit,
+                        Balance > 0, MySecurity.Bars.Close[^2], Volume, "NormalisationUp", null, "NM");
                     WriteLogNM(Balance, PosVolumes);
                     return;
                 }
@@ -609,21 +621,24 @@ public partial class Tool
         if (Scripts.Length == 1)
         {
             // Проверка частичного исполнения заявки
-            if (Scripts[0].ActiveOrder != null &&
-                (Scripts[0].ActiveOrder.Quantity - Scripts[0].ActiveOrder.Balance > 0.00001 || Scripts[0].ActiveOrder.Note == "PartEx")) return true;
+            if (Scripts[0].ActiveOrder != null && (Scripts[0].ActiveOrder.Quantity - Scripts[0].ActiveOrder.Balance > 0.00001 ||
+                Scripts[0].ActiveOrder.Note == "PartEx")) return true;
 
             // Проверка соответствия позиций
             PositionType CurPosition = Scripts[0].CurrentPosition;
-            if (CurPosition == Neutral && Balance != 0 || CurPosition == Long && Balance <= 0 || CurPosition == Short && Balance >= 0)
+            if (CurPosition == Neutral && Balance != 0 ||
+                CurPosition == Long && Balance <= 0 || CurPosition == Short && Balance >= 0)
             {
                 if (!NowBidding || !NormalPrice)
                 {
-                    AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.", MySettings.DisplaySpecialInfo, true);
+                    AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                        MySettings.DisplaySpecialInfo, true);
                     return true;
                 }
                 AddInfo(Name + ": Позиция скрипта не соответствует позиции в портфеле. Нормализация по рынку.", SendEmail: true);
 
-                Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+                Order[] ActiveOrders =
+                    Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
                 foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
 
                 int VolumeOrder;
@@ -632,7 +647,8 @@ public partial class Tool
                 else if (CurPosition == Short) VolumeOrder = Math.Abs(Balance) + PosVolumes.Item2;
                 else VolumeOrder = Math.Abs(Balance);
 
-                SendOrder(MySecurity, OrderType.Market, IsBuy, MySecurity.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
+                SendOrder(MySecurity, OrderType.Market,
+                    IsBuy, MySecurity.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
                 return false;
             }
         }
@@ -641,23 +657,28 @@ public partial class Tool
             // Проверка частичного исполнения заявок
             foreach (IScript MyScript in Scripts)
                 if (MyScript.ActiveOrder != null &&
-                    (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 || MyScript.ActiveOrder.Note == "PartEx")) return true;
+                    (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 ||
+                    MyScript.ActiveOrder.Note == "PartEx")) return true;
 
             // Проверка соответствия позиций
             PositionType CurPosition1 = Scripts[0].CurrentPosition;
             PositionType CurPosition2 = Scripts[1].CurrentPosition;
             if (CurPosition1 == CurPosition2)
             {
-                if (CurPosition1 == Neutral && Balance != 0 || CurPosition1 == Long && Balance <= 0 || CurPosition1 == Short && Balance >= 0)
+                if (CurPosition1 == Neutral && Balance != 0 ||
+                    CurPosition1 == Long && Balance <= 0 || CurPosition1 == Short && Balance >= 0)
                 {
                     if (!NowBidding || !NormalPrice)
                     {
-                        AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.", MySettings.DisplaySpecialInfo, true);
+                        AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                            MySettings.DisplaySpecialInfo, true);
                         return true;
                     }
-                    AddInfo(Name + ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                    AddInfo(Name +
+                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
 
-                    Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+                    Order[] ActiveOrders = Orders.ToArray()
+                        .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
                     foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
 
                     int VolumeOrder;
@@ -666,7 +687,8 @@ public partial class Tool
                     else if (CurPosition1 == Short) VolumeOrder = Math.Abs(Balance) + PosVolumes.Item2;
                     else VolumeOrder = Math.Abs(Balance);
 
-                    SendOrder(MySecurity, OrderType.Market, IsBuy, MySecurity.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
+                    SendOrder(MySecurity, OrderType.Market,
+                        IsBuy, MySecurity.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
@@ -676,15 +698,19 @@ public partial class Tool
                 {
                     if (!NowBidding || !NormalPrice)
                     {
-                        AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.", MySettings.DisplaySpecialInfo, true);
+                        AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                            MySettings.DisplaySpecialInfo, true);
                         return true;
                     }
-                    AddInfo(Name + ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                    AddInfo(Name +
+                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
 
-                    Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+                    Order[] ActiveOrders = Orders.ToArray()
+                        .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
                     foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
 
-                    SendOrder(MySecurity, OrderType.Market, Balance < 0, MySecurity.Bars.Close[^2], Math.Abs(Balance), "BringingIntoLine", null, "NM");
+                    SendOrder(MySecurity, OrderType.Market,
+                        Balance < 0, MySecurity.Bars.Close[^2], Math.Abs(Balance), "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
@@ -695,16 +721,20 @@ public partial class Tool
                 {
                     if (!NowBidding || !NormalPrice)
                     {
-                        AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.", MySettings.DisplaySpecialInfo, true);
+                        AddInfo(Name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                            MySettings.DisplaySpecialInfo, true);
                         return true;
                     }
-                    AddInfo(Name + ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                    AddInfo(Name +
+                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
 
-                    Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+                    Order[] ActiveOrders = Orders.ToArray()
+                        .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
                     foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
 
                     int VolumeOrder = CurPos == Long ? Math.Abs(Balance) + PosVolumes.Item1 : Math.Abs(Balance) + PosVolumes.Item2;
-                    SendOrder(MySecurity, OrderType.Market, CurPos == Long, MySecurity.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
+                    SendOrder(MySecurity, OrderType.Market,
+                        CurPos == Long, MySecurity.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
@@ -714,7 +744,8 @@ public partial class Tool
 
     private bool CancelActiveOrders()
     {
-        Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+        Order[] ActiveOrders = Orders.ToArray()
+            .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
         if (ActiveOrders.Length == 0) return true;
 
         AddInfo(Name + ": Отмена всех активных заявок: " + ActiveOrders.Length);
@@ -737,7 +768,8 @@ public partial class Tool
     }
     private bool CancelUnknownsOrders()
     {
-        Order[] Unknowns = Orders.ToArray().Where(x => x.Sender == null && x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
+        Order[] Unknowns = Orders.ToArray()
+            .Where(x => x.Sender == null && x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
         if (Unknowns.Length == 0) return true;
 
         AddInfo(Name + ": Отмена неизвестных активных заявок: " + Unknowns.Length);
@@ -762,8 +794,9 @@ public partial class Tool
     private void UpdateControlPanel(int Balance, int RealBalance, bool NowBidding, bool ReadyToTrade, (double, double) RubReqs,
         (double, double) ClearVols, (int, int) PosVolumes, (int, int) OrderVolumes, double Average, double SmallATR)
     {
-        (MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor = NowBidding && (!ShowBasicSecurity ||
-            ShowBasicSecurity && BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ? OxyPlot.OxyColors.Red : OxyPlot.OxyColors.Black;
+        (MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor =
+            NowBidding && (!ShowBasicSecurity || ShowBasicSecurity && BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
+            OxyPlot.OxyColors.Red : OxyPlot.OxyColors.Black;
         MainModel.InvalidatePlot(false);
 
         Window.Dispatcher.Invoke(() =>
@@ -783,16 +816,15 @@ public partial class Tool
     {
         try
         {
-            System.IO.File.AppendAllText("Logs/LogsTools/" + Name + ".txt", DateTime.Now.ToString(IC) + ": /////////////////// Risks" +
-                "\nBalance " + Balance.ToString(IC) + "\nRealBalance " + RealBalance.ToString(IC) +
-                "\nUseShiftBalance " + UseShiftBalance.ToString() + "\nBaseBalance " + BaseBalance.ToString(IC) +
-                "\nStopTrading " + StopTrading.ToString() + "\nNowBidding " + NowBidding.ToString() + "\nReadyToTrade " + ReadyToTrade.ToString() +
-                "\nPortfolio.Saldo " + Portfolio.Saldo.ToString(IC) + "\nShareOfFunds " + ShareOfFunds.ToString(IC) +
-                "\nRubReqs " + RubReqs.Item1.ToString(IC) + "/" + RubReqs.Item2.ToString(IC) +
-                "\nClearVols " + ClearVols.Item1.ToString(IC) + "/" + ClearVols.Item2.ToString(IC) +
-                "\nPosVols " + PosVolumes.Item1.ToString(IC) + "/" + PosVolumes.Item2.ToString(IC) +
-                "\nOrderVol " + OrderVolumes.Item1.ToString(IC) + "/" + OrderVolumes.Item2.ToString(IC) +
-                "\nMinLots " + MinNumberOfLots.ToString(IC) + "\nMaxLots " + MaxNumberOfLots.ToString(IC) + "\n");
+            System.IO.File.AppendAllText("Logs/LogsTools/" + Name + ".txt", DateTime.Now + ": /////////////////// Risks" +
+                "\nBalance " + Balance + "\nRealBalance " + RealBalance +
+                "\nUseShiftBalance " + UseShiftBalance + "\nBaseBalance " + BaseBalance +
+                "\nStopTrading " + StopTrading + "\nNowBidding " + NowBidding + "\nReadyToTrade " + ReadyToTrade +
+                "\nPortfolio.Saldo " + Portfolio.Saldo + "\nShareOfFunds " + ShareOfFunds +
+                "\nRubReqs " + RubReqs.Item1 + "/" + RubReqs.Item2 + "\nClearVols " + ClearVols.Item1 + "/" + ClearVols.Item2 +
+                "\nPosVols " + PosVolumes.Item1 + "/" + PosVolumes.Item2 +
+                "\nOrderVol " + OrderVolumes.Item1 + "/" + OrderVolumes.Item2 +
+                "\nMinLots " + MinNumberOfLots + "\nMaxLots " + MaxNumberOfLots + "\n");
         }
         catch (Exception e) { AddInfo(Name + ": Исключение логирования рисков: " + e.Message); }
     }
@@ -800,13 +832,13 @@ public partial class Tool
     {
         try
         {
-            System.IO.File.AppendAllText("Logs/LogsTools/" + Name + ".txt", DateTime.Now.ToString(IC) + ": /////////////////// NM" +
-                "\nBalance " + Balance.ToString(IC) + "\nUseShiftBalance " + UseShiftBalance.ToString() + "\nBaseBalance " + BaseBalance.ToString(IC) +
-                "\nReserateLong " + MySecurity.ReserateLong.ToString(IC) + "\nReserateShort " + MySecurity.ReserateShort.ToString(IC) +
-                "\nInitReqLong " + MySecurity.InitReqLong.ToString(IC) + "\nInitReqShort " + MySecurity.InitReqShort.ToString(IC) +
-                "\nPortfolio.Saldo " + Portfolio.Saldo.ToString(IC) + "\nShareOfFunds " + ShareOfFunds.ToString(IC) +
-                "\nPosVols " + PosVolumes.Item1.ToString(IC) + "/" + PosVolumes.Item2.ToString(IC) +
-                "\nMinLots " + MinNumberOfLots.ToString(IC) + "\nMaxLots " + MaxNumberOfLots.ToString(IC) + "\n");
+            System.IO.File.AppendAllText("Logs/LogsTools/" + Name + ".txt", DateTime.Now + ": /////////////////// NM" +
+                "\nBalance " + Balance + "\nUseShiftBalance " + UseShiftBalance + "\nBaseBalance " + BaseBalance +
+                "\nReserateLong " + MySecurity.ReserateLong + "\nReserateShort " + MySecurity.ReserateShort +
+                "\nInitReqLong " + MySecurity.InitReqLong + "\nInitReqShort " + MySecurity.InitReqShort +
+                "\nPortfolio.Saldo " + Portfolio.Saldo + "\nShareOfFunds " + ShareOfFunds +
+                "\nPosVols " + PosVolumes.Item1 + "/" + PosVolumes.Item2 +
+                "\nMinLots " + MinNumberOfLots + "\nMaxLots " + MaxNumberOfLots + "\n");
         }
         catch (Exception e) { AddInfo(Name + ": Исключение логирования NM: " + e.Message); }
     }
@@ -816,7 +848,8 @@ public partial class Tool
     private void ProcessOrders(IScript MyScript, (int, int) OrderVolumes, bool NormalPrice)
     {
         Security Symbol = MySecurity;
-        double PrevClose = BasicSecurity?.Bars.DateTime[^1] > MySecurity.Bars.DateTime[^1] ? Symbol.Bars.Close[^1] : Symbol.Bars.Close[^2];
+        double PrevClose =
+            BasicSecurity?.Bars.DateTime[^1] > MySecurity.Bars.DateTime[^1] ? Symbol.Bars.Close[^1] : Symbol.Bars.Close[^2];
         int VolumeOrder = MyScript.CurrentPosition == PositionType.Long ? OrderVolumes.Item2 : OrderVolumes.Item1;
 
         bool[] IsGrow = MyScript.Result.IsGrow;
@@ -831,12 +864,14 @@ public partial class Tool
                 if (ActiveOrder.Quantity - ActiveOrder.Balance > 0.00001 || ActiveOrder.Note == "PartEx")
                 {
                     if (Math.Abs(ActiveOrder.Price - PrevClose) > 0.00001)
-                        ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit, PrevClose, ActiveOrder.Balance, ActiveOrder.Signal, MyScript, "PartEx");
+                        ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit,
+                            PrevClose, ActiveOrder.Balance, ActiveOrder.Signal, MyScript, "PartEx");
                 }
                 else if ((ActiveOrder.BuySell == "B") != IsGrow[^1] ||
                     (MyScript.CurrentPosition == PositionType.Short) != IsGrow[^1] || VolumeOrder == 0) CancelOrder(ActiveOrder);
                 else if (Math.Abs(ActiveOrder.Price - PrevClose) > 0.00001 || Math.Abs(ActiveOrder.Balance - VolumeOrder) > 1)
-                    ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit, PrevClose, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
+                    ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit,
+                        PrevClose, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
             }
             else if (DateTime.Now >= ActiveOrder.Time.AddMinutes(5))
             {
@@ -854,9 +889,11 @@ public partial class Tool
             BasicSecurity != null && BasicSecurity.Bars.DateTime[^1].Date != BasicSecurity.Bars.DateTime[^2].Date) return;
 
         // Проверка условий для выставления новой заявки
-        if (MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] || MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1])
+        if (MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] ||
+            MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1])
         {
-            SendOrder(Symbol, OrderType.Limit, IsGrow[^1], PrevClose, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
+            SendOrder(Symbol, OrderType.Limit,
+                IsGrow[^1], PrevClose, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
             WriteLogScript(MyScript);
         }
     }
@@ -880,14 +917,16 @@ public partial class Tool
                 {
                     int Quantity = ActiveOrder.Quantity - ActiveOrder.Balance; // Нужно сделать уверенную замену через ReplaceOrder
                     if (CancelOrder(ActiveOrder))
-                        SendOrder(Symbol, OrderType.Market, ActiveOrder.BuySell == "S", PriceOrder, Quantity, "CancelPartEx", MyScript, "NM");
+                        SendOrder(Symbol, OrderType.Market,
+                            ActiveOrder.BuySell == "S", PriceOrder, Quantity, "CancelPartEx", MyScript, "NM");
                 }
             }
             else if (VolumeOrder == 0) CancelOrder(ActiveOrder);
             else if (Math.Abs(ActiveOrder.Price - PriceOrder) > 0.00001 || Math.Abs(ActiveOrder.Balance - VolumeOrder) > 1)
             {
                 if (PriceOrder - Symbol.MinPrice > -0.00001 && PriceOrder - Symbol.MaxPrice < 0.00001)
-                    ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit, PriceOrder, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
+                    ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit,
+                        PriceOrder, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
                 else CancelOrder(ActiveOrder);
             }
             return;
@@ -899,10 +938,12 @@ public partial class Tool
             BasicSecurity != null && BasicSecurity.Bars.DateTime[^1].Date != BasicSecurity.Bars.DateTime[^2].Date) return;
 
         // Проверка условий для выставления новой заявки
-        if ((MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] || MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1]) &&
+        if ((MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] ||
+            MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1]) &&
             PriceOrder - Symbol.MinPrice > -0.00001 && PriceOrder - Symbol.MaxPrice < 0.00001)
         {
-            SendOrder(Symbol, OrderType.Limit, IsGrow[^1], PriceOrder, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
+            SendOrder(Symbol, OrderType.Limit,
+                IsGrow[^1], PriceOrder, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
             WriteLogScript(MyScript);
         }
     }
@@ -934,8 +975,10 @@ public partial class Tool
                     if (DateTime.Now > ActiveOrder.Time.AddSeconds(WaitingLimit) && NowBidding)
                     {
                         if (NormalPrice)
-                            ReplaceOrder(ActiveOrder, Symbol, OrderType.Market, PrevClose, ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript);
-                        else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                            ReplaceOrder(ActiveOrder, Symbol, OrderType.Market,
+                                PrevClose, ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript);
+                        else AddInfo(MyScript.Name +
+                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
                     }
                 }
                 else if (VolumeOrder == 0 || DateTime.Now < DateTime.Today.AddHours(7.5) && ActiveOrder.Note == null ||
@@ -953,14 +996,16 @@ public partial class Tool
                     {
                         if (NormalPrice) ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit, PrevClose,
                             ActiveOrder.Balance, ActiveOrder.Signal + "AtClose", MyScript, "CloseNB");
-                        else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                        else AddInfo(MyScript.Name +
+                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
                     }
                 }
                 else if (DateTime.Now >= ActiveOrder.Time.AddSeconds(WaitingLimit))
                 {
                     if (NormalPrice) ReplaceOrder(ActiveOrder, Symbol, OrderType.Market, PrevClose,
                         ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
-                    else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                    else AddInfo(MyScript.Name +
+                        ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
                 }
             }
             return;
@@ -970,16 +1015,15 @@ public partial class Tool
         if (!NowBidding || VolumeOrder == 0) return;
         if (LastExecuted != null && LastExecuted.DateTime.Date == DateTime.Today && LastExecuted.DateTime >= MyScript.Result.iLastDT)
         {
-            if (LastExecuted.Note == null || LastExecuted.Note == "NB" && LastExecuted.DateTime < DateTime.Today.AddHours(7.5)) return;
-            if (LastExecuted.Note != null)
+            if (LastExecuted.Note == null ||
+                LastExecuted.Note == "NB" && LastExecuted.DateTime < DateTime.Today.AddHours(7.5)) return;
+
+            for (int bar = MyScript.Result.Indicators[0].Length - 1; bar > 1; bar--)
             {
-                for (int bar = MyScript.Result.Indicators[0].Length - 1; bar > 1; bar--)
+                if (LastExecuted.BuySell == "B" && !IsGrow[bar - 1] || LastExecuted.BuySell == "S" && IsGrow[bar - 1])
                 {
-                    if (LastExecuted.BuySell == "B" && !IsGrow[bar - 1] || LastExecuted.BuySell == "S" && IsGrow[bar - 1])
-                    {
-                        if (Math.Abs(MyScript.Result.Indicators[0][bar - 1] - MyScript.Result.Indicators[0][^2]) < 0.00001) return;
-                        else break;
-                    }
+                    if (Math.Abs(MyScript.Result.Indicators[0][bar - 1] - MyScript.Result.Indicators[0][^2]) < 0.00001) return;
+                    else break;
                 }
             }
         }
@@ -990,14 +1034,16 @@ public partial class Tool
             if (CurPosition == PositionType.Short && IsGrow[^1] || CurPosition == PositionType.Long && !IsGrow[^1])
             {
                 double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
-                SendOrder(Symbol, OrderType.Limit, IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
+                SendOrder(Symbol, OrderType.Limit,
+                    IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
                 WriteLogScript(MyScript);
             }
         }
         else if (CurPosition == PositionType.Short && !IsGrow[^1] || CurPosition == PositionType.Long && IsGrow[^1])
         {
             double Price = IsGrow[^1] ? PrevStopLine - Symbol.MinStep : PrevStopLine + Symbol.MinStep;
-            SendOrder(Symbol, OrderType.Conditional, !IsGrow[^1], Price, VolumeOrder, !IsGrow[^1] ? "BuyAtStop" : "SellAtStop", MyScript);
+            SendOrder(Symbol, OrderType.Conditional,
+                !IsGrow[^1], Price, VolumeOrder, !IsGrow[^1] ? "BuyAtStop" : "SellAtStop", MyScript);
             WriteLogScript(MyScript);
         }
         else
@@ -1006,7 +1052,8 @@ public partial class Tool
             if (Symbol.LastTrade.DateTime < DateTime.Today.AddHours(10.5) && DateTime.Now < DateTime.Today.AddHours(10.5))
             {
                 double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
-                SendOrder(Symbol, OrderType.Limit, IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
+                SendOrder(Symbol, OrderType.Limit,
+                    IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
             }
             else
             {
@@ -1022,7 +1069,8 @@ public partial class Tool
         string SelectedScript = null;
         Window.Dispatcher.Invoke(() =>
         {
-            Grid MyGrid = (((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
+            Grid MyGrid =
+            (((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
             SelectedScript = MyGrid.Children.OfType<ComboBox>().Last().Text;
 
             MyScript.BlockInfo.Text = "IsGrow[i] " + MyScript.Result.IsGrow[^1] +
@@ -1033,17 +1081,21 @@ public partial class Tool
             if (MyAnn.ToolTip == MyScript.Name || MyAnn.ToolTip is "System" or null) MainModel.Annotations.Remove(MyAnn);
 
         if (MyScript.Result.Type != ScriptType.OSC)
-            foreach (OxyPlot.Series.Series MySeries in MainModel.Series.ToArray()) if (MySeries.Title == MyScript.Name) MainModel.Series.Remove(MySeries);
+            foreach (OxyPlot.Series.Series MySeries in MainModel.Series.ToArray())
+                if (MySeries.Title == MyScript.Name) MainModel.Series.Remove(MySeries);
 
         if (SelectedScript == MyScript.Name || SelectedScript == "AllScripts")
         {
             if (MyScript.Result.Type == ScriptType.OSC) UpdateMiniModel(MyScript);
-            else foreach (double[] Indicator in MyScript.Result.Indicators) MainModel.Series.Add(MakeLineSeries(Indicator, MyScript.Name));
+            else foreach (double[] Indicator in MyScript.Result.Indicators)
+                    MainModel.Series.Add(MakeLineSeries(Indicator, MyScript.Name));
 
             if (!ShowBasicSecurity)
             {
-                Trade[] MyTrades = MyScript.MyTrades.ToArray().Concat(SystemTrades.ToArray().Where(x => x.Seccode == MySecurity.Seccode)).ToArray();
-                Order[] MyOrders = Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && x.Status is "active" or "watching").ToArray();
+                Trade[] MyTrades = MyScript.MyTrades.ToArray()
+                    .Concat(SystemTrades.ToArray().Where(x => x.Seccode == MySecurity.Seccode)).ToArray();
+                Order[] MyOrders =
+                    Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && x.Status is "active" or "watching").ToArray();
                 if (MyTrades.Length > 0 || MyOrders.Length > 0) AddAnnotations(MyTrades, MyOrders);
             }
         }
@@ -1069,7 +1121,8 @@ public partial class Tool
                 y = InitialLength - MyScript.Result.IsGrow.Length;
                 MySecurity.Bars.TrimBars(y);
             }
-            else AddInfo(Name + ": Количество торговых баров больше базисных: " + InitialLength + "/" + MyScript.Result.IsGrow.Length, SendEmail: true);
+            else AddInfo(Name + ": Количество торговых баров больше базисных: " +
+                InitialLength + "/" + MyScript.Result.IsGrow.Length, SendEmail: true);
             return false;
         }
         return true;
@@ -1078,14 +1131,14 @@ public partial class Tool
     {
         try
         {
-            string Data = DateTime.Now.ToString(IC) + ": /////////////////// Script: " + MyScript.Name + "\nType " + MyScript.Result.Type.ToString() +
-                "\nCurPosition " + MyScript.CurrentPosition.ToString() + "\nIsGrow[^1] " + MyScript.Result.IsGrow[^1].ToString() +
-                "\nIsGrow[^2] " + MyScript.Result.IsGrow[^2].ToString() + "\nOnlyLimit " + MyScript.Result.OnlyLimit.ToString() +
-                "\nCentre " + MyScript.Result.Centre.ToString(IC) + "\nLevel " + MyScript.Result.Level.ToString(IC);
+            string Data = DateTime.Now + ": /////////////////// Script: " + MyScript.Name + "\nType " + MyScript.Result.Type +
+                "\nCurPosition " + MyScript.CurrentPosition + "\nIsGrow[^1] " + MyScript.Result.IsGrow[^1] +
+                "\nIsGrow[^2] " + MyScript.Result.IsGrow[^2] + "\nOnlyLimit " + MyScript.Result.OnlyLimit +
+                "\nCentre " + MyScript.Result.Centre + "\nLevel " + MyScript.Result.Level;
 
             for (int i = 0; i < MyScript.Result.Indicators.Length; i++)
                 if (MyScript.Result.Indicators[i] != null)
-                    Data += "\nIndicator" + (i + 1).ToString(IC) + "[^2] " + MyScript.Result.Indicators[i][^2].ToString(IC);
+                    Data += "\nIndicator" + (i + 1) + "[^2] " + MyScript.Result.Indicators[i][^2];
 
             System.IO.File.AppendAllText("Logs/LogsTools/" + Name + ".txt", Data + "\n");
         }
@@ -1098,7 +1151,9 @@ internal static class Extensions
     public static bool UpdateOrdersAndPosition(this IScript MyScript)
     {
         MyScript.LastExecuted = MyScript.MyOrders.ToArray().LastOrDefault(x => x.Status == "matched" && x.Note != "NM");
-        Order[] ActiveOrders = Orders.ToArray().Where(x => x.Sender == MyScript.Name && (x.Status is "active" or "watching")).ToArray();
+        Order[] ActiveOrders =
+            Orders.ToArray().Where(x => x.Sender == MyScript.Name && (x.Status is "active" or "watching")).ToArray();
+
         if (ActiveOrders.Length <= 1) MyScript.ActiveOrder = ActiveOrders.SingleOrDefault();
         else
         {

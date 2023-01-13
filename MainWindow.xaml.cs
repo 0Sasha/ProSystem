@@ -853,7 +853,7 @@ public partial class MainWindow : Window
         string Filter = (string)ComboBoxDistrib.SelectedItem;
         for (int i = Tools.Count - 1; i >= 0; i--)
         {
-            if (Tools[i].BaseBalance == 0) MaxReq = Tools[i].ShareOfFunds;
+            if (!Tools[i].UseShiftBalance) MaxReq = Tools[i].ShareOfFunds;
             else MaxReq = Tools[i].BaseBalance > 0 ?
                 Tools[i].ShareOfFunds + (Tools[i].BaseBalance * Tools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
                 Tools[i].ShareOfFunds + (-Tools[i].BaseBalance * Tools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100);

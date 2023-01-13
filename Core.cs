@@ -46,7 +46,7 @@ public partial class MainWindow : Window
     public static readonly string[] MyAlgorithms = new string[]
     {
         "RSI", "StochRSI", "MFI", "DeMarker", "Stochastic",
-        "CMO", "CMF", "RVI", "CCI", "FRC", "OBV", "AD", "SumLine",
+        "CMO", "CMF", "RVI", "CCI", "DPO", "FRC", "OBV", "AD", "SumLine",
         "CHO", "ROC", "MACD", "MA", "Channel", "CrossEMA",
         "ATRS", "PARS"
     };
@@ -546,13 +546,18 @@ public partial class MainWindow : Window
             Tool[] MyTools = Tools.ToArray();
             foreach (Position MyPosition in Positions.ToArray())
             {
-                if ((int)MyPosition.Saldo != 0 && MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
+                if ((int)MyPosition.Saldo != 0 &&
+                    MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
                     AddInfo("CheckPortfolio: обнаружен независимый актив: " + MyPosition.Seccode, SendEmail: true);
             }
 
             double MaxMinReqs = Portfolio.Saldo / 100 * MySettings.MaxShareMinReqsPortfolio;
             double MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
-            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
+            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs)
+            {
+                CheckMaxReqsTools();
+                return;
+            }
 
             // Запрос информации
             RequestInfo();
@@ -564,7 +569,8 @@ public partial class MainWindow : Window
             if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
 
             // Балансировка портфеля
-            AddInfo("CheckPortfolio: Требования портфеля превысили нормы: " + MySettings.MaxShareMinReqsPortfolio.ToString(IC) + "%/" +
+            AddInfo("CheckPortfolio: Требования портфеля превысили нормы: " +
+                MySettings.MaxShareMinReqsPortfolio.ToString(IC) + "%/" +
                 MySettings.MaxShareInitReqsPortfolio.ToString(IC) + "% MinReqs/InitReqs: " +
                 Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2).ToString(IC) + "%/" +
                 Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2).ToString(IC) + "%", SendEmail: true);
@@ -719,6 +725,26 @@ public partial class MainWindow : Window
                 AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
             }
         }
+    }
+    private static void CheckMaxReqsTools()
+    {
+        double maxReqs = 0;
+        foreach (var tool in Tools.ToArray())
+        {
+            if (tool.Active)
+            {
+                if (tool.TradeShare) maxReqs += Portfolio.Saldo / 100 * tool.ShareOfFunds;
+                else maxReqs += tool.NumberOfLots * Math.Max(tool.MySecurity.InitReqLong, tool.MySecurity.InitReqShort);
+                
+                if (tool.UseShiftBalance)
+                    maxReqs += Math.Abs(tool.BaseBalance) * Math.Max(tool.MySecurity.InitReqLong, tool.MySecurity.InitReqShort);
+            }
+        }
+
+        if (maxReqs > Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio)
+            AddInfo("CheckMaxReqsTools: Потенциальные требования портфеля превышают норму: " +
+                MySettings.MaxShareInitReqsPortfolio.ToString(IC) + "%. PotentialInitReqs: " +
+                Math.Abs(maxReqs / (Portfolio.Saldo / 100), 2) + "%", SendEmail: true);
     }
     private static void RequestInfo()
     {
