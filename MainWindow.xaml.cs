@@ -832,7 +832,7 @@ public partial class MainWindow : Window
 
         var Assets = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
         var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 3, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
-        var MaxVol = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+        var MaxVol = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black };
         var Axis = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
@@ -851,23 +851,24 @@ public partial class MainWindow : Window
         double FactReq, MaxReq;
         double SumMaxVol = 0;
         string Filter = (string)ComboBoxDistrib.SelectedItem;
-        for (int i = Tools.Count - 1; i >= 0; i--)
+        Tool[] MyTools = Tools.Where(x => x.Active).ToArray();
+        for (int i = MyTools.Length - 1; i >= 0; i--)
         {
-            if (!Tools[i].UseShiftBalance) MaxReq = Tools[i].ShareOfFunds;
-            else MaxReq = Tools[i].BaseBalance > 0 ?
-                Tools[i].ShareOfFunds + (Tools[i].BaseBalance * Tools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
-                Tools[i].ShareOfFunds + (-Tools[i].BaseBalance * Tools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100);
+            if (!MyTools[i].UseShiftBalance) MaxReq = MyTools[i].ShareOfFunds;
+            else MaxReq = MyTools[i].BaseBalance > 0 ?
+                MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
+                MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100);
 
             SumMaxVol += MaxReq;
             if (Filter == "All tools" ||
-                Filter == "First part" && i < Tools.Count / 2 || Filter == "Second part" && i >= Tools.Count / 2)
+                Filter == "First part" && i < MyTools.Length / 2 || Filter == "Second part" && i >= MyTools.Length / 2)
             {
-                Position Pos = Positions.SingleOrDefault(x => x.Seccode == Tools[i].MySecurity.Seccode);
+                Position Pos = Positions.SingleOrDefault(x => x.Seccode == MyTools[i].MySecurity.Seccode);
                 if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
                 {
-                    int shift = (bool)ExcludeBaseCheckBox.IsChecked ? Tools[i].BaseBalance : 0;
-                    FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * Tools[i].MySecurity.InitReqLong :
-                        (-Pos.Saldo - shift) * Tools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100);
+                    int shift = (bool)ExcludeBaseCheckBox.IsChecked ? MyTools[i].BaseBalance : 0;
+                    FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqLong :
+                        (-Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100);
                     FactVol.Items.Add(new OxyPlot.Series.BarItem
                     {
                         Value = FactReq,
@@ -877,9 +878,9 @@ public partial class MainWindow : Window
                 else if (!(bool)OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
                 else continue;
                 
-                Assets.Labels.Add(Tools[i].Name);
+                Assets.Labels.Add(MyTools[i].Name);
                 MaxVol.Items.Add(new OxyPlot.Series.BarItem{
-                    Value = (bool)ExcludeBaseCheckBox.IsChecked ? Tools[i].ShareOfFunds : MaxReq });
+                    Value = (bool)ExcludeBaseCheckBox.IsChecked ? MyTools[i].ShareOfFunds : MaxReq });
             }
         }
 

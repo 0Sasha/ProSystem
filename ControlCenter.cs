@@ -78,7 +78,12 @@ public partial class Tool
     public bool StopTrading
     {
         get => StopTr;
-        set { StopTr = value; NotifyChanged(); }
+        set
+        {
+            StopTr = value;
+            if (Active) BrushState = StopTr ? System.Windows.Media.Brushes.Yellow : System.Windows.Media.Brushes.Green;
+            NotifyChanged();
+        }
     }
     public bool TradeShare
     {

@@ -158,7 +158,8 @@ public partial class NewTool : Window
             {
                 Close();
                 BasicSecurity = BasicSecurity != null ? AllSecurities.Single(x => x == BasicSecurity) : null;
-                MainWindow.Window.SaveTool(new Tool(ToolName.Text, AllSecurities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray()));
+                MainWindow.Window.SaveTool(new Tool(ToolName.Text,
+                    AllSecurities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray()));
             }
         }
         else
@@ -168,7 +169,12 @@ public partial class NewTool : Window
                 Tools.SingleOrDefault(x => x.MySecurity.Seccode == TradedSecurity.Seccode) != null &&
                 SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode) return;
 
-            SelectedTool.Name = ToolName.Text;
+            if (SelectedTool.Name != ToolName.Text)
+            {
+                MySettings.ToolsByPriority.Remove(SelectedTool.Name);
+                SelectedTool.Name = ToolName.Text;
+                MySettings.ToolsByPriority.Add(SelectedTool.Name);
+            }
             if (SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode)
             {
                 SelectedTool.MySecurity = AllSecurities.Single(x => x == TradedSecurity);

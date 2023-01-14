@@ -142,8 +142,8 @@ public partial class Tool : INotifyPropertyChanged
             }
 
             BrushState = System.Windows.Media.Brushes.Red;
-            ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).
-                Children.OfType<Grid>().Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
+            ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
+                .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
         else
         {
@@ -169,10 +169,10 @@ public partial class Tool : INotifyPropertyChanged
                     return true;
                 })) return;
             }
-            BrushState = System.Windows.Media.Brushes.Green;
+            BrushState = StopTrading ? System.Windows.Media.Brushes.Yellow : System.Windows.Media.Brushes.Green;
             Active = true;
-            ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).
-                Children.OfType<Grid>().Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
+            ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
+                .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
         }
         NotifyChanged();
     }
