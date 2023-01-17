@@ -208,6 +208,11 @@ public partial class MainWindow : Window
             TolerancePositionTxt.SetBinding(TextBox.TextProperty,
                 new Binding() { Source = MySettings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
 
+            OptShareBaseBalTxt.SetBinding(TextBox.TextProperty,
+                new Binding() { Source = MySettings, Path = new PropertyPath("OptShareBaseBalances"), Mode = BindingMode.TwoWay });
+            ToleranceBaseBalTxt.SetBinding(TextBox.TextProperty,
+                new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceBaseBalances"), Mode = BindingMode.TwoWay });
+
             MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty,
                 new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPosition"), Mode = BindingMode.TwoWay });
             MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty,
@@ -555,7 +560,7 @@ public partial class MainWindow : Window
             double MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
             if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs)
             {
-                CheckMaxReqsTools();
+                CheckReqsTools();
                 return;
             }
 
@@ -726,9 +731,10 @@ public partial class MainWindow : Window
             }
         }
     }
-    private static void CheckMaxReqsTools()
+    private static void CheckReqsTools()
     {
         double maxReqs = 0;
+        double maxReqsBaseBalance = 0;
         foreach (var tool in Tools.ToArray())
         {
             if (tool.Active)
@@ -737,12 +743,23 @@ public partial class MainWindow : Window
                 else maxReqs += tool.NumberOfLots * Math.Max(tool.MySecurity.InitReqLong, tool.MySecurity.InitReqShort);
                 
                 if (tool.UseShiftBalance)
+                {
+                    maxReqsBaseBalance += tool.BaseBalance *
+                        (tool.MySecurity.LastTrade.Price / tool.MySecurity.MinStep * tool.MySecurity.MinStepCost);
                     maxReqs += Math.Abs(tool.BaseBalance) * Math.Max(tool.MySecurity.InitReqLong, tool.MySecurity.InitReqShort);
+                }
             }
         }
 
+        double curShare = Math.Round(maxReqsBaseBalance / Portfolio.Saldo * 100, 2);
+        Window.Dispatcher.Invoke(() => Window.CurShareBaseBalTxt.Text = curShare.ToString());
+
+        if (curShare > MySettings.OptShareBaseBalances + MySettings.ToleranceBaseBalances ||
+            curShare < MySettings.OptShareBaseBalances - MySettings.ToleranceBaseBalances)
+            AddInfo("CheckReqsTools: Доля базовых активов за пределами допустимого отклонения: " + curShare + "%", SendEmail: true);
+
         if (maxReqs > Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio)
-            AddInfo("CheckMaxReqsTools: Потенциальные требования портфеля превышают норму: " +
+            AddInfo("CheckReqsTools: Потенциальные требования портфеля превышают норму: " +
                 MySettings.MaxShareInitReqsPortfolio.ToString(IC) + "%. PotentialInitReqs: " +
                 Math.Round(maxReqs / (Portfolio.Saldo / 100), 2) + "%", SendEmail: true);
     }

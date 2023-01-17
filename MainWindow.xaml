@@ -8,7 +8,7 @@
         mc:Ignorable="d"
         Closing="ClosingMainWindow"
         Title="ProSystem" Height="900" Width="1350"
-        MinHeight="500" MinWidth="1000" FontSize="13">
+        MinHeight="500" MinWidth="725" FontSize="13">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="5.5*"/>
@@ -56,21 +56,28 @@
                     <Grid HorizontalAlignment="Left" Margin="430,10,0,0" Width="410" Height="380" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
                         <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Average equity for 3 days" VerticalAlignment="Top"/>
-                        <TextBox Name="AverageEquityTxt" HorizontalAlignment="Left" Margin="180,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="90"/>
+                        <TextBox Name="AverageEquityTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="180,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="90"/>
                         <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Equity tolerance from the average %" VerticalAlignment="Top"/>
                         <TextBox Name="ToleranceEquityTxt" HorizontalAlignment="Left" Margin="240,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
                         <TextBlock HorizontalAlignment="Left" Margin="0,76,0,0" Text="Position tolerance multiplier" VerticalAlignment="Top"/>
                         <TextBox Name="TolerancePositionTxt" HorizontalAlignment="Left" Margin="240,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,126,0,0" Text="Maximum share InitReqs position %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsPositionTxt" HorizontalAlignment="Left" Margin="240,125,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,151,0,0" Text="Maximum share InitReqs tool %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsToolTxt" HorizontalAlignment="Left" Margin="240,150,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        
-                        <TextBlock HorizontalAlignment="Left" Margin="0,201,0,0" Text="Maximum share MinReqs portfolio %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareMinReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,200,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,226,0,0" Text="Maximum share InitReqs portfolio %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,225,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,126,0,0" Text="Current share of base balances %" VerticalAlignment="Top"/>
+                        <TextBox Name="CurShareBaseBalTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="220,125,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="50"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,151,0,0" Text="Optimal share of base balances %" VerticalAlignment="Top"/>
+                        <TextBox Name="OptShareBaseBalTxt" HorizontalAlignment="Left" Margin="240,150,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,176,0,0" Text="Tolerance from the optimal %" VerticalAlignment="Top"/>
+                        <TextBox Name="ToleranceBaseBalTxt" HorizontalAlignment="Left" Margin="240,175,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+
+                        <TextBlock HorizontalAlignment="Left" Margin="0,226,0,0" Text="Maximum share of InitReqs position %" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsPositionTxt" HorizontalAlignment="Left" Margin="240,225,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,251,0,0" Text="Maximum share of InitReqs tool %" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsToolTxt" HorizontalAlignment="Left" Margin="240,250,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+
+                        <TextBlock HorizontalAlignment="Left" Margin="0,276,0,0" Text="Maximum share of MinReqs portfolio %" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareMinReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,275,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,301,0,0" Text="Maximum share of InitReqs portfolio %" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,300,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="280,1,0,0" Text="Tools by priority" VerticalAlignment="Top" FontWeight="Bold"/>
                         <ListView Name="ToolsByPriorityView" Margin="280,25,0,0" Height="300" VerticalAlignment="Top">

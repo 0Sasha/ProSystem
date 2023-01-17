@@ -426,6 +426,8 @@ public enum OrderType
 
     private int TolEq = 40;
     private int TolPos = 3;
+    private int OptShBasBal = 90;
+    private int TolBasBal = 5;
 
     private int MaxShInRePos = 10;
     private int MaxShInReTool = 25;
@@ -573,6 +575,27 @@ public enum OrderType
             NotifyChanged();
         }
     } // Допустимое отклонение объёма текущей позиции в X от рассчитанного объёма
+
+    public int OptShareBaseBalances
+    {
+        get => OptShBasBal;
+        set
+        {
+            if (value is < 1 or > 150) AddInfo("OptShareBaseBalances должна быть от 1% до 150%.");
+            else OptShBasBal = value;
+            NotifyChanged();
+        }
+    } // Оптимальная доля базовых активов (балансов) в портфеле
+    public int ToleranceBaseBalances
+    {
+        get => TolBasBal;
+        set
+        {
+            if (value is < 1 or > 150) AddInfo("ToleranceBaseBalances должно быть от 1% до 150%.");
+            else TolBasBal = value;
+            NotifyChanged();
+        }
+    } // Допустимое отклонение доли базовых активов (балансов) от оптимального значения
 
     public int MaxShareInitReqsPosition
     {
