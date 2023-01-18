@@ -872,7 +872,7 @@ internal static class TXmlConnector
     #region Methods for sending commands
     public static void Connect()
     {
-        if (!Window.ConnectorInitialized)
+        if (!ConnectorInitialized)
         {
             AddInfo("Коннектор не инициализирован.");
             return;

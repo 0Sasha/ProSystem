@@ -434,7 +434,7 @@ public enum OrderType
     private int MaxShMinRePort = 60;
     private int MaxShInRePort = 85;
 
-    public List<string> ToolsByPriority { get; set; } // Приоритетность инструментов
+    public List<string> ToolsByPriority { get; set; } = new(); // Приоритетность инструментов
     public int ModelUpdateInterval
     {
         get => UpdInt;
@@ -674,6 +674,60 @@ public enum OrderType
     [field: NonSerialized] public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
     private void NotifyChanged() => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(null));
     public Settings() { }
+    public void CheckSettings()
+    {
+        if (ModelUpdateInterval < 1) ModelUpdateInterval = 5;
+        if (RecalcInterval < 1) RecalcInterval = 30;
+        if (RequestTM < 10)
+        {
+            RequestTM = 15;
+            AddInfo("RequestTM по умолчанию.");
+        }
+        if (SessionTM < 30)
+        {
+            SessionTM = 180;
+            AddInfo("SessionTM по умолчанию.");
+        }
+
+        Equity ??= new();
+        if (ToleranceEquity < 10)
+        {
+            ToleranceEquity = 40;
+            AddInfo("ToleranceEquity по умолчанию.");
+        }
+        if (TolerancePosition < 1)
+        {
+            TolerancePosition = 3;
+            AddInfo("TolerancePosition по умолчанию.");
+        }
+
+        if (MaxShareInitReqsPosition < 1)
+        {
+            MaxShareInitReqsPosition = 15;
+            AddInfo("MaxShareInitReqsPosition по умолчанию.");
+        }
+        if (MaxShareInitReqsTool < 1)
+        {
+            MaxShareInitReqsTool = 25;
+            AddInfo("MaxShareInitReqsTool по умолчанию.");
+        }
+        if (MaxShareMinReqsPortfolio < 10)
+        {
+            MaxShareMinReqsPortfolio = 60;
+            AddInfo("MaxShareMinReqsPortfolio по умолчанию.");
+        }
+        if (MaxShareInitReqsPortfolio < 10)
+        {
+            MaxShareInitReqsPortfolio = 85;
+            AddInfo("MaxShareInitReqsPortfolio по умолчанию.");
+        }
+
+        if (ToolsByPriority.Count != Tools.Count)
+        {
+            foreach (Tool MyTool in Tools) ToolsByPriority.Add(MyTool.Name);
+            AddInfo("Восстановлена ToolsByPriority по умолчанию.");
+        }
+    }
 }
 
 public class Position

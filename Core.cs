@@ -56,8 +56,8 @@ public partial class MainWindow : Window
 
     #region Properties
     public static MainWindow Window { get; private set; }
-    public static Settings MySettings { get; set; }
-    public bool ConnectorInitialized { get; set; }
+    public static Settings MySettings { get; set; } = new();
+    public static bool ConnectorInitialized { get; set; }
     public static ConnectionState Connection
     {
         get => ConnectionSt;
@@ -107,11 +107,11 @@ public partial class MainWindow : Window
     }
     public static bool SystemReadyToTrading { get; set; }
     public static bool ServerAvailable { get; set; }
-    public static DateTime TriggerReconnection { get; set; } = DateTime.Now.AddMinutes(2);
+    public static DateTime TriggerReconnection { get; set; } = DateTime.Now.AddMinutes(3);
     public static DateTime TriggerNotification { get; set; }
 
-    public static ObservableCollection<Tool> Tools { get; set; }
-    public static ObservableCollection<Trade> Trades { get; set; }
+    public static ObservableCollection<Tool> Tools { get; set; } = new();
+    public static ObservableCollection<Trade> Trades { get; set; } = new();
 
     public static double USDRUB { get; set; }
     public static double EURRUB { get; set; }
@@ -129,22 +129,13 @@ public partial class MainWindow : Window
         CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(WriteLogUnhandledException);
         TaskScheduler.UnobservedTaskException += new EventHandler<UnobservedTaskExceptionEventArgs>(WriteLogTaskException);
 
-        // Восстановление и привязка данных
-        DeserializeAndBindData();
+        // Восстановление и проверка настроек
+        DeserializeData();
+        MySettings.CheckSettings();
 
-        // Привязка контролов
-        OrdersView.ItemsSource = Orders;
-        TradesView.ItemsSource = Trades;
-        ToolsView.ItemsSource = Tools;
-        ComboBoxTool.ItemsSource = Tools;
-        ComboBoxDistrib.ItemsSource = new string[] { "All tools", "First part", "Second part" };
-        ComboBoxDistrib.SelectedIndex = 0;
-        BoxConnectors.ItemsSource = MyConnectors;
-        BoxConnectors.SelectedIndex = 0;
-        ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
-        ComboBox.ItemsSource = new string[] { "SendEmail", "Test" };
-
-        // Подписка на события
+        // Привязка данных и восстановление вкладок инструментов
+        BindData();
+        RestoreToolTabs();
         Orders.CollectionChanged += UpdateOrders;
         Trades.CollectionChanged += UpdateTrades;
         Tools.CollectionChanged += UpdateTools;
@@ -160,159 +151,21 @@ public partial class MainWindow : Window
         // Запуск единого потока проверки состояния системы
         ThreadCheckingConditions.Start();
     }
-    private void DeserializeAndBindData()
+    private void DeserializeData()
     {
-        if (!Directory.Exists("Data"))
-        {
-            MySettings = new Settings();
-            Tools = new();
-            Trades = new();
-            return;
-        }
+        if (!Directory.Exists("Data")) return;
 
         var Formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
         try
         {
             using Stream MyStream = new FileStream("Data/Settings.bin", FileMode.Open, FileAccess.Read, FileShare.Read);
             MySettings = (Settings)Formatter.Deserialize(MyStream);
-
-            IntervalUpdateTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ModelUpdateInterval"), Mode = BindingMode.TwoWay });
-            IntervalRecalcTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("RecalcInterval"), Mode = BindingMode.TwoWay });
-            ScheduleCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ScheduledConnection"), Mode = BindingMode.TwoWay });
-
-            DisplaySentOrdersCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("DisplaySentOrders"), Mode = BindingMode.TwoWay });
-            DisplayNewTradesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("DisplayNewTrades"), Mode = BindingMode.TwoWay });
-            DisplayMessagesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("DisplayMessages"), Mode = BindingMode.TwoWay });
-            DisplaySpecialInfoCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("DisplaySpecialInfo"), Mode = BindingMode.TwoWay });
-
-            TxtLog.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("LoginConnector"), Mode = BindingMode.TwoWay });
-            ConnectorLogLevelTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("LogLevelConnector"), Mode = BindingMode.TwoWay });
-            RequestTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("RequestTM"), Mode = BindingMode.TwoWay });
-            SessionTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
-
-            AverageEquityTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("AverageValueEquity"), Mode = BindingMode.OneWay });
-            ToleranceEquityTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceEquity"), Mode = BindingMode.TwoWay });
-            TolerancePositionTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
-
-            OptShareBaseBalTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("OptShareBaseBalances"), Mode = BindingMode.TwoWay });
-            ToleranceBaseBalTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceBaseBalances"), Mode = BindingMode.TwoWay });
-
-            MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPosition"), Mode = BindingMode.TwoWay });
-            MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsTool"), Mode = BindingMode.TwoWay });
-            MaxShareInitReqsPortfolioTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPortfolio"), Mode = BindingMode.TwoWay });
-            MaxShareMinReqsPortfolioTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareMinReqsPortfolio"), Mode = BindingMode.TwoWay });
-
-            ShelflifeTradesTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTrades"), Mode = BindingMode.TwoWay });
-            ShelflifeOrdersScriptsTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeOrdersScripts"), Mode = BindingMode.TwoWay });
-            ShelflifeTradesScriptsTxt.SetBinding(TextBox.TextProperty,
-                new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTradesScripts"), Mode = BindingMode.TwoWay });
-
-            if (MySettings.ModelUpdateInterval < 1) MySettings.ModelUpdateInterval = 5;
-            if (MySettings.RecalcInterval < 1) MySettings.RecalcInterval = 30;
-            if (MySettings.RequestTM < 10)
-            {
-                MySettings.RequestTM = 15;
-                AddInfo("RequestTM по умолчанию.");
-            }
-            if (MySettings.SessionTM < 30)
-            {
-                MySettings.SessionTM = 180;
-                AddInfo("SessionTM по умолчанию.");
-            }
-
-            if (MySettings.Equity == null) MySettings.Equity = new();
-            if (MySettings.ToleranceEquity < 10)
-            {
-                MySettings.ToleranceEquity = 40;
-                AddInfo("ToleranceEquity по умолчанию.");
-            }
-            if (MySettings.TolerancePosition < 1)
-            {
-                MySettings.TolerancePosition = 3;
-                AddInfo("TolerancePosition по умолчанию.");
-            }
-
-            if (MySettings.MaxShareInitReqsPosition < 1)
-            {
-                MySettings.MaxShareInitReqsPosition = 15;
-                AddInfo("MaxShareInitReqsPosition по умолчанию.");
-            }
-            if (MySettings.MaxShareInitReqsTool < 1)
-            {
-                MySettings.MaxShareInitReqsTool = 25;
-                AddInfo("MaxShareInitReqsTool по умолчанию.");
-            }
-            if (MySettings.MaxShareMinReqsPortfolio < 10)
-            {
-                MySettings.MaxShareMinReqsPortfolio = 60;
-                AddInfo("MaxShareMinReqsPortfolio по умолчанию.");
-            }
-            if (MySettings.MaxShareInitReqsPortfolio < 10)
-            {
-                MySettings.MaxShareInitReqsPortfolio = 85;
-                AddInfo("MaxShareInitReqsPortfolio по умолчанию.");
-            }
         }
-        catch (Exception e) { AddInfo("Исключение десериализации Settings." + e.Message); MySettings = new Settings(); } // Settings
+        catch (Exception e) { AddInfo("Исключение десериализации Settings." + e.Message); } // Settings
         try
         {
             using Stream MyStream = new FileStream("Data/Tools.bin", FileMode.Open, FileAccess.Read, FileShare.Read);
             Tools = new ObservableCollection<Tool>((IEnumerable<Tool>)Formatter.Deserialize(MyStream));
-            if (MySettings != null)
-            {
-                if (MySettings.ToolsByPriority == null || MySettings.ToolsByPriority.Count != Tools.Count)
-                {
-                    MySettings.ToolsByPriority = new();
-                    foreach (Tool MyTool in Tools) MySettings.ToolsByPriority.Add(MyTool.Name);
-                    AddInfo("Восстановлена ToolsByPriority по умолчанию.");
-                }
-                else
-                {
-                    for (int i = 0; i < Tools.Count; i++)
-                    {
-                        if (MySettings.ToolsByPriority[i] != Tools[i].Name)
-                        {
-                            Tool SourceTool = Tools[i];
-                            int x = Array.FindIndex(Tools.ToArray(), x => x.Name == MySettings.ToolsByPriority[i]);
-                            Tools[i] = Tools[x];
-                            Tools[x] = SourceTool;
-                        }
-                    }
-                }
-            }
-            for (int i = 0; i < Tools.Count; i++)
-            {
-                TabsTools.Items.Add(new TabItem()
-                {
-                    Header = Tools[i].Name,
-                    Width = 48,
-                    Height = 18,
-                    Content = GetGridTabTool(Tools[i])
-                });
-                Tools[i].Initialize(TabsTools.Items[i] as TabItem);
-            }
         }
         catch (Exception e) { AddInfo("Исключение десериализации Tools." + e.Message); } // Tools
         try
@@ -327,6 +180,94 @@ public partial class MainWindow : Window
             if (Info != "") TxtBox.Text = "Начало восстановленного фрагмента.\n" + Info + "\nКонец восстановленного фрагмента.";
         }
         catch (Exception e) { AddInfo("Исключение чтения Info." + e.Message); } // Info
+    }
+    private void BindData()
+    {
+        IntervalUpdateTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ModelUpdateInterval"), Mode = BindingMode.TwoWay });
+        IntervalRecalcTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("RecalcInterval"), Mode = BindingMode.TwoWay });
+        ScheduleCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ScheduledConnection"), Mode = BindingMode.TwoWay });
+
+        DisplaySentOrdersCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("DisplaySentOrders"), Mode = BindingMode.TwoWay });
+        DisplayNewTradesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("DisplayNewTrades"), Mode = BindingMode.TwoWay });
+        DisplayMessagesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("DisplayMessages"), Mode = BindingMode.TwoWay });
+        DisplaySpecialInfoCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("DisplaySpecialInfo"), Mode = BindingMode.TwoWay });
+
+        TxtLog.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("LoginConnector"), Mode = BindingMode.TwoWay });
+        ConnectorLogLevelTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("LogLevelConnector"), Mode = BindingMode.TwoWay });
+        RequestTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("RequestTM"), Mode = BindingMode.TwoWay });
+        SessionTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
+
+        AverageEquityTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("AverageValueEquity"), Mode = BindingMode.OneWay });
+        ToleranceEquityTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceEquity"), Mode = BindingMode.TwoWay });
+        TolerancePositionTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
+
+        OptShareBaseBalTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("OptShareBaseBalances"), Mode = BindingMode.TwoWay });
+        ToleranceBaseBalTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceBaseBalances"), Mode = BindingMode.TwoWay });
+
+        MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPosition"), Mode = BindingMode.TwoWay });
+        MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsTool"), Mode = BindingMode.TwoWay });
+        MaxShareInitReqsPortfolioTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPortfolio"), Mode = BindingMode.TwoWay });
+        MaxShareMinReqsPortfolioTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareMinReqsPortfolio"), Mode = BindingMode.TwoWay });
+
+        ShelflifeTradesTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTrades"), Mode = BindingMode.TwoWay });
+        ShelflifeOrdersScriptsTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeOrdersScripts"), Mode = BindingMode.TwoWay });
+        ShelflifeTradesScriptsTxt.SetBinding(TextBox.TextProperty,
+            new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTradesScripts"), Mode = BindingMode.TwoWay });
+
+
+        OrdersView.ItemsSource = Orders;
+        TradesView.ItemsSource = Trades;
+        ToolsView.ItemsSource = Tools;
+        ComboBoxTool.ItemsSource = Tools;
+        ComboBoxDistrib.ItemsSource = new string[] { "All tools", "First part", "Second part" };
+        ComboBoxDistrib.SelectedIndex = 0;
+        BoxConnectors.ItemsSource = MyConnectors;
+        BoxConnectors.SelectedIndex = 0;
+        ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
+        ComboBox.ItemsSource = new string[] { "SendEmail", "Test" };
+    }
+    private void RestoreToolTabs()
+    {
+        for (int i = 0; i < Tools.Count; i++)
+        {
+            if (MySettings.ToolsByPriority[i] != Tools[i].Name)
+            {
+                Tool SourceTool = Tools[i];
+                int x = Array.FindIndex(Tools.ToArray(), x => x.Name == MySettings.ToolsByPriority[i]);
+                Tools[i] = Tools[x];
+                Tools[x] = SourceTool;
+            }
+            TabsTools.Items.Add(new TabItem()
+            {
+                Header = Tools[i].Name,
+                Width = 48,
+                Height = 18,
+                Content = GetGridTabTool(Tools[i])
+            });
+            Tools[i].Initialize(TabsTools.Items[i] as TabItem);
+        }
     }
 
     private void PrepareToTrading()
@@ -520,7 +461,8 @@ public partial class MainWindow : Window
         }
         bool ClosePositionByMarket(Security Symbol, Position MyPosition)
         {
-            if (SendOrder(Symbol, OrderType.Market, (int)MyPosition.Saldo < 0, 100, (int)Math.Abs(MyPosition.Saldo), "ClosingPositionByMarket"))
+            if (SendOrder(Symbol, OrderType.Market,
+                (int)MyPosition.Saldo < 0, 100, (int)Math.Abs(MyPosition.Saldo), "ClosingPositionByMarket"))
             {
                 System.Threading.Thread.Sleep(500);
                 if ((int)MyPosition.Saldo != 0)
@@ -565,7 +507,7 @@ public partial class MainWindow : Window
             }
 
             // Запрос информации
-            RequestInfo();
+            GetPortfolio(Clients[0].Union);
             System.Threading.Thread.Sleep(5000);
 
             // Повторная проверка объёма требований
@@ -585,12 +527,14 @@ public partial class MainWindow : Window
             foreach (Position MyPosition in Positions.ToArray())
             {
                 if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-                if ((int)MyPosition.Saldo != 0 && MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
+                if ((int)MyPosition.Saldo != 0 &&
+                    MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
                 {
                     // Отмена соответствующих заявок
                     if (!CancelActiveOrders(MyPosition.Seccode))
                     {
-                        AddInfo("CheckPortfolio: Не удалось отменить заявки перед закрытием неизвестной позиции: " + MyPosition.Seccode);
+                        AddInfo("CheckPortfolio: Не удалось отменить заявки перед закрытием неизвестной позиции: " + 
+                            MyPosition.Seccode);
                         continue;
                     }
 
@@ -622,7 +566,8 @@ public partial class MainWindow : Window
 
                     bool Long = (int)MyPosition.Saldo > 0;
                     int Vol = (int)Math.Abs(MyPosition.Saldo);
-                    if (Long && Vol * MyTool.MySecurity.InitReqLong > MaxShare || !Long && Vol * MyTool.MySecurity.InitReqShort > MaxShare)
+                    if (Long && Vol * MyTool.MySecurity.InitReqLong > MaxShare ||
+                        !Long && Vol * MyTool.MySecurity.InitReqShort > MaxShare)
                     {
                         AddInfo("CheckPortfolio: Позиция превышает MaxShareInitReqsTool: " + MyPosition.Seccode);
 
@@ -664,19 +609,13 @@ public partial class MainWindow : Window
                 }
             }
 
-            // Запрос информации и проверка объёма требований
-            RequestInfo();
-            System.Threading.Thread.Sleep(5000);
-            MaxMinReqs = Portfolio.Saldo / 100 * MySettings.MaxShareMinReqsPortfolio;
-            MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
-            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-
             // Отключение наименее приоритетных активных инструментов
             for (int i = MySettings.ToolsByPriority.Count - 1; i > 0; i--)
             {
-                System.Threading.Thread.Sleep(2000);
                 GetPortfolio(Clients[0].Union);
-                System.Threading.Thread.Sleep(3000);
+                System.Threading.Thread.Sleep(5000);
+                MaxMinReqs = Portfolio.Saldo / 100 * MySettings.MaxShareMinReqsPortfolio;
+                MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
                 if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
                 if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
 

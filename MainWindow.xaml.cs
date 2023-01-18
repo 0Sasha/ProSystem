@@ -42,7 +42,7 @@ public partial class MainWindow : Window
         if (Connection != ConnectionState.Disconnected) await Task.Run(() => Disconnect());
 
         // Выход
-        if (!Window.ConnectorInitialized || ConnectorUnInitialize()) { Logger.StopLogging(); return; }
+        if (!ConnectorInitialized || ConnectorUnInitialize()) { Logger.StopLogging(); return; }
         else MessageBox.Show("UnInitialization failed.");
     }
     private void SendCommand(object sender, RoutedEventArgs e)
