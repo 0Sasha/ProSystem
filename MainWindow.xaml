@@ -15,8 +15,8 @@
             <RowDefinition Name="RowInfo" Height="1*"/>
             <RowDefinition Height="20"/>
         </Grid.RowDefinitions>
-        <TabControl Name="MainTabs">
-            <TabItem Header="Main" Width="80" Margin="45,0,-45,0">
+        <TabControl Name="MainTabs" BorderBrush="Gray">
+            <TabItem Header="Main" Margin="22,-2,-22,0" Width="85">
                 <Grid>
                     <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="200" Height="125" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector" VerticalAlignment="Top" FontWeight="Bold"/>
@@ -28,12 +28,13 @@
                         <Button Name="ConnectBtn" Content="Connect" HorizontalAlignment="Left" Margin="75,75,0,0" VerticalAlignment="Top" Click="ChangeСonnection" Width="125" Height="20"/>
                     </Grid>
                     <Grid HorizontalAlignment="Left" Margin="10,140,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Notification settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Email" VerticalAlignment="Top"/>
-                        <TextBox Name="TxtEmail" HorizontalAlignment="Left" Margin="75,25,0,0" VerticalAlignment="Top" Width="125" Height="20"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Password" VerticalAlignment="Top"/>
-                        <PasswordBox Name="TxtPasEmail" HorizontalAlignment="Left" Margin="75,50,0,0" VerticalAlignment="Top" Width="125" Height="20"/>
-                        <Button Name="NotifBtn" Content="Save login details" HorizontalAlignment="Left" Margin="75,75,0,0" VerticalAlignment="Top" Click="SaveLoginDetails" Width="125" Height="20"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector settings" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Logging level" VerticalAlignment="Top"/>
+                        <TextBox Name="ConnectorLogLevelTxt" HorizontalAlignment="Left" Margin="170,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Request timeout" VerticalAlignment="Top"/>
+                        <TextBox Name="RequestTxt" HorizontalAlignment="Left" Margin="170,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="1,76,0,0" Text="Session timeout" VerticalAlignment="Top"/>
+                        <TextBox Name="SessionTxt" HorizontalAlignment="Left" Margin="170,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
                     </Grid>
                     <Grid HorizontalAlignment="Left" Margin="220,10,0,0" Width="200" Height="125" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="General settings" VerticalAlignment="Top" FontWeight="Bold"/>
@@ -43,15 +44,6 @@
                         <TextBox Name="IntervalRecalcTxt" HorizontalAlignment="Left" Margin="170,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
                         <CheckBox Name="ScheduleCheck" Content="Scheduled connection" HorizontalAlignment="Left" Margin="0,77,0,0" VerticalAlignment="Top"/>
                         <CheckBox Name="BackupServerCheck" Content="Backup server address" HorizontalAlignment="Left" Margin="0,102,0,0" VerticalAlignment="Top"/>
-                    </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="220,140,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Logging level" VerticalAlignment="Top"/>
-                        <TextBox Name="ConnectorLogLevelTxt" HorizontalAlignment="Left" Margin="170,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Request timeout" VerticalAlignment="Top"/>
-                        <TextBox Name="RequestTxt" HorizontalAlignment="Left" Margin="170,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="1,76,0,0" Text="Session timeout" VerticalAlignment="Top"/>
-                        <TextBox Name="SessionTxt" HorizontalAlignment="Left" Margin="170,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
                     </Grid>
                     <Grid HorizontalAlignment="Left" Margin="430,10,0,0" Width="410" Height="380" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
@@ -80,7 +72,7 @@
                         <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,300,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="280,1,0,0" Text="Tools by priority" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <ListView Name="ToolsByPriorityView" Margin="280,25,0,0" Height="300" VerticalAlignment="Top">
+                        <ListView Name="ToolsByPriorityView" Margin="280,25,0,0" Height="350" VerticalAlignment="Top">
                             <ListView.View>
                                 <GridView>
                                     <GridViewColumn Width="100">Tool name</GridViewColumn>
@@ -111,12 +103,9 @@
                         <TextBlock HorizontalAlignment="Left" Margin="0,76,0,0" Text="Shelf life trades scripts" VerticalAlignment="Top"/>
                         <TextBox Name="ShelflifeTradesScriptsTxt" HorizontalAlignment="Left" Margin="170,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
                     </Grid>
-
-                    <ComboBox Name="ComboBox" HorizontalAlignment="Left" Margin="710,340,0,0" VerticalAlignment="Top" Width="130"/>
-                    <Button Name="SendBtn" Content="Send" HorizontalAlignment="Left" Margin="710,368,0,0" VerticalAlignment="Top" Width="130" Click="SendCommand"/>
                 </Grid>
             </TabItem>
-            <TabItem Header="Portfolio" Width="80" Margin="45,0,-45,0">
+            <TabItem Header="Portfolio" Margin="21,-2,-21,0" Width="85">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
@@ -196,14 +185,14 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Toolbar" Width="80" Margin="45,0,-45,0">
+            <TabItem Header="Toolbar" Margin="20,-2,-20,0" Width="85">
                 <Grid>
                     <ListView Name="ToolsView" FontWeight="Bold">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="60">Name</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ShortName}" Width="90">Security</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.LastTrade.Price}" Width="70">LastTrade</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.LastTrade.Price}" Width="70">Last trade</GridViewColumn>
                                 <GridViewColumn Width="50">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
@@ -211,27 +200,23 @@
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Scripts.Length}" Width="50">Scripts</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BaseTF}" Width="35">BTF</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Scripts.Length}" Width="45">Scripts</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Bars.Close.Length}" Width="50">Bars</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.SourceBars.TF}" Width="35">STF</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Seccode}" Width="60">Seccode</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Currency}" Width="60">Currency</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Board}" Width="50">Board</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Decimals}" Width="30">Decimals</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.MinStep}" Width="60">Step</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.MinStepCost}" Width="60">StepC</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Currency}" Width="40">Cur</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Board}" Width="45">Board</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.MinStep}" Width="50">Step</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.MinStepCost}" Width="40">Cost</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.LotSize}" Width="30">Lot</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.ShortName}" Width="90">BasicSecurity</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.ShortName}" Width="100">Basic security</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Seccode}" Width="90">Basic seccode</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Bars.Close.Length}" Width="70">Basic bars</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.InitReqLong}" Width="100">InitReqLong</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.InitReqShort}" Width="100">InitReqShort</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.RiskrateLong}" Width="50">RiskL</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ReserateLong}" Width="50">ResL</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.RiskrateShort}" Width="50">RiskS</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ReserateShort}" Width="50">ResS</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Seccode}" Width="90">BasicSeccode</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.LastTrade.Price}" Width="100">BasicLastTrade</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Bars.Close.Length}" Width="90">BasicBars</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -247,10 +232,10 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Tools" Width="80" Margin="45,0,-45,0">
+            <TabItem Header="Tools" Margin="19,-2,-19,0" Width="85">
                 <TabControl Name="TabsTools" FontSize="12"></TabControl>
             </TabItem>
-            <TabItem Header="Distribution" Width="80" Margin="45,0,-45,0">
+            <TabItem Header="Distribution" Margin="18,-2,-18,0" Width="85">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition MinHeight="26" Height="26"/>
@@ -260,7 +245,7 @@
                     <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ShowDistributionInfo"/>
                     <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" IsChecked="True" HorizontalAlignment="Left" Margin="115,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
                     <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" IsChecked="True" HorizontalAlignment="Left" Margin="248,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
-                    
+
                     <Border Grid.Row="1" BorderThickness="0.5" BorderBrush="Black">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -273,7 +258,7 @@
                     </Border>
                 </Grid>
             </TabItem>
-            <TabItem Header="Info" Width="80" Margin="45,0,-45,0">
+            <TabItem Header="Info" Margin="17,-2,-17,0" Width="85">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
@@ -284,7 +269,7 @@
                         <RowDefinition/>
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" BorderThickness="0.5" BorderBrush="Black" Grid.ColumnSpan="2"></Border>
-                    
+
                     <ComboBox Name="ComboBoxTool" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ComboBoxToolChanged"/>
                     <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="112,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ShowScriptInfo"/>
                     <Button Content="Show script info" HorizontalAlignment="Left" Margin="223,1,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowScriptInfo"/>
@@ -343,13 +328,17 @@
                 </Grid>
             </TabItem>
         </TabControl>
-        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" FontSize="13">
-            <MenuItem Header="Menu" Margin="0, 2, 0, 0" BorderBrush="Gray" Height="22" Width="47">
+        <Menu VerticalAlignment="Top" HorizontalAlignment="Left">
+            <MenuItem BorderBrush="Gray" Height="24" Width="25">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
                 <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
                 <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
+                <MenuItem Header="Take login details" Click="TakeLoginDetails"></MenuItem>
                 <Separator/>
                 <MenuItem Header="Resize control panel" Click="ResizeControlPanel"></MenuItem>
+                <MenuItem Header="Test">
+                    <MenuItem Header="Test 1" Click="Test"></MenuItem>
+                </MenuItem>
             </MenuItem>
         </Menu>
         <TextBox Name="TxtBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontSize="11" FontWeight="Bold" Grid.Row="1">
@@ -361,6 +350,6 @@
         </TextBox>
         <TextBlock Text="Connection" HorizontalAlignment="Left" Margin="5,1,0,0" VerticalAlignment="Top" Grid.Row="2"/>
         <Rectangle Name="StCon" HorizontalAlignment="Left" Height="16" Width="16" Margin="75,2,0,0" Stroke="LightGray" VerticalAlignment="Top" Grid.Row="2"/>
-        <Button Content="Info panel" HorizontalAlignment="Right" Grid.Row="2" VerticalAlignment="Top" Width="70" Height="20" Click="ResizeInfoPanel" Background="White" BorderBrush="LightGray"/>
+        <Button HorizontalAlignment="Right" Grid.Row="2" VerticalAlignment="Top" Width="20" Height="20" Click="ResizeInfoPanel" Background="White" BorderBrush="LightGray"/>
     </Grid>
 </Window>

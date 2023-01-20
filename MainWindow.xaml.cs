@@ -45,13 +45,9 @@ public partial class MainWindow : Window
         if (!ConnectorInitialized || ConnectorUnInitialize()) { Logger.StopLogging(); return; }
         else MessageBox.Show("UnInitialization failed.");
     }
-    private void SendCommand(object sender, RoutedEventArgs e)
+    private void Test(object sender, RoutedEventArgs e)
     {
-        if (ComboBox.Text == "SendEmail") SendEmail("Проблема на сервере.");
-        else if (ComboBox.Text == "Test")
-        {
 
-        }
     }
 
     private void ClearOutdatedData()
@@ -106,114 +102,10 @@ public partial class MainWindow : Window
     {
         AddInfo("SaveData: Сериализация", false);
         bool Result = true;
-        var Formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
 
-        if (Directory.Exists("Data"))
-        {
-            try
-            {
-                File.Copy("Data/Tools.bin", "Data/Tools copy.bin", true);
-                using Stream MyStream = new FileStream("Data/Tools.bin", FileMode.Create, FileAccess.Write, FileShare.None);
-                Formatter.Serialize(MyStream, Tools);
-                File.Delete("Data/Tools copy.bin");
-            }
-            catch (Exception e)
-            {
-                AddInfo("Исключение сериализации инструментов: " + e.Message, SendEmail: true);
-                if (File.Exists("Data/Tools copy.bin"))
-                {
-                    System.Threading.Thread.Sleep(3000);
-                    try
-                    {
-                        File.Move("Data/Tools copy.bin", "Data/Tools.bin", true);
-                        AddInfo("Исходный файл восстановлен.");
-                    }
-                    catch { AddInfo("Исходный файл не восстановлен."); }
-                }
-                else AddInfo("Исходный файл не восстановлен.");
-                Result = false;
-            } // Tools
-            try
-            {
-                File.Copy("Data/Settings.bin", "Data/Settings copy.bin", true);
-                using Stream MyStream = new FileStream("Data/Settings.bin", FileMode.Create, FileAccess.Write, FileShare.None);
-                Formatter.Serialize(MyStream, MySettings);
-                File.Delete("Data/Settings copy.bin");
-            }
-            catch (Exception e)
-            {
-                AddInfo("Исключение сериализации настроек: " + e.Message, SendEmail: true);
-                if (File.Exists("Data/Settings copy.bin"))
-                {
-                    System.Threading.Thread.Sleep(3000);
-                    try
-                    {
-                        File.Move("Data/Settings copy.bin", "Data/Settings.bin", true);
-                        AddInfo("Исходный файл восстановлен.");
-                    }
-                    catch { AddInfo("Исходный файл не восстановлен."); }
-                }
-                else AddInfo("Исходный файл не восстановлен.");
-                Result = false;
-            } // Settings
-            try
-            {
-                File.Copy("Data/Trades.bin", "Data/Trades copy.bin", true);
-                using Stream MyStream = new FileStream("Data/Trades.bin", FileMode.Create, FileAccess.Write, FileShare.None);
-                Formatter.Serialize(MyStream, Trades);
-                File.Delete("Data/Trades copy.bin");
-            }
-            catch (Exception e)
-            {
-                AddInfo("Исключение сериализации сделок: " + e.Message);
-                if (File.Exists("Data/Trades copy.bin"))
-                {
-                    System.Threading.Thread.Sleep(3000);
-                    try
-                    {
-                        File.Move("Data/Trades copy.bin", "Data/Trades.bin", true);
-                        AddInfo("Исходный файл восстановлен.");
-                    }
-                    catch { AddInfo("Исходный файл не восстановлен."); }
-                }
-                else AddInfo("Исходный файл не восстановлен.");
-                Result = false;
-            } // Trades
-        }
-        else
-        {
-            Directory.CreateDirectory("Data");
-            try
-            {
-                using Stream MyStream = new FileStream("Data/Tools.bin", FileMode.Create, FileAccess.Write, FileShare.None);
-                Formatter.Serialize(MyStream, Tools);
-            }
-            catch (Exception e)
-            {
-                AddInfo("Исключение сериализации инструментов: " + e.Message);
-                Result = false;
-            }
-            try
-            {
-                using Stream MyStream = new FileStream("Data/Settings.bin", FileMode.Create, FileAccess.Write, FileShare.None);
-                Formatter.Serialize(MyStream, MySettings);
-            }
-            catch (Exception e)
-            {
-                AddInfo("Исключение сериализации настроек: " + e.Message);
-                Result = false;
-            }
-            try
-            {
-                using Stream MyStream = new FileStream("Data/Trades.bin", FileMode.Create, FileAccess.Write, FileShare.None);
-                Formatter.Serialize(MyStream, Trades);
-            }
-            catch (Exception e)
-            {
-                AddInfo("Исключение сериализации сделок: " + e.Message);
-                Result = false;
-            }
-        }
+        if (!SerializeObject("Tools", Tools) ||
+            !SerializeObject("Settings", MySettings) ||
+            !SerializeObject("Trades", Trades)) Result = false;
         if (SaveInfoPanel)
         {
             try { Dispatcher.Invoke(() => File.WriteAllText("Data/Info.txt", TxtBox.Text)); }
@@ -228,18 +120,66 @@ public partial class MainWindow : Window
         if (SaveData(true)) AddInfo("Данные сохранены.");
         else AddInfo("Данные не сохранены.");
     }
-    private void SaveLoginDetails(object sender, RoutedEventArgs e)
+    private void TakeLoginDetails(object sender, RoutedEventArgs e)
     {
-        if (TxtEmail.Text.Length > 0 && TxtPasEmail.Password.Length > 0)
+        if (!File.Exists("Data/mail.txt"))
         {
-            MySettings.Email = TxtEmail.Text;
-            MySettings.EmailPassword = TxtPasEmail.Password;
-            if (SaveData())
+            AddInfo("mail.txt не найден");
+            return;
+        }
+        try
+        {
+            string[] details = File.ReadAllLines("Data/mail.txt");
+            MySettings.Email = details[0];
+            MySettings.EmailPassword = details[1];
+            SendEmail("Test notify");
+            AddInfo("Тестовое уведомление запущено.");
+        }
+        catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
+    }
+    private static bool SerializeObject(string nameFile, object obj)
+    {
+        if (!Directory.Exists("Data")) try { Directory.CreateDirectory("Data"); }
+            catch (Exception ex)
             {
-                TxtEmail.Clear();
-                TxtPasEmail.Clear();
-                AddInfo("Данные почты сохранены.");
+                AddInfo("SerializeObject: не удалось создать директорию Data: " + ex.Message);
+                return false;
             }
+
+        try
+        {
+            if (File.Exists("Data/" + nameFile + " copy.bin"))
+            {
+                AddInfo("SerializeObject: копия " + nameFile + " уже существует", SendEmail: true);
+                File.Move("Data/" + nameFile + " copy.bin", "Data/" + nameFile + " copy " +
+                    DateTime.Now.ToString("dd.MM.yyyy HH.mm.ss") + ".bin", true);
+            }
+
+            if (File.Exists("Data/" + nameFile + ".bin"))
+                File.Copy("Data/" + nameFile + ".bin", "Data/" + nameFile + " copy.bin", true);
+
+            using Stream MyStream = new FileStream("Data/" + nameFile + ".bin", FileMode.Create, FileAccess.Write, FileShare.None);
+            var Formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+            Formatter.Serialize(MyStream, obj);
+
+            if (File.Exists("Data/" + nameFile + " copy.bin")) File.Delete("Data/" + nameFile + " copy.bin");
+            return true;
+        }
+        catch (Exception e)
+        {
+            AddInfo("Исключение сериализации " + nameFile + ": " + e.Message, SendEmail: true);
+            if (File.Exists("Data/" + nameFile + " copy.bin"))
+            {
+                System.Threading.Thread.Sleep(3000);
+                try
+                {
+                    File.Move("Data/" + nameFile + " copy.bin", "Data/" + nameFile + ".bin", true);
+                    AddInfo("Исходный файл восстановлен.");
+                }
+                catch (Exception ex) { AddInfo("Исходный файл не восстановлен: " + ex.Message); }
+            }
+            else AddInfo("Исходный файл не восстановлен, поскольку нет копии файла");
+            return false;
         }
     }
 

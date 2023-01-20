@@ -246,7 +246,6 @@ public partial class MainWindow : Window
         BoxConnectors.ItemsSource = MyConnectors;
         BoxConnectors.SelectedIndex = 0;
         ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
-        ComboBox.ItemsSource = new string[] { "SendEmail", "Test" };
     }
     private void RestoreToolTabs()
     {
