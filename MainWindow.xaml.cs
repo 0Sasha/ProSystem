@@ -4,9 +4,11 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Controls;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using static ProSystem.TXmlConnector;
 
 namespace ProSystem;
@@ -24,10 +26,11 @@ public partial class MainWindow : Window
         }
         else AddInfo("Введите логин и пароль.");
     }
-    private async void ClosingMainWindow(object sender, System.ComponentModel.CancelEventArgs e)
+    private async void ClosingMainWindow(object sender, CancelEventArgs e)
     {
         // Подтверждение выхода и сохранение данных
-        MessageBoxResult Res = MessageBox.Show("Are you sure you want to exit?", "Closing", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        MessageBoxResult Res =
+            MessageBox.Show("Are you sure you want to exit?", "Closing", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (Res == MessageBoxResult.No || !SaveData(true))
         {
             e.Cancel = true;
@@ -103,22 +106,29 @@ public partial class MainWindow : Window
         AddInfo("SaveData: Сериализация", false);
         bool Result = true;
 
-        if (!SerializeObject("Tools", Tools) ||
-            !SerializeObject("Settings", MySettings) ||
-            !SerializeObject("Trades", Trades)) Result = false;
+        if (!SerializeObject("Tools", Tools) || !SerializeObject("Portfolio", Portfolio) ||
+            !SerializeObject("Settings", MySettings) || !SerializeObject("Trades", Trades)) Result = false;
         if (SaveInfoPanel)
         {
             try { Dispatcher.Invoke(() => File.WriteAllText("Data/Info.txt", TxtBox.Text)); }
             catch (Exception e) { AddInfo("Исключение записи информационной панели: " + e.Message); Result = false; }
         }
 
-        TriggerSerialization = DateTime.Now.AddSeconds(30);
+        TriggerSerialization = DateTime.Now.AddSeconds(60);
         return Result;
     }
     private void SaveData(object sender, RoutedEventArgs e)
     {
         if (SaveData(true)) AddInfo("Данные сохранены.");
         else AddInfo("Данные не сохранены.");
+    }
+    private void SaveData(object sender, PropertyChangedEventArgs e)
+    {
+        if (DateTime.Now > TriggerSerialization)
+        {
+            TriggerSerialization = DateTime.Now.AddSeconds(5);
+            Task.Run(() => SaveData());
+        }
     }
     private void TakeLoginDetails(object sender, RoutedEventArgs e)
     {
@@ -132,8 +142,8 @@ public partial class MainWindow : Window
             string[] details = File.ReadAllLines("Data/mail.txt");
             MySettings.Email = details[0];
             MySettings.EmailPassword = details[1];
-            SendEmail("Test notify");
-            AddInfo("Тестовое уведомление запущено.");
+            Notifier.Notify("Test notify");
+            AddInfo("Тестовое уведомление отправлено.");
         }
         catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
     }
@@ -150,7 +160,7 @@ public partial class MainWindow : Window
         {
             if (File.Exists("Data/" + nameFile + " copy.bin"))
             {
-                AddInfo("SerializeObject: копия " + nameFile + " уже существует", SendEmail: true);
+                AddInfo("SerializeObject: копия " + nameFile + " уже существует", notify: true);
                 File.Move("Data/" + nameFile + " copy.bin", "Data/" + nameFile + " copy " +
                     DateTime.Now.ToString("dd.MM.yyyy HH.mm.ss") + ".bin", true);
             }
@@ -167,7 +177,7 @@ public partial class MainWindow : Window
         }
         catch (Exception e)
         {
-            AddInfo("Исключение сериализации " + nameFile + ": " + e.Message, SendEmail: true);
+            AddInfo("Исключение сериализации " + nameFile + ": " + e.Message, notify: true);
             if (File.Exists("Data/" + nameFile + " copy.bin"))
             {
                 System.Threading.Thread.Sleep(3000);
@@ -183,101 +193,34 @@ public partial class MainWindow : Window
         }
     }
 
-    public void UpdatePortfolio()
-    {
-        Dispatcher.Invoke(() =>
-        {
-            PortfolioView.ItemsSource = new List<object>(MoneyPositions.Concat(Positions)) { Portfolio };
-            if (DateTime.Now > TriggerSerialization) SaveData();
-        });
-    }
-    private void UpdateTools(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
     {
         ToolsView.Items.Refresh();
-        if (DateTime.Now > TriggerSerialization) Dispatcher.Invoke(() => SaveData());
+        if (DateTime.Now > TriggerSerialization) Task.Run(() => SaveData());
     }
-    private void UpdateOrders(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void UpdateOrders(object sender, NotifyCollectionChangedEventArgs e)
     {
         OrdersView.Items.Refresh();
         if (OrdersView.Items.Count > 0) OrdersView.ScrollIntoView(OrdersView.Items[^1]);
     }
-    private void UpdateTrades(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    private void UpdateTrades(object sender, NotifyCollectionChangedEventArgs e)
     {
         TradesView.Items.Refresh();
-        TradesView.ScrollIntoView(TradesView.Items[^1]);
+        if (TradesView.Items.Count > 0) TradesView.ScrollIntoView(TradesView.Items[^1]);
     }
 
-    public static void AddInfo(string Data, bool Important = true, bool SendEmail = false)
+    public static void AddInfo(string data, bool important = true, bool notify = false)
     {
-        Logger.WriteLogSystem(Data);
-        if (Important)
+        Logger.WriteLogSystem(data);
+        if (important)
         {
             Window.Dispatcher.Invoke(() =>
             {
-                Window.TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss", IC) + ": " + Data);
+                Window.TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss", IC) + ": " + data);
                 Window.TxtBox.ScrollToEnd();
             });
         }
-        if (SendEmail && DateTime.Now > TriggerNotification) MainWindow.SendEmail(Data);
-    }
-    public static void SendEmail(string Data)
-    {
-        TriggerNotification = DateTime.Now.AddHours(4);
-        Task.Run(() =>
-        {
-            System.Net.Mail.SmtpClient Smtp = new("smtp.gmail.com", 587);
-            System.Net.Mail.MailMessage Message = new(MySettings.Email, MySettings.Email, "Info", Data);
-
-            Smtp.EnableSsl = true;
-            Smtp.Credentials = new System.Net.NetworkCredential(MySettings.Email, MySettings.EmailPassword);
-            while (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable()) System.Threading.Thread.Sleep(15000);
-            try
-            {
-                Smtp.Send(Message);
-                AddInfo("Оповещение отправлено.");
-            }
-            catch (Exception e)
-            {
-                AddInfo("Повторная попытка отправки оповещения через 10 минут. Исключение: " + e.Message);
-                System.Threading.Thread.Sleep(600000);
-                Task.Run(() => SendEmail(Data));
-            }
-            finally
-            {
-                Smtp.Dispose();
-                Message.Dispose();
-            }
-        });
-    }
-    public static void WriteLogTaskException(object sender, UnobservedTaskExceptionEventArgs args)
-    {
-        Exception[] MyExceptions = args.Exception.InnerExceptions.ToArray();
-        string Data = "Task Exception:";
-        foreach (Exception e in MyExceptions) Data += "\n" + e.Message + "\n" + e.StackTrace;
-        AddInfo(Data, true, true);
-    }
-    public static void WriteLogUnhandledException(object sender, UnhandledExceptionEventArgs args)
-    {
-        Exception e = (Exception)args.ExceptionObject;
-        string Path = "UnhandledException " + DateTime.Now.ToString("dd.MM.yyyy HH.mm.ss", IC) + ".txt";
-        string Data = e.Message + "\n" + e.StackTrace;
-        try { File.WriteAllText(Path, Data); }
-        catch { }
-
-        System.Net.Mail.SmtpClient Smtp = new("smtp.gmail.com", 587);
-        System.Net.Mail.MailMessage Message = new(MySettings.Email, MySettings.Email, "Info", Data);
-        try
-        {
-            Smtp.EnableSsl = true;
-            Smtp.Credentials = new System.Net.NetworkCredential(MySettings.Email, MySettings.EmailPassword);
-            Smtp.Send(Message);
-        }
-        finally
-        {
-            Smtp.Dispose();
-            Message.Dispose();
-            Logger.WriteLogSystem(Data);
-        }
+        if (notify) Notifier.Notify(data);
     }
 
     private void ShowUsedMemory(object sender, RoutedEventArgs e) =>
@@ -768,7 +711,7 @@ public partial class MainWindow : Window
     }
     private void ShowDistributionInfo(object sender, RoutedEventArgs e)
     {
-        if (Tools.Count < 1 || Portfolio.Saldo < 1) return;
+        if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
 
         var Assets = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
         var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 3, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
@@ -788,26 +731,18 @@ public partial class MainWindow : Window
             ExtraGridlineColor = OxyPlot.OxyColors.LightGray
         };
 
-        double FactReq, MaxReq;
-        double SumMaxVol = 0;
         string Filter = (string)ComboBoxDistrib.SelectedItem;
         Tool[] MyTools = Tools.Where(x => x.Active).ToArray();
         for (int i = MyTools.Length - 1; i >= 0; i--)
         {
-            if (!MyTools[i].UseShiftBalance) MaxReq = MyTools[i].ShareOfFunds;
-            else MaxReq = MyTools[i].BaseBalance > 0 ?
-                MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
-                MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100);
-
-            SumMaxVol += MaxReq;
             if (Filter == "All tools" ||
                 Filter == "First part" && i < MyTools.Length / 2 || Filter == "Second part" && i >= MyTools.Length / 2)
             {
-                Position Pos = Positions.SingleOrDefault(x => x.Seccode == MyTools[i].MySecurity.Seccode);
+                Position Pos = Portfolio.Positions.SingleOrDefault(x => x.Seccode == MyTools[i].MySecurity.Seccode);
                 if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
                 {
                     int shift = (bool)ExcludeBaseCheckBox.IsChecked ? MyTools[i].BaseBalance : 0;
-                    FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqLong :
+                    double FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqLong :
                         (-Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100);
                     FactVol.Items.Add(new OxyPlot.Series.BarItem
                     {
@@ -819,8 +754,12 @@ public partial class MainWindow : Window
                 else continue;
                 
                 Assets.Labels.Add(MyTools[i].Name);
-                MaxVol.Items.Add(new OxyPlot.Series.BarItem{
-                    Value = (bool)ExcludeBaseCheckBox.IsChecked ? MyTools[i].ShareOfFunds : MaxReq });
+                MaxVol.Items.Add(new OxyPlot.Series.BarItem {
+                    Value = (bool)ExcludeBaseCheckBox.IsChecked || !MyTools[i].UseShiftBalance ?
+                    MyTools[i].ShareOfFunds : (MyTools[i].BaseBalance > 0 ?
+                    MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
+                    MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100))
+                });
             }
         }
 
@@ -833,8 +772,10 @@ public partial class MainWindow : Window
         DistributionPlot.Model = Model;
 
         var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 2, FillColor = OxyPlot.OxyColors.DarkGoldenrod, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
-        var MaxVolPorfolio = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+        var FactVolPorfolio = new OxyPlot.Series.BarSeries {
+            BarWidth = 2, FillColor = OxyPlot.OxyColors.DarkGoldenrod, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+        var MaxVolPorfolio = new OxyPlot.Series.BarSeries {
+            FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
         var AxisPorfolio = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
@@ -850,8 +791,8 @@ public partial class MainWindow : Window
         };
 
         AssetsPorfolio.Labels.Add("Portfolio");
-        FactVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.InitReqs / Portfolio.Saldo * 100 });
-        MaxVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = SumMaxVol });
+        FactVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.ShareInitReqs });
+        MaxVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.PotentialShareInitReqs });
 
         Model = new OxyPlot.PlotModel();
         Model.Series.Add(MaxVolPorfolio);

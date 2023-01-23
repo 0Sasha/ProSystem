@@ -18,6 +18,7 @@ internal static class TXmlConnector
     private static Trade MyTrade;
     private static Order MyOrder;
     private static Order[] MyOrders;
+    private static bool Scheduled;
     private static int WaitingTime = 18000;
     private static DateTime TriggerDataProcessing = DateTime.Now;
 
@@ -70,11 +71,7 @@ internal static class TXmlConnector
                 }
                 while (!DataQueue.IsEmpty)
                 {
-                    if (DataQueue.TryDequeue(out Data))
-                    {
-                        string Section = ProcessData(Data);
-                        if (Section == "positions") Task.Run(() => Window.UpdatePortfolio());
-                    }
+                    if (DataQueue.TryDequeue(out Data)) ProcessData(Data);
                     else AddInfo("ProcessDataQueue: не удалось взять объект из очереди.");
                 }
                 if (ShowInfo)
@@ -85,7 +82,7 @@ internal static class TXmlConnector
             }
             catch (Exception e)
             {
-                AddInfo("ProcessDataQueue: Исключение: " + e.Message, SendEmail: true);
+                AddInfo("ProcessDataQueue: Исключение: " + e.Message, notify: true);
                 AddInfo("Трассировка стека: " + e.StackTrace);
                 AddInfo("Данные: " + Data, false);
                 if (e.InnerException != null)
@@ -259,7 +256,7 @@ internal static class TXmlConnector
                     MyOrders = Orders.ToArray();
                     if (MyOrders.Where(x => x.TrID == TrID).Count() > 1)
                     {
-                        AddInfo("orders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", SendEmail: true);
+                        AddInfo("orders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", notify: true);
                         Window.Dispatcher.Invoke(() =>
                         {
                             while (MyOrders.Where(x => x.TrID == TrID).Count() > 1)
@@ -417,8 +414,9 @@ internal static class TXmlConnector
                         if (!XR.ReadToFollowing("seccode")) { XR.Close(); return Section; }
                         XR.Read(); Value = XR.Value;
 
-                        if (Positions.SingleOrDefault(x => x.Seccode == Value) == null) Positions.Add(new Position(Value));
-                        Position MyPosition = Positions.Single(x => x.Seccode == Value);
+                        if (Portfolio.Positions.SingleOrDefault(x => x.Seccode == Value) == null)
+                            Portfolio.Positions.Add(new Position(Value));
+                        Position MyPosition = Portfolio.Positions.Single(x => x.Seccode == Value);
 
                         if (!XR.ReadToFollowing("market")) { AddInfo("Не найден market позиции"); continue; }
                         XR.Read(); MyPosition.Market = XR.Value;
@@ -474,14 +472,14 @@ internal static class TXmlConnector
                     {
                         if (!XR.ReadToFollowing("shortname")) { XR.Close(); return Section; }
                         XR.Read(); Value = XR.Value;
-                        if (MoneyPositions.SingleOrDefault(x => x.ShortName == XR.Value) == null)
-                            MoneyPositions.Add(new Position() { ShortName = Value });
+                        if (Portfolio.MoneyPositions.SingleOrDefault(x => x.ShortName == XR.Value) == null)
+                            Portfolio.MoneyPositions.Add(new Position() { ShortName = Value });
 
                         if (!XR.ReadToFollowing("saldoin")) { AddInfo("Не найдено saldoin позиции"); continue; }
-                        XR.Read(); MoneyPositions.Single(x => x.ShortName == Value).SaldoIn = double.Parse(XR.Value, IC);
+                        XR.Read(); Portfolio.MoneyPositions.Single(x => x.ShortName == Value).SaldoIn = double.Parse(XR.Value, IC);
 
                         if (!XR.ReadToFollowing("saldo")) { AddInfo("Не найдено saldo позиции"); continue; }
-                        XR.Read(); MoneyPositions.Single(x => x.ShortName == Value).Saldo = double.Parse(XR.Value, IC);
+                        XR.Read(); Portfolio.MoneyPositions.Single(x => x.ShortName == Value).Saldo = double.Parse(XR.Value, IC);
                     }
                     else { AddInfo("Пришла неизвестная позиция:" + Subsection); XR.Close(); return Section; }
                 }
@@ -527,7 +525,8 @@ internal static class TXmlConnector
                     if (XR.GetAttribute("recover") != "true")
                     {
                         Connection = ConnectionState.Connected;
-                        AddInfo("Connected");
+                        AddInfo("Connected", !Scheduled);
+                        Scheduled = false;
                     }
                     else
                     {
@@ -544,7 +543,8 @@ internal static class TXmlConnector
                     if (XR.GetAttribute("recover") != "true")
                     {
                         Connection = ConnectionState.Disconnected;
-                        AddInfo("Disconnected");
+                        AddInfo("Disconnected", !Scheduled);
+                        Scheduled = false;
                     }
                     else
                     {
@@ -559,7 +559,7 @@ internal static class TXmlConnector
                     BackupServer = !BackupServer;
 
                     Connection = ConnectionState.Disconnected;
-                    XR.Read(); AddInfo("Server error: " + XR.Value + " BackupServer: " + !BackupServer, SendEmail: true);
+                    XR.Read(); AddInfo("Server error: " + XR.Value + " BackupServer: " + !BackupServer, notify: true);
                 }
             }
             else if (Section == "mc_portfolio")
@@ -588,16 +588,17 @@ internal static class TXmlConnector
                 {
                     if (!XR.ReadToFollowing("seccode")) { XR.Close(); return Section; }
                     XR.Read(); Value = XR.Value;
-                    if (Positions.SingleOrDefault(x => x.Seccode == Value) == null) Positions.Add(new Position(Value));
+                    if (Portfolio.Positions.SingleOrDefault(x => x.Seccode == Value) == null)
+                        Portfolio.Positions.Add(new Position(Value));
 
                     if (!XR.ReadToFollowing("open_balance")) { AddInfo("Не найден open_balance позиции"); continue; }
-                    XR.Read(); Positions.Single(x => x.Seccode == Value).SaldoIn = int.Parse(XR.Value, IC);
+                    XR.Read(); Portfolio.Positions.Single(x => x.Seccode == Value).SaldoIn = int.Parse(XR.Value, IC);
 
                     if (!XR.ReadToFollowing("balance")) { AddInfo("Не найден balance позиции"); continue; }
-                    XR.Read(); Positions.Single(x => x.Seccode == Value).Saldo = int.Parse(XR.Value, IC);
+                    XR.Read(); Portfolio.Positions.Single(x => x.Seccode == Value).Saldo = int.Parse(XR.Value, IC);
 
                     if (!XR.ReadToFollowing("pl")) { AddInfo("Нет pl позиции."); continue; }
-                    XR.Read(); Positions.Single(x => x.Seccode == Value).PL = double.Parse(XR.Value, IC);
+                    XR.Read(); Portfolio.Positions.Single(x => x.Seccode == Value).PL = double.Parse(XR.Value, IC);
                 }
             }
             // Второстепенные секции
@@ -717,7 +718,6 @@ internal static class TXmlConnector
                 if (!XR.ReadToFollowing("reserate_shortx")) { AddInfo("sec_permissions: no reserate_shortx"); XR.Close(); return Section; }
                 XR.Read(); MyTool.MySecurity.MinReserateShort = double.Parse(XR.Value, IC);*/
 
-                Task.Run(() => MyTaskTool.MySecurity.UpdateRequirements());
                 XR.Close(); return Section;
             }
             else if (Section == "messages") // Текстовые сообщения
@@ -870,7 +870,7 @@ internal static class TXmlConnector
     #endregion
 
     #region Methods for sending commands
-    public static void Connect()
+    public static void Connect(bool scheduled = false)
     {
         if (!ConnectorInitialized)
         {
@@ -899,6 +899,7 @@ internal static class TXmlConnector
             "</request_timeout><push_u_limits>" + UnLimits + "</push_u_limits><push_pos_equity>" + Equity + "</push_pos_equity></command>";
 
         // Отправка команды
+        Scheduled = scheduled;
         string Result = ConnectorSendCommand(StartPart, EndPart, Window.Dispatcher.Invoke(() => Window.TxtPas.SecurePassword));
         GC.Collect();
 
@@ -909,11 +910,12 @@ internal static class TXmlConnector
             AddInfo(Result);
         }
     }
-    public static void Disconnect()
+    public static void Disconnect(bool scheduled = false)
     {
         SystemReadyToTrading = false;
         Connection = ConnectionState.Disconnecting;
 
+        Scheduled = scheduled;
         string Сommand = "<command id=\"disconnect\"/>";
         string Result = ConnectorSendCommand(Сommand);
         if (Result.StartsWith("<result success=\"true\"", SC)) Connection = ConnectionState.Disconnected;
@@ -1221,7 +1223,7 @@ internal static class TXmlConnector
 
                     if (!MyTask.Wait(WaitingTime * 15))
                     {
-                        AddInfo("SendCommand: Бесконечное ожидание ответа сервера.", SendEmail: true);
+                        AddInfo("SendCommand: Бесконечное ожидание ответа сервера.", notify: true);
                         MyTask.Wait();
                     }
                     AddInfo("SendCommand: Ответ сервера получен.", false);

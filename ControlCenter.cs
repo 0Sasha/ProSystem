@@ -151,7 +151,7 @@ public partial class Tool
         }
         catch (Exception e)
         {
-            AddInfo(Name + ": Calculate: Исключение: " + e.Message, SendEmail: true);
+            AddInfo(Name + ": Calculate: Исключение: " + e.Message, notify: true);
             AddInfo("Трассировка стека: " + e.StackTrace);
             if (e.InnerException != null)
             {
@@ -307,13 +307,13 @@ public partial class Tool
     {
         if (MySecurity.LastTrade == null || MySecurity.LastTrade.DateTime < DateTime.Now.AddDays(-5))
         {
-            AddInfo(Name + ": Последняя сделка не актуальна или её не существует. Подписка на сделки и выход.", SendEmail: true);
+            AddInfo(Name + ": Последняя сделка не актуальна или её не существует. Подписка на сделки и выход.", notify: true);
             SubUnsub(true, MySecurity.Board, MySecurity.Seccode, true, false, false);
             return false;
         }
         else if (MySecurity.Bars == null || BasicSecurity != null && BasicSecurity.Bars == null)
         {
-            AddInfo(Name + ": Базовых баров не существует. Запрос баров и выход.", SendEmail: true);
+            AddInfo(Name + ": Базовых баров не существует. Запрос баров и выход.", notify: true);
             RequestBars(this);
             return false;
         }
@@ -322,13 +322,13 @@ public partial class Tool
         {
             string Counts = MySecurity.Bars.Close.Length.ToString();
             if (BasicSecurity != null) Counts += "/" + BasicSecurity.Bars.Close.Length;
-            AddInfo(Name + ": Недостаточно базовых баров: " + Counts + " Запрос баров и выход.", SendEmail: true);
+            AddInfo(Name + ": Недостаточно базовых баров: " + Counts + " Запрос баров и выход.", notify: true);
             RequestBars(this);
             return false;
         }
         else if (Scripts.Length > 2)
         {
-            AddInfo(Name + ": Непредвиденное количество скриптов: " + Scripts.Length, SendEmail: true);
+            AddInfo(Name + ": Непредвиденное количество скриптов: " + Scripts.Length, notify: true);
             return false;
         }
         return true;
@@ -398,16 +398,10 @@ public partial class Tool
         Trade LastTrade = Trades.ToArray().LastOrDefault(x => x.Seccode == MySecurity.Seccode);
         if (LastTrade != null && LastTrade.DateTime.AddSeconds(2) > DateTime.Now) Thread.Sleep(1500);
     }
-    private void CheckPortfolio(ref bool ReadyToTrade)
+    private static void CheckPortfolio(ref bool ReadyToTrade)
     {
         if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-        int UpperBorder = MySettings.AverageValueEquity + MySettings.AverageValueEquity / 100 * MySettings.ToleranceEquity;
-        int LowerBorder = MySettings.AverageValueEquity - MySettings.AverageValueEquity / 100 * MySettings.ToleranceEquity;
-        if (Portfolio.Saldo < LowerBorder || Portfolio.Saldo > UpperBorder)
-        {
-            AddInfo(Name + ": Стоимость портфеля за пределами допустимого отклонения: " + Portfolio.Saldo, SendEmail: true);
-            ReadyToTrade = false;
-        }
+        if (!Portfolio.CheckEquity(MySettings.ToleranceEquity)) ReadyToTrade = false;
     }
 
     private (double, double) GetAndCheckRubReqs(ref bool ReadyToTrade)
@@ -418,7 +412,7 @@ public partial class Tool
         {
             if (USDRUB < 0.1 || EURRUB < 0.1)
             {
-                AddInfo(Name + ": Запрос USDRUB и EURRUB", SendEmail: true);
+                AddInfo(Name + ": Запрос USDRUB и EURRUB", notify: true);
                 GetHistoryData("CETS", "USD000UTSTOM", "1", 1);
                 GetHistoryData("CETS", "EUR_RUB__TOM", "1", 1);
                 ReadyToTrade = false;
@@ -427,7 +421,7 @@ public partial class Tool
             else if (MySecurity.Currency == "EUR") RubReqs = (MySecurity.InitReqLong * EURRUB, MySecurity.InitReqShort * EURRUB);
             else
             {
-                AddInfo(Name + ": Неизвестная валюта: " + MySecurity.Currency, SendEmail: true);
+                AddInfo(Name + ": Неизвестная валюта: " + MySecurity.Currency, notify: true);
                 ReadyToTrade = false;
             }
         }
@@ -480,7 +474,7 @@ public partial class Tool
         }
         else if (NumberOfLots * Math.Max(RubReqs.Item1, RubReqs.Item2) > MaxShare)
         {
-            AddInfo(Name + ": NumberOfLots превышает допустимый объём риска.", SendEmail: true);
+            AddInfo(Name + ": NumberOfLots превышает допустимый объём риска.", notify: true);
             LongVolume = (int)Math.Floor(MaxShare / RubReqs.Item1);
             ShortVolume = (int)Math.Floor(MaxShare / RubReqs.Item2);
         }
@@ -497,7 +491,7 @@ public partial class Tool
     private int GetAndCheckBalance((int, int) PosVolumes, ref bool ReadyToTrade, ref DateTime TriggerPosition, out int RealBalance)
     {
         int Balance = 0;
-        Position MyPosition = Positions.ToArray().SingleOrDefault(x => x.Seccode == MySecurity.Seccode);
+        Position MyPosition = Portfolio.Positions.ToArray().SingleOrDefault(x => x.Seccode == MySecurity.Seccode);
         if (MyPosition != null) Balance = (int)MyPosition.Saldo;
 
         RealBalance = Balance;
@@ -510,13 +504,13 @@ public partial class Tool
                 ReadyToTrade = false;
                 if (TriggerPosition == DateTime.MinValue)
                 {
-                    AddInfo(Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", SendEmail: true);
+                    AddInfo(Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
                     TriggerPosition = DateTime.Now.AddHours(12);
                 }
             }
             else
             {
-                AddInfo(Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", SendEmail: true);
+                AddInfo(Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
                 if (TriggerPosition == DateTime.MinValue)
                 {
                     TriggerPosition = DateTime.Now.AddHours(4);
@@ -641,7 +635,7 @@ public partial class Tool
                         MySettings.DisplaySpecialInfo, true);
                     return true;
                 }
-                AddInfo(Name + ": Позиция скрипта не соответствует позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                AddInfo(Name + ": Позиция скрипта не соответствует позиции в портфеле. Нормализация по рынку.", notify: true);
 
                 Order[] ActiveOrders =
                     Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
@@ -681,7 +675,7 @@ public partial class Tool
                         return true;
                     }
                     AddInfo(Name +
-                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", notify: true);
 
                     Order[] ActiveOrders = Orders.ToArray()
                         .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
@@ -709,7 +703,7 @@ public partial class Tool
                         return true;
                     }
                     AddInfo(Name +
-                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", notify: true);
 
                     Order[] ActiveOrders = Orders.ToArray()
                         .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
@@ -732,7 +726,7 @@ public partial class Tool
                         return true;
                     }
                     AddInfo(Name +
-                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", SendEmail: true);
+                        ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", notify: true);
 
                     Order[] ActiveOrders = Orders.ToArray()
                         .Where(x => x.Seccode == MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
@@ -883,7 +877,7 @@ public partial class Tool
             {
                 if (NormalPrice) ReplaceOrder(ActiveOrder, Symbol, OrderType.Market, PrevClose,
                     ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
-                else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
             }
             else if ((ActiveOrder.BuySell == "B") != IsGrow[^1] || VolumeOrder == 0) CancelOrder(ActiveOrder);
             return;
@@ -984,7 +978,7 @@ public partial class Tool
                             ReplaceOrder(ActiveOrder, Symbol, OrderType.Market,
                                 PrevClose, ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript);
                         else AddInfo(MyScript.Name +
-                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
                     }
                 }
                 else if (VolumeOrder == 0 || DateTime.Now < DateTime.Today.AddHours(7.5) && ActiveOrder.Note == null ||
@@ -1003,7 +997,7 @@ public partial class Tool
                         if (NormalPrice) ReplaceOrder(ActiveOrder, Symbol, OrderType.Limit, PrevClose,
                             ActiveOrder.Balance, ActiveOrder.Signal + "AtClose", MyScript, "CloseNB");
                         else AddInfo(MyScript.Name +
-                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
                     }
                 }
                 else if (DateTime.Now >= ActiveOrder.Time.AddSeconds(WaitingLimit))
@@ -1011,7 +1005,7 @@ public partial class Tool
                     if (NormalPrice) ReplaceOrder(ActiveOrder, Symbol, OrderType.Market, PrevClose,
                         ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
                     else AddInfo(MyScript.Name +
-                        ": Цена за пределами нормального диапазона. Ожидание возвращения.", SendEmail: true);
+                        ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
                 }
             }
             return;
@@ -1054,7 +1048,7 @@ public partial class Tool
         }
         else
         {
-            AddInfo(MyScript.Name + ": Текущая позиция скрипта не соответствует IsGrow.", SendEmail: true);
+            AddInfo(MyScript.Name + ": Текущая позиция скрипта не соответствует IsGrow.", notify: true);
             if (Symbol.LastTrade.DateTime < DateTime.Today.AddHours(10.5) && DateTime.Now < DateTime.Today.AddHours(10.5))
             {
                 double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
@@ -1121,14 +1115,14 @@ public partial class Tool
             if (MyScript.Result.IsGrow.Length > 500)
             {
                 AddInfo(Name + ": Количество торговых баров больше базисных: " +
-                    InitialLength + "/" + MyScript.Result.IsGrow.Length + " Обрезка.", SendEmail: true);
+                    InitialLength + "/" + MyScript.Result.IsGrow.Length + " Обрезка.", notify: true);
                 y = MySecurity.SourceBars.Close.Length - BasicSecurity.SourceBars.Close.Length + 20;
                 MySecurity.SourceBars.TrimBars(y);
                 y = InitialLength - MyScript.Result.IsGrow.Length;
                 MySecurity.Bars.TrimBars(y);
             }
             else AddInfo(Name + ": Количество торговых баров больше базисных: " +
-                InitialLength + "/" + MyScript.Result.IsGrow.Length, SendEmail: true);
+                InitialLength + "/" + MyScript.Result.IsGrow.Length, notify: true);
             return false;
         }
         return true;
