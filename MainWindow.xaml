@@ -15,20 +15,35 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Height" Value="16.5"/>
         </Style>
+        <Style x:Key="Norm" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Height" Value="20"/>
+        </Style>
         <DataTemplate x:Key="SaldoIn">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn, StringFormat=### ### ###.##}"/> </DataTemplate>
         <DataTemplate x:Key="PL">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=PL}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=PL, StringFormat=### ### ###.##}"/> </DataTemplate>
         <DataTemplate x:Key="Saldo">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Saldo}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Saldo, StringFormat=### ### ###.##}"/> </DataTemplate>
         <DataTemplate x:Key="UnrealPL">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=UnrealPL}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=UnrealPL, StringFormat=### ### ###.##}"/> </DataTemplate>
         <DataTemplate x:Key="FinRes">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=FinRes}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=FinRes, StringFormat=### ### ###.##}"/> </DataTemplate>
         <DataTemplate x:Key="InitReqs">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=InitReqs}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=InitReqs, StringFormat=### ### ###.##}"/> </DataTemplate>
         <DataTemplate x:Key="MinReqs">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MinReqs}"/> </DataTemplate>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MinReqs, StringFormat=### ### ###.##}"/>
+        </DataTemplate>
+        <DataTemplate x:Key="LastTrade">
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MySecurity.LastTrade.Price, StringFormat=### ### ###.##}"/>
+        </DataTemplate>
+        <DataTemplate x:Key="InitReqLong">
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MySecurity.InitReqLong, StringFormat=N2}"/>
+        </DataTemplate>
+        <DataTemplate x:Key="InitReqShort">
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MySecurity.InitReqShort, StringFormat=N2}"/>
+        </DataTemplate>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -70,44 +85,44 @@
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Average equity for 3 days" VerticalAlignment="Top"/>
-                        <TextBox Name="AverageEquityTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="180,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="90" Background="#FFEDEDED"/>
+                        <TextBlock Name="AverageEquityTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,25,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Current share of InitReqs %" VerticalAlignment="Top"/>
-                        <TextBox Name="CurShareInitReqsTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="220,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="50" Background="#FFEDEDED"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Current share of InitReqs" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareInitReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,50,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,76,0,0" Text="Potential share of InitReqs %" VerticalAlignment="Top"/>
-                        <TextBox Name="PotShareInitReqsTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="220,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="50" Background="#FFEDEDED"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,76,0,0" Text="Potential share of InitReqs" VerticalAlignment="Top"/>
+                        <TextBlock Name="PotShareInitReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,75,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,101,0,0" Text="Current share of MinReqs %" VerticalAlignment="Top"/>
-                        <TextBox Name="CurShareMinReqsTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="220,100,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="50" Background="#FFEDEDED"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,101,0,0" Text="Current share of MinReqs" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareMinReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,100,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,126,0,0" Text="Current share of base assets %" VerticalAlignment="Top"/>
-                        <TextBox Name="CurShareBaseAssetsTxt" IsReadOnly="True" HorizontalAlignment="Left" Margin="220,125,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="50" Background="#FFEDEDED"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,126,0,0" Text="Current share of base assets" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareBaseAssetsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,125,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
 
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,176,0,0" Text="Equity tolerance from the average %" VerticalAlignment="Top"/>
-                        <TextBox Name="ToleranceEquityTxt" HorizontalAlignment="Left" Margin="240,175,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,176,0,0" Text="Equity tolerance from the average" VerticalAlignment="Top"/>
+                        <TextBox Name="ToleranceEquityTxt" HorizontalAlignment="Left" Margin="230,175,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="0,201,0,0" Text="Position tolerance multiplier" VerticalAlignment="Top"/>
-                        <TextBox Name="TolerancePositionTxt" HorizontalAlignment="Left" Margin="240,200,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBox Name="TolerancePositionTxt" HorizontalAlignment="Left" Margin="230,200,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,226,0,0" Text="Optimal share of base assets %" VerticalAlignment="Top"/>
-                        <TextBox Name="OptShareBaseAssetsTxt" HorizontalAlignment="Left" Margin="240,225,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,226,0,0" Text="Optimal share of base assets" VerticalAlignment="Top"/>
+                        <TextBox Name="OptShareBaseAssetsTxt" HorizontalAlignment="Left" Margin="230,225,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,251,0,0" Text="Tolerance share of base assets %" VerticalAlignment="Top"/>
-                        <TextBox Name="ToleranceBaseAssetsTxt" HorizontalAlignment="Left" Margin="240,250,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,251,0,0" Text="Tolerance share of base assets" VerticalAlignment="Top"/>
+                        <TextBox Name="ToleranceBaseAssetsTxt" HorizontalAlignment="Left" Margin="230,250,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,276,0,0" Text="Maximum share of InitReqs position %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsPositionTxt" HorizontalAlignment="Left" Margin="240,275,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,276,0,0" Text="Maximum share of position InitReqs" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsPositionTxt" HorizontalAlignment="Left" Margin="230,275,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,301,0,0" Text="Maximum share of InitReqs tool %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsToolTxt" HorizontalAlignment="Left" Margin="240,300,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,301,0,0" Text="Maximum share of tool InitReqs" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsToolTxt" HorizontalAlignment="Left" Margin="230,300,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,326,0,0" Text="Maximum share of MinReqs portfolio %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareMinReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,325,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,326,0,0" Text="Maximum share of portfolio MinReqs" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareMinReqsPortfolioTxt" HorizontalAlignment="Left" Margin="230,325,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,351,0,0" Text="Maximum share of InitReqs portfolio %" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="240,350,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,351,0,0" Text="Maximum share of portfolio InitReqs" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="230,350,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="280,1,0,0" Text="Tools by priority" VerticalAlignment="Top" FontWeight="Bold"/>
                         <ListView Name="ToolsByPriorityView" Margin="280,25,0,0" Height="350" VerticalAlignment="Top">
@@ -212,7 +227,7 @@
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MarketName}" Width="100">Market</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=ShortName}" Width="180">Name</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="70">Seccode</GridViewColumn>
-                                <GridViewColumn CellTemplate="{StaticResource SaldoIn}"  Width="150">Incoming position</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource SaldoIn}" Width="150">Incoming position</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource PL}" Width="150">P/L</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource Saldo}" Width="150">Position</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource UnrealPL}" Width="100">Unreal P/L</GridViewColumn>
@@ -226,12 +241,12 @@
             </TabItem>
             <TabItem Header="Toolbar" Margin="20,-2,-20,0" Width="85">
                 <Grid>
-                    <ListView Name="ToolsView" FontWeight="Bold">
+                    <ListView Name="ToolsView" FontWeight="Bold" ItemContainerStyle="{StaticResource Norm}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="60">Name</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ShortName}" Width="90">Security</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.LastTrade.Price}" Width="70">Last trade</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource LastTrade}" Width="70">Last trade</GridViewColumn>
                                 <GridViewColumn Width="50">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
@@ -250,8 +265,8 @@
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.ShortName}" Width="100">Basic security</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Seccode}" Width="100">Basic seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Bars.Close.Length}" Width="70">Basic bars</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.InitReqLong}" Width="100">InitReqLong</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.InitReqShort}" Width="100">InitReqShort</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource InitReqLong}"  Width="100">InitReqLong</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource InitReqShort}"  Width="100">InitReqShort</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.RiskrateLong}" Width="50">RiskL</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ReserateLong}" Width="50">ResL</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.RiskrateShort}" Width="50">RiskS</GridViewColumn>

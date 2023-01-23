@@ -206,36 +206,86 @@ public partial class MainWindow : Window
         SessionTxt.SetBinding(TextBox.TextProperty,
             new Binding() { Source = MySettings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
 
-        AverageEquityTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = Portfolio, Path = new PropertyPath("AverageEquity"), Mode = BindingMode.OneWay });
-        CurShareInitReqsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = Portfolio, Path = new PropertyPath("ShareInitReqs"), Mode = BindingMode.OneWay });
-        PotShareInitReqsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = Portfolio, Path = new PropertyPath("PotentialShareInitReqs"), Mode = BindingMode.OneWay });
-        CurShareMinReqsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = Portfolio, Path = new PropertyPath("ShareMinReqs"), Mode = BindingMode.OneWay });
-        CurShareBaseAssetsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = Portfolio, Path = new PropertyPath("ShareBaseAssets"), Mode = BindingMode.OneWay });
+        AverageEquityTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = Portfolio,
+            Path = new PropertyPath("AverageEquity"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "### ### ### УЕ"
+        });
+        CurShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = Portfolio,
+            Path = new PropertyPath("ShareInitReqs"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        PotShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = Portfolio,
+            Path = new PropertyPath("PotentialShareInitReqs"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        CurShareMinReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = Portfolio,
+            Path = new PropertyPath("ShareMinReqs"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        CurShareBaseAssetsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = Portfolio,
+            Path = new PropertyPath("ShareBaseAssets"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
 
 
-        ToleranceEquityTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceEquity"), Mode = BindingMode.TwoWay });
+        ToleranceEquityTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("ToleranceEquity"),
+            Mode = BindingMode.TwoWay, StringFormat = "#'%'"
+        });
         TolerancePositionTxt.SetBinding(TextBox.TextProperty,
             new Binding() { Source = MySettings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
 
-        OptShareBaseAssetsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("OptShareBaseAssets"), Mode = BindingMode.TwoWay });
-        ToleranceBaseAssetsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ToleranceBaseAssets"), Mode = BindingMode.TwoWay });
+        OptShareBaseAssetsTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("OptShareBaseAssets"),
+            Mode = BindingMode.TwoWay, StringFormat = "#'%'"
+        });
+        ToleranceBaseAssetsTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("ToleranceBaseAssets"),
+            Mode = BindingMode.TwoWay,
+            StringFormat = "#'%'"
+        });
 
-        MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPosition"), Mode = BindingMode.TwoWay });
-        MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsTool"), Mode = BindingMode.TwoWay });
-        MaxShareInitReqsPortfolioTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPortfolio"), Mode = BindingMode.TwoWay });
-        MaxShareMinReqsPortfolioTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("MaxShareMinReqsPortfolio"), Mode = BindingMode.TwoWay });
+        MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPosition"),
+            Mode = BindingMode.TwoWay, StringFormat = "#'%'"
+        });
+        MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("MaxShareInitReqsTool"),
+            Mode = BindingMode.TwoWay,
+            StringFormat = "#'%'"
+        });
+        MaxShareInitReqsPortfolioTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("MaxShareInitReqsPortfolio"),
+            Mode = BindingMode.TwoWay,
+            StringFormat = "#'%'"
+        });
+        MaxShareMinReqsPortfolioTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = MySettings, Path = new PropertyPath("MaxShareMinReqsPortfolio"),
+            Mode = BindingMode.TwoWay,
+            StringFormat = "#'%'"
+        });
 
         ShelflifeTradesTxt.SetBinding(TextBox.TextProperty,
             new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTrades"), Mode = BindingMode.TwoWay });
@@ -395,7 +445,7 @@ public partial class MainWindow : Window
                     // Переподключение по расписанию
                     if (MySettings.ScheduledConnection && DateTime.Now.Minute == 50)
                     {
-                        if (DateTime.Now.Hour == 18 && DateTime.Now.Second < 3 || DateTime.Now < DateTime.Today.AddMinutes(400))
+                        if (DateTime.Now < DateTime.Today.AddMinutes(400)) //DateTime.Now.Hour == 18 && DateTime.Now.Second < 3
                         {
                             Task TaskDisconnect = Task.Run(() => Disconnect(true));
                             if (!TaskDisconnect.Wait(300000))
