@@ -2,6 +2,7 @@
 using System.Linq;
 using System.ComponentModel;
 using System.Windows.Data;
+using System.Windows.Media;
 using System.Windows.Controls;
 using System.Collections.Generic;
 using OxyPlot;
@@ -55,7 +56,7 @@ public partial class Tool : INotifyPropertyChanged
     }
 
     [field: NonSerialized] public PlotController Controller { get; set; }
-    [field: NonSerialized] public System.Windows.Media.Brush BrushState { get; set; }
+    [field: NonSerialized] public Brush BrushState { get; set; }
 
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
     private void NotifyChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
@@ -72,7 +73,7 @@ public partial class Tool : INotifyPropertyChanged
         Controller = new PlotController();
         Controller.BindMouseDown(OxyMouseButton.Left, PlotCommands.PanAt);
         Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
-        BrushState = System.Windows.Media.Brushes.Red;
+        BrushState = Brushes.Red;
     }
     #endregion
 
@@ -89,13 +90,13 @@ public partial class Tool : INotifyPropertyChanged
 
         if (Active)
         {
-            BrushState = System.Windows.Media.Brushes.Green;
+            BrushState = Brushes.Green;
             (MyTabItem.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
         }
         else
         {
-            BrushState = System.Windows.Media.Brushes.Red;
+            BrushState = Brushes.Red;
             (MyTabItem.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
@@ -141,7 +142,7 @@ public partial class Tool : INotifyPropertyChanged
                 });
             }
 
-            BrushState = System.Windows.Media.Brushes.Red;
+            BrushState = Brushes.Red;
             ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
                 .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
@@ -169,7 +170,7 @@ public partial class Tool : INotifyPropertyChanged
                     return true;
                 })) return;
             }
-            BrushState = StopTrading ? System.Windows.Media.Brushes.Yellow : System.Windows.Media.Brushes.Green;
+            BrushState = StopTrading ? Brushes.Yellow : Brushes.Green;
             Active = true;
             ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
                 .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
@@ -241,6 +242,12 @@ public partial class Tool : INotifyPropertyChanged
             ItemsSource = MyItems,
             TrackerFormatString = "High: {3:0.0000}\nLow: {4:0.0000}\nOpen: {5:0.0000}\nClose: {6:0.0000}"
         };
+
+        Theme.Color(NewModel);
+        Theme.Color(xAxis);
+        Theme.Color(yAxis);
+        Theme.Color(Candles);
+
         NewModel.Axes.Add(xAxis);
         NewModel.Axes.Add(yAxis);
         NewModel.Series.Add(Candles);
@@ -351,6 +358,11 @@ public partial class Tool : INotifyPropertyChanged
         yAxis.ExtraGridlines = Gridlines;
         yAxis.ExtraGridlineThickness = 2;
 
+        Theme.Color(Model);
+        Theme.Color(xAxis);
+        Theme.Color(yAxis);
+        yAxis.ExtraGridlineColor = OxyColors.Gray;
+
         Model.Axes.Add(xAxis);
         Model.Axes.Add(yAxis);
         foreach (Series MySeries in ListSeries) Model.Series.Add(MySeries);
@@ -389,13 +401,13 @@ public partial class Tool : INotifyPropertyChanged
             {
                 if (MyTrade.BuySell == "B")
                 {
-                    MyColor = OxyColors.Green;
+                    MyColor = Theme.GreenBar;
                     yStartPoint = MySecurity.Bars.Low[i] - MySecurity.Bars.Low[i] * 0.001;
                     yEndPoint = MySecurity.Bars.Low[i];
                 }
                 else
                 {
-                    MyColor = OxyColors.Red;
+                    MyColor = Theme.RedBar;
                     yStartPoint = MySecurity.Bars.High[i] + MySecurity.Bars.High[i] * 0.001;
                     yEndPoint = MySecurity.Bars.High[i];
                 }
@@ -427,7 +439,7 @@ public partial class Tool : INotifyPropertyChanged
                 Type = LineAnnotationType.Horizontal,
                 Y = ActiveOrder.Price,
                 MinimumX = MainModel.Axes[0].ActualMaximum - 20,
-                Color = ActiveOrder.BuySell == "B" ? OxyColors.DarkGreen : OxyColors.DarkRed,
+                Color = ActiveOrder.BuySell == "B" ? Theme.GreenBar : Theme.RedBar,
                 ToolTip = ActiveOrder.Sender,
                 Text = ActiveOrder.Signal,
                 StrokeThickness = 2
@@ -438,7 +450,7 @@ public partial class Tool : INotifyPropertyChanged
     {
         DataPoint[] Points = new DataPoint[Indicator.Length];
         for (int i = 0; i < Indicator.Length; i++) Points[i] = new DataPoint(i, Indicator[i]);
-        return new LineSeries() { ItemsSource = Points, Color = OxyColors.DarkBlue, Title = Name };
+        return new LineSeries() { ItemsSource = Points, Color = Theme.Indicator, Title = Name };
     }
     private static void AutoScaling(CandleStickSeries Candles, DateTimeAxis xAxis, LinearAxis yAxis)
     {

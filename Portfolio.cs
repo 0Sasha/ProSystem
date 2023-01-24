@@ -25,7 +25,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
         {
             inReqs = value;
             ShareInitReqs = Math.Round(inReqs / Saldo * 100, 2);
-            UpdateView();
+            UpdatePositions();
             NotifyChanged();
         }
     } // Начальные требования
@@ -123,10 +123,11 @@ public class UnitedPortfolio : INotifyPropertyChanged
             AddInfo("Portfolio: Потенциальные начальные требования портфеля превышают норму: " +
                 settings.MaxShareInitReqsPortfolio + "%. PotentialInitReqs: " + PotentialShareInitReqs + "%", notify: true);
     }
-    public void UpdateView()
+    public void UpdatePositions()
     {
         try
         {
+            Positions.RemoveAll(x => x.Saldo == 0);
             AllPositions = new(MoneyPositions.Concat(Positions.OrderBy(x => x.ShortName))) { this };
             Window.Dispatcher.Invoke(() =>
             {
@@ -134,7 +135,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
                 Window.PortfolioView.ScrollIntoView(this);
             });
         }
-        catch (Exception ex) { AddInfo("UpdateView исключение: " + ex.Message); }
+        catch (Exception ex) { AddInfo("UpdatePositions исключение: " + ex.Message); }
     }
     public void UpdateEquity(DateTime dateTimeOpenPeriod)
     {

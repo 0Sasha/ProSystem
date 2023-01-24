@@ -796,7 +796,7 @@ public partial class Tool
     {
         (MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor =
             NowBidding && (!ShowBasicSecurity || ShowBasicSecurity && BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
-            OxyPlot.OxyColors.Red : OxyPlot.OxyColors.Black;
+            Theme.RedBar : Theme.FadedBar;
         MainModel.InvalidatePlot(false);
 
         Window.Dispatcher.Invoke(() =>

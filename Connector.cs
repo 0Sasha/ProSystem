@@ -165,8 +165,8 @@ internal static class TXmlConnector
                 bool Filter = MySecurity.Market != "4";
                 while (XR.Read())
                 {
-                    if (Filter && XR.HasAttributes && sDateTime.Count > 0 &&
-                        sDateTime[^1].Date != DateTime.ParseExact(XR.GetAttribute("date"), DTForm, IC).Date &&
+                    if (Filter && XR.HasAttributes && (sDateTime.Count == 0 ||
+                        sDateTime[^1].Date != DateTime.ParseExact(XR.GetAttribute("date"), DTForm, IC).Date) &&
                         double.Parse(XR.GetAttribute("high"), IC) - double.Parse(XR.GetAttribute("low"), IC) < 0.00001) XR.Read();
                     if (XR.HasAttributes) // Чтение и запись данных
                     {
@@ -1075,7 +1075,7 @@ internal static class TXmlConnector
             "</seccode></security><period>" + Period + "</period><count>" + Count + "</count><reset>" + Reset + "</reset></command>";
 
         string Result = ConnectorSendCommand(Сommand);
-        if (Result != "<result success=\"true\"/>") AddInfo("GetHistoryData: " + Result);
+        if (Result != "<result success=\"true\"/>") AddInfo("GetHistoryData: " + Result + "\n Command: " + Сommand);
     }
     public static void GetSecurityInfo(string Market, string Seccode)
     {
