@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Windows;
 using System.Windows.Data;
@@ -10,7 +11,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using static ProSystem.TXmlConnector;
-
 namespace ProSystem;
 
 public partial class MainWindow : Window
@@ -189,6 +189,48 @@ public partial class MainWindow : Window
                 catch (Exception ex) { AddInfo("Исходный файл не восстановлен: " + ex.Message); }
             }
             else AddInfo("Исходный файл не восстановлен, поскольку нет копии файла");
+            return false;
+        }
+    }
+    private static async Task<bool> CompressFilesAndRemove(string directory, string partName)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                var paths = Directory.GetFiles(directory).Where(x => x.Contains(partName)).ToArray();
+                if (paths.Length == 0)
+                {
+                    AddInfo("CompressFiles: Файлы не найдены. " + directory + "/" + partName);
+                    return false;
+                }
+
+                foreach (var path in paths)
+                {
+                    using FileStream sourceStream = new(path, FileMode.Open);
+                    using FileStream targetStream = File.Create(path + ".zip");
+
+                    using GZipStream compressionStream = new(targetStream, CompressionLevel.SmallestSize);
+                    await sourceStream.CopyToAsync(compressionStream);
+
+                    if (targetStream.Length > 0)
+                    {
+                        sourceStream.Close();
+                        File.Delete(path);
+                    }
+                    else AddInfo("CompressFiles: Исходный файл не удалён, поскольку поток целевого файла пустой.");
+                }
+                return true;
+            }
+            else
+            {
+                AddInfo("CompressFiles: Директория " + directory + " не существует");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            AddInfo("CompressFiles: " + ex.Message);
             return false;
         }
     }

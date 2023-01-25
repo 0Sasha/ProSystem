@@ -488,6 +488,7 @@ public partial class MainWindow : Window
                     BackupServer = false;
                     Portfolio.UpdateEquity(DateTime.Today.AddDays(-1));
                     Portfolio.CheckEquity(MySettings.ToleranceEquity);
+                    Task.Run(() => CompressFilesAndRemove("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd")));
                 }
             }
             else System.Threading.Thread.Sleep(10);
