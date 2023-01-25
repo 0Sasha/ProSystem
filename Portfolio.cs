@@ -11,8 +11,6 @@ public class UnitedPortfolio : INotifyPropertyChanged
 {
     private double inReqs;
     private double minReqs;
-    private double potShareInReqs;
-    private double shareBA;
 
     public string Union { get; set; } // Код юниона
     public double SaldoIn { get; set; } // Входящая оценка стоимости единого портфеля
@@ -45,26 +43,11 @@ public class UnitedPortfolio : INotifyPropertyChanged
     public double VarMargin { get; set; } // Вариационная маржа FORTS
     public double FinRes { get; set; } // Финансовый результат последнего клиринга FORTS
 
-    public double ShareBaseAssets
-    {
-        get => shareBA;
-        set
-        {
-            shareBA = value;
-            NotifyChanged();
-        }
-    } // Доля базовых активов
+    public double ShareBaseAssets { get; private set; } // Доля базовых активов
+    public double ShareInitReqsBaseAssets { get; private set; } // Доля начальных требований базовых активов
     public double ShareInitReqs { get; private set; } // Доля начальных требований
     public double ShareMinReqs { get; private set; } // Доля минимальных требования
-    public double PotentialShareInitReqs
-    {
-        get => potShareInReqs;
-        set
-        {
-            potShareInReqs = value;
-            NotifyChanged();
-        }
-    } // Доля потенциальных начальных требований
+    public double PotentialShareInitReqs { get; private set; } // Потенциальная доля начальных требований
 
     public Dictionary<DateTime, int> Equity { get; set; } = new();
     public int AverageEquity
@@ -89,7 +72,8 @@ public class UnitedPortfolio : INotifyPropertyChanged
     public void UpdateSharesAndCheck(Tool[] tools, Settings settings)
     {
         double sumPotInitReqs = 0;
-        double sumReqsBaseBalance = 0;
+        double sumInitReqsBaseAssets = 0;
+        double sumReqsBaseAssets = 0;
         foreach (var tool in tools)
         {
             if (tool.Active)
@@ -103,16 +87,21 @@ public class UnitedPortfolio : INotifyPropertyChanged
 
                 if (tool.UseShiftBalance)
                 {
-                    sumReqsBaseBalance += tool.BaseBalance *
+                    sumReqsBaseAssets += tool.BaseBalance *
                         (tool.MySecurity.LastTrade.Price / tool.MySecurity.MinStep * tool.MySecurity.MinStepCost);
-                    sumPotInitReqs += Math.Abs(tool.BaseBalance) *
-                        Math.Max(tool.MySecurity.InitReqLong, tool.MySecurity.InitReqShort);
+
+                    var inReqsBaseAssets = tool.BaseBalance > 0 ?
+                        tool.BaseBalance * tool.MySecurity.InitReqLong : -tool.BaseBalance * tool.MySecurity.InitReqShort;
+
+                    sumPotInitReqs += inReqsBaseAssets;
+                    sumInitReqsBaseAssets += inReqsBaseAssets;
                 }
             }
         }
 
         PotentialShareInitReqs = Math.Round(sumPotInitReqs / Saldo * 100, 2);
-        ShareBaseAssets = Math.Round(sumReqsBaseBalance / Saldo * 100, 2);
+        ShareBaseAssets = Math.Round(sumReqsBaseAssets / Saldo * 100, 2);
+        ShareInitReqsBaseAssets = Math.Round(sumInitReqsBaseAssets / Saldo * 100, 2);
 
         if (ShareBaseAssets > settings.OptShareBaseAssets + settings.ToleranceBaseAssets ||
             ShareBaseAssets < settings.OptShareBaseAssets - settings.ToleranceBaseAssets)

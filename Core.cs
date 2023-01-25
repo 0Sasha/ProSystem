@@ -220,6 +220,13 @@ public partial class MainWindow : Window
             Mode = BindingMode.OneWay,
             StringFormat = "#.##'%'"
         });
+        CurShareInitReqsBaseTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = Portfolio,
+            Path = new PropertyPath("ShareInitReqsBaseAssets"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
         PotShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = Portfolio,
