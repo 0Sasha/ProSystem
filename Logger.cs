@@ -3,13 +3,12 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using static ProSystem.MainWindow;
-
 namespace ProSystem;
 
 public static class Logger
 {
     private static StreamWriter Writer;
-    public static void StartLogging()
+    public static void StartLogging(bool subscribe = false)
     {
         if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
         string Path = "Logs/" + DateTime.Today.ToShortDateString() + ".txt";
@@ -18,9 +17,12 @@ public static class Logger
         WriteLogSystem("Start logging");
         Writer.Flush();
 
-        AppDomain CurrentDomain = AppDomain.CurrentDomain;
-        CurrentDomain.UnhandledException += new(WriteLogUnhandledException);
-        TaskScheduler.UnobservedTaskException += new(WriteLogTaskException);
+        if (subscribe)
+        {
+            AppDomain CurrentDomain = AppDomain.CurrentDomain;
+            CurrentDomain.UnhandledException += new(WriteLogUnhandledException);
+            TaskScheduler.UnobservedTaskException += new(WriteLogTaskException);
+        }
     }
     public static void WriteLogSystem(string Data)
     {

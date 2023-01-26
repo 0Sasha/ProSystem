@@ -118,7 +118,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Window = this;
-        Logger.StartLogging();
+        Logger.StartLogging(true);
 
         // Восстановление данных и проверка настроек
         DeserializeData();
@@ -488,14 +488,18 @@ public partial class MainWindow : Window
                     else if (!MySettings.ScheduledConnection && DateTime.Now.Minute is 0 or 30)
                         MySettings.ScheduledConnection = true;
                 }
-                else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0 && DateTime.Now.Second < 2)
+                else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0 && DateTime.Now.Second < 15)
                 {
-                    Logger.StopLogging();
-                    Logger.StartLogging();
                     BackupServer = false;
-                    Portfolio.UpdateEquity(DateTime.Today.AddDays(-1));
-                    Portfolio.CheckEquity(MySettings.ToleranceEquity);
-                    Task.Run(() => CompressFilesAndRemove("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd")));
+                    Task.Run(() =>
+                    {
+                        Logger.StopLogging();
+                        Logger.StartLogging();
+                        Portfolio.UpdateEquity(DateTime.Today.AddDays(-1));
+                        Portfolio.CheckEquity(MySettings.ToleranceEquity);
+                        _ = CompressFilesAndRemove("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"));
+                    });
+                    System.Threading.Thread.Sleep(18000);
                 }
             }
             else System.Threading.Thread.Sleep(10);
