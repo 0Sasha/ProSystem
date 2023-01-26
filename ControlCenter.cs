@@ -268,7 +268,7 @@ public partial class Tool
                     UnknowOrder.Signal = SystemOrders[i].Signal;
                     UnknowOrder.Note = SystemOrders[i].Note;
                     Window.Dispatcher.Invoke(() => SystemOrders[i] = UnknowOrder);
-                    break;
+                    continue;
                 }
             }
         }
@@ -298,7 +298,7 @@ public partial class Tool
                     UnknowTrade.SignalOrder = SystemOrders[i].Signal;
                     UnknowTrade.NoteOrder = SystemOrders[i].Note;
                     Window.Dispatcher.Invoke(() => SystemTrades.Add(UnknowTrade));
-                    break;
+                    continue;
                 }
             }
         }
@@ -536,6 +536,10 @@ public partial class Tool
             return;
         }
 
+        bool NeedToNormalizeUp =
+            Balance > 0 && Balance + Math.Ceiling(Balance * 0.04) + 0.2 < ClearVolumes.Item1 ||
+            Balance < 0 && -Balance + Math.Ceiling(-Balance * 0.04) + 0.2 < ClearVolumes.Item2;
+
         Order ActiveOrder = ActiveOrders.SingleOrDefault();
         if (ActiveOrder != null)
         {
@@ -556,8 +560,7 @@ public partial class Tool
                     ReplaceOrder(ActiveOrder, MySecurity, OrderType.Limit,
                         MySecurity.Bars.Close[^2], Volume, "Normalization", null, "NM");
             }
-            else if ((ActiveOrder.BuySell == "B") == Balance > 0 &&
-                (Balance > 0 && Balance + 1 < PosVolumes.Item1 || Balance < 0 && -Balance + 1 < PosVolumes.Item2))
+            else if ((ActiveOrder.BuySell == "B") == Balance > 0 && NeedToNormalizeUp)
             {
                 foreach (IScript MyScript in Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
@@ -590,12 +593,11 @@ public partial class Tool
             SendOrder(MySecurity, OrderType.Limit, Balance < 0, MySecurity.Bars.Close[^2], Volume, "Normalization", null, "NM");
             WriteLogNM(Balance, PosVolumes);
         }
-        else if (Balance > 0 && Balance + Math.Ceiling(Balance * 0.04) + 0.2 < ClearVolumes.Item1 ||
-            Balance < 0 && -Balance + Math.Ceiling(-Balance * 0.04) + 0.2 < ClearVolumes.Item2)
+        else if (NeedToNormalizeUp)
         {
             foreach (IScript MyScript in Scripts)
-                if (MyScript.ActiveOrder != null && (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 ||
-                    MyScript.ActiveOrder.Note == "PartEx" ||
+                if (MyScript.ActiveOrder != null &&
+                    (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 || MyScript.ActiveOrder.Note == "PartEx" ||
                     Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)) return;
 
             foreach (IScript MyScript in Scripts)
