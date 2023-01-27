@@ -268,7 +268,6 @@ public partial class Tool
                     UnknowOrder.Signal = SystemOrders[i].Signal;
                     UnknowOrder.Note = SystemOrders[i].Note;
                     Window.Dispatcher.Invoke(() => SystemOrders[i] = UnknowOrder);
-                    continue;
                 }
             }
         }
@@ -298,7 +297,6 @@ public partial class Tool
                     UnknowTrade.SignalOrder = SystemOrders[i].Signal;
                     UnknowTrade.NoteOrder = SystemOrders[i].Note;
                     Window.Dispatcher.Invoke(() => SystemTrades.Add(UnknowTrade));
-                    continue;
                 }
             }
         }

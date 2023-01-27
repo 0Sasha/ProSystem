@@ -103,6 +103,7 @@ public class Trade
     public Trade() { }
     public Trade(long TradeNo) { this.TradeNo = TradeNo; }
     public Trade(DateTime DateTime) { this.DateTime = DateTime; }
+    public Trade GetCopy() => (Trade)MemberwiseClone();
 }
 
 public class Market

@@ -7,8 +7,7 @@
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
         Closing="ClosingMainWindow"
-        Title="ProSystem" Height="950" Width="1350"
-        MinHeight="500" MinWidth="725" FontSize="13">
+        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="725" FontSize="13">
     <Window.Resources>
         <Style x:Key="Narrow" TargetType="ListViewItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

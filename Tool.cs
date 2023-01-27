@@ -251,7 +251,7 @@ public partial class Tool : INotifyPropertyChanged
         NewModel.Axes.Add(xAxis);
         NewModel.Axes.Add(yAxis);
         NewModel.Series.Add(Candles);
-        NewModel.PlotMargins = new OxyThickness(0, 0, 45, 20);
+        NewModel.PlotMargins = new OxyThickness(0, 0, 50, 20);
 
         // Обработка исходной модели
         int Range = 100;
@@ -336,13 +336,15 @@ public partial class Tool : INotifyPropertyChanged
             if (MyScript.Result.Centre != -1)
                 Gridlines = new double[] { MyScript.Result.Centre + MyScript.Result.Level, MyScript.Result.Centre - MyScript.Result.Level };
 
+            List<OxyColor> colors = Theme.Indicators.ToList();
             foreach (double[] Indicator in MyScript.Result.Indicators)
             {
                 if (Indicator != null)
                 {
                     Points = new();
                     for (int i = 0; i < Indicator.Length; i++) Points.Add(new DataPoint(i, Indicator[i]));
-                    ListSeries.Add(new LineSeries() { ItemsSource = Points, Title = MyScript.Name });
+                    ListSeries.Add(new LineSeries() { ItemsSource = Points, Title = MyScript.Name, Color = colors[0] });
+                    if (colors.Count > 1) colors.RemoveAt(0);
                 }
             }
             if (ListSeries.Count > 1) Points = (ListSeries[0] as LineSeries).ItemsSource as List<DataPoint>;
@@ -356,17 +358,15 @@ public partial class Tool : INotifyPropertyChanged
         xAxis.Maximum = Points.Count + 4;
         xAxis.Minimum = xAxis.Maximum - Range > 1 ? xAxis.Maximum - Range : 1;
         yAxis.ExtraGridlines = Gridlines;
-        yAxis.ExtraGridlineThickness = 2;
 
         Theme.Color(Model);
-        Theme.Color(xAxis);
-        Theme.Color(yAxis);
-        yAxis.ExtraGridlineColor = OxyColors.Gray;
+        Theme.Color(xAxis, false);
+        Theme.Color(yAxis, false);
 
         Model.Axes.Add(xAxis);
         Model.Axes.Add(yAxis);
         foreach (Series MySeries in ListSeries) Model.Series.Add(MySeries);
-        Model.PlotMargins = new OxyThickness(0, 0, 45, 0);
+        Model.PlotMargins = new OxyThickness(0, 0, 50, 0);
 
         // Настройка новой модели
         MainModel.Axes[0].AxisChanged -= MiniHandler;
@@ -394,43 +394,72 @@ public partial class Tool : INotifyPropertyChanged
         int i;
         OxyColor MyColor;
         double yStartPoint, yEndPoint;
-        foreach (Trade MyTrade in MyTrades)
+        List<(Trade, int)> trades = new();
+        List<(Trade, int)> tradesOnlyWithPoint = new();
+        foreach (Trade trade in MyTrades)
         {
-            i = Array.FindIndex(MySecurity.Bars.DateTime, x => x.AddMinutes(MySecurity.Bars.TF) > MyTrade.DateTime);
-            if (i > -1)
+            i = Array.FindIndex(MySecurity.Bars.DateTime, x => x.AddMinutes(MySecurity.Bars.TF) > trade.DateTime);
+            if (i < 0)
             {
-                if (MyTrade.BuySell == "B")
-                {
-                    MyColor = Theme.GreenBar;
-                    yStartPoint = MySecurity.Bars.Low[i] - MySecurity.Bars.Low[i] * 0.001;
-                    yEndPoint = MySecurity.Bars.Low[i];
-                }
-                else
-                {
-                    MyColor = Theme.RedBar;
-                    yStartPoint = MySecurity.Bars.High[i] + MySecurity.Bars.High[i] * 0.001;
-                    yEndPoint = MySecurity.Bars.High[i];
-                }
-
-                MainModel.Annotations.Add(new ArrowAnnotation()
-                {
-                    Color = MyColor,
-                    Text = MyTrade.SignalOrder + "; " + MyTrade.Quantity + "; " + MyTrade.Price,
-                    StartPoint = new DataPoint(i, yStartPoint),
-                    EndPoint = new DataPoint(i, yEndPoint),
-                    ToolTip = MyTrade.SenderOrder
-                });
-                MainModel.Annotations.Add(new PointAnnotation()
-                {
-                    X = i,
-                    Y = MyTrade.Price,
-                    Fill = OxyColors.WhiteSmoke,
-                    Stroke = OxyColors.Black,
-                    StrokeThickness = 1,
-                    ToolTip = MyTrade.SenderOrder
-                });
+                AddInfo("AddAnnotations: Не найден бар, на котором произошла сделка.");
+                continue;
             }
-            else AddInfo("AddAnnotations: Не найден бар, на котором произошла сделка.");
+
+            var sameTrade = trades.SingleOrDefault(x => x.Item2 == i && x.Item1.BuySell == trade.BuySell);
+            if (sameTrade.Item1 != null)
+            {
+                sameTrade.Item1.Quantity += trade.Quantity;
+                if (sameTrade.Item1.Price != trade.Price) tradesOnlyWithPoint.Add((trade, i));
+            }
+            else trades.Add((trade.GetCopy(), i));
+        }
+        foreach ((Trade, int) MyTrade in trades)
+        {
+            var trade = MyTrade.Item1;
+            i = MyTrade.Item2;
+
+            if (trade.BuySell == "B")
+            {
+                MyColor = Theme.GreenBar;
+                yStartPoint = MySecurity.Bars.Low[i] - MySecurity.Bars.Low[i] * 0.001;
+                yEndPoint = MySecurity.Bars.Low[i];
+            }
+            else
+            {
+                MyColor = Theme.RedBar;
+                yStartPoint = MySecurity.Bars.High[i] + MySecurity.Bars.High[i] * 0.001;
+                yEndPoint = MySecurity.Bars.High[i];
+            }
+
+            MainModel.Annotations.Add(new ArrowAnnotation()
+            {
+                Color = MyColor,
+                Text = trade.SignalOrder + "; " + trade.Quantity + "; " + trade.Price,
+                StartPoint = new DataPoint(i, yStartPoint),
+                EndPoint = new DataPoint(i, yEndPoint),
+                ToolTip = trade.SenderOrder
+            });
+            MainModel.Annotations.Add(new PointAnnotation()
+            {
+                X = i,
+                Y = trade.Price,
+                Fill = OxyColors.WhiteSmoke,
+                Stroke = OxyColors.Black,
+                StrokeThickness = 1,
+                ToolTip = trade.SenderOrder
+            });
+        }
+        foreach ((Trade, int) MyTrade in tradesOnlyWithPoint)
+        {
+            MainModel.Annotations.Add(new PointAnnotation()
+            {
+                X = MyTrade.Item2,
+                Y = MyTrade.Item1.Price,
+                Fill = OxyColors.WhiteSmoke,
+                Stroke = OxyColors.Black,
+                StrokeThickness = 1,
+                ToolTip = MyTrade.Item1.SenderOrder
+            });
         }
         foreach (Order ActiveOrder in MyOrders)
         {
