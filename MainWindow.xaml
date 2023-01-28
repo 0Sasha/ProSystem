@@ -6,15 +6,15 @@
         xmlns:oxyWpf="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf" 
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
-        Closing="ClosingMainWindow"
+        Closing="ClosingMainWindow" Style="{StaticResource MainWindowStyle}"
         Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="725" FontSize="13">
     <Window.Resources>
-        <Style x:Key="Narrow" TargetType="ListViewItem">
+        <Style x:Key="Narrow" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Height" Value="16.5"/>
         </Style>
-        <Style x:Key="Norm" TargetType="ListViewItem">
+        <Style x:Key="Norm" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Height" Value="20"/>
@@ -56,9 +56,9 @@
             <RowDefinition Name="RowInfo" Height="1*"/>
             <RowDefinition Height="20"/>
         </Grid.RowDefinitions>
-        <TabControl Name="MainTabs" BorderBrush="Gray">
-            <TabItem Header="Main" Margin="22,-2,-22,0" Width="85">
-                <Grid>
+        <TabControl Name="MainTabs" BorderBrush="{StaticResource txtStroke}">
+            <TabItem Header="Main" Width="90" Height="28" VerticalAlignment="Top">
+                <Grid Margin="0,1">
                     <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="200" Height="125" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector" VerticalAlignment="Top" FontWeight="Bold"/>
                         <ComboBox Name="BoxConnectors" HorizontalAlignment="Left" Margin="75,0,0,0" VerticalAlignment="Top" FontSize="12" Width="125" Height="20"/>
@@ -167,8 +167,8 @@
                     </Grid>
                 </Grid>
             </TabItem>
-            <TabItem Header="Portfolio" Margin="21,-2,-21,0" Width="85">
-                <Grid>
+            <TabItem Header="Portfolio" Width="90" Height="28" VerticalAlignment="Top">
+                <Grid Margin="0,1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
                         <ColumnDefinition/>
@@ -177,7 +177,7 @@
                         <RowDefinition Height="1*"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
-                    <ListView Name="OrdersView" FontWeight="Bold" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Name="OrdersView" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Sender}" Width="120">Sender</GridViewColumn>
@@ -209,7 +209,7 @@
                             </ContextMenu>
                         </ListView.ContextMenu>
                     </ListView>
-                    <ListView Grid.Column="1" Name="TradesView" FontWeight="Bold" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Grid.Column="1" Name="TradesView" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
@@ -230,7 +230,7 @@
                             </ContextMenu>
                         </ListView.ContextMenu>
                     </ListView>
-                    <ListView Grid.Row="1" Name="PortfolioView" Grid.ColumnSpan="3" FontWeight="Bold" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Grid.Row="1" Name="PortfolioView" Grid.ColumnSpan="3" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MarketName}" Width="100">Market</GridViewColumn>
@@ -248,9 +248,9 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Toolbar" Margin="20,-2,-20,0" Width="85">
-                <Grid>
-                    <ListView Name="ToolsView" FontWeight="Bold" ItemContainerStyle="{StaticResource Norm}">
+            <TabItem Header="Toolbar" Width="90" Height="28" VerticalAlignment="Top">
+                <Grid Margin="0,1">
+                    <ListView Name="ToolsView" ItemContainerStyle="{StaticResource Norm}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="60">Name</GridViewColumn>
@@ -259,7 +259,7 @@
                                 <GridViewColumn Width="50">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="15"/>
+                                            <Button Style="{StaticResource nonTypBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="15"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -295,49 +295,45 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Tools" Margin="19,-2,-19,0" Width="85">
+            <TabItem Header="Tools" Width="90" Height="28" VerticalAlignment="Top">
                 <TabControl Name="TabsTools" FontSize="12"></TabControl>
             </TabItem>
-            <TabItem Header="Distribution" Margin="18,-2,-18,0" Width="85">
-                <Grid>
+            <TabItem Header="Distribution" Width="90" Height="28" VerticalAlignment="Top">
+                <Grid Margin="0,1">
                     <Grid.RowDefinitions>
-                        <RowDefinition MinHeight="26" Height="26"/>
+                        <RowDefinition MinHeight="28" Height="28"/>
+                        <RowDefinition Height="6*"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" BorderThickness="0.5" BorderBrush="Black"></Border>
-                    <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ShowDistributionInfo"/>
-                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" IsChecked="True" HorizontalAlignment="Left" Margin="115,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
-                    <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" IsChecked="True" HorizontalAlignment="Left" Margin="248,1,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
 
-                    <Border Grid.Row="1" BorderThickness="0.5" BorderBrush="Black">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="6*"/>
-                                <RowDefinition/>
-                            </Grid.RowDefinitions>
-                            <oxyWpf:PlotView Name="DistributionPlot" Grid.Row="0"/>
-                            <oxyWpf:PlotView Name="PortfolioPlot" Grid.Row="1"/>
-                        </Grid>
-                    </Border>
+                    <Border Grid.Row="0" BorderThickness="1" BorderBrush="{StaticResource txtStroke}"></Border>
+                    <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Height="24" Width="110" SelectionChanged="ShowDistributionInfo"/>
+                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" IsChecked="True" HorizontalAlignment="Left" Margin="115,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+                    <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" IsChecked="True" HorizontalAlignment="Left" Margin="248,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+
+                    <Border Grid.Row="1" Grid.RowSpan="2" Margin="0,2" BorderThickness="1" BorderBrush="{StaticResource txtStroke}"></Border>
+                    <oxyWpf:PlotView Name="DistributionPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtStroke}" Grid.Row="1"/>
+                    <oxyWpf:PlotView Name="PortfolioPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtStroke}" Grid.Row="2"/>
                 </Grid>
             </TabItem>
-            <TabItem Header="Info" Margin="17,-2,-17,0" Width="85">
-                <Grid>
+            <TabItem Header="Info" Width="90" Height="28" VerticalAlignment="Top">
+                <Grid Margin="0,1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
                         <ColumnDefinition/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="26" MinHeight="26"/>
+                        <RowDefinition Height="28" MinHeight="28"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" BorderThickness="0.5" BorderBrush="Black" Grid.ColumnSpan="2"></Border>
 
-                    <ComboBox Name="ComboBoxTool" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="1,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ComboBoxToolChanged"/>
-                    <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="112,1,0,0" VerticalAlignment="Top" Width="110" SelectionChanged="ShowScriptInfo"/>
-                    <Button Content="Show script info" HorizontalAlignment="Left" Margin="223,1,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowScriptInfo"/>
-                    <Button Content="Show system info" HorizontalAlignment="Left" Margin="334,1,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowSystemInfo"/>
-                    <ListView Name="OrdersInfo" Grid.Row="1" FontWeight="Bold" ItemContainerStyle="{StaticResource Narrow}">
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" BorderThickness="1" BorderBrush="{StaticResource txtStroke}"></Border>
+                    <ComboBox Name="ComboBoxTool" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Height="24" Width="110" SelectionChanged="ComboBoxToolChanged"/>
+                    <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="113,2,0,0" VerticalAlignment="Top" Height="24" Width="110" SelectionChanged="ShowScriptInfo"/>
+                    <Button Content="Show script info" HorizontalAlignment="Left" Margin="224,2,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowScriptInfo"/>
+                    <Button Content="Show system info" HorizontalAlignment="Left" Margin="335,2,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowSystemInfo"/>
+
+                    <ListView Name="OrdersInfo" Grid.Row="1" Margin="0,3" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Sender}" Width="120">Sender</GridViewColumn>
@@ -367,7 +363,7 @@
                             </ContextMenu>
                         </ListView.ContextMenu>
                     </ListView>
-                    <ListView Name="TradesInfo" Grid.Row="1" Grid.Column="1" FontWeight="Bold" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Name="TradesInfo" Grid.Row="1" Margin="0,2" Grid.Column="1" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
@@ -391,8 +387,9 @@
                 </Grid>
             </TabItem>
         </TabControl>
-        <Menu VerticalAlignment="Top" HorizontalAlignment="Left">
-            <MenuItem BorderBrush="Gray" Height="24" Width="25">
+        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2" Height="4" Width="90" 
+              Background="{StaticResource volBack}" BorderBrush="{StaticResource volStroke}">
+            <MenuItem HorizontalAlignment="Left" Height="4" Width="90">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
                 <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
                 <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
@@ -404,7 +401,7 @@
                 </MenuItem>
             </MenuItem>
         </Menu>
-        <TextBox Name="TxtBox" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontSize="11" FontWeight="Bold" Grid.Row="1">
+        <TextBox Name="TxtBox" Style="{StaticResource nonFocusTxt}" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontSize="11" FontWeight="Bold" Grid.Row="1">
             <TextBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Clear" Click="ClearInfo"></MenuItem>

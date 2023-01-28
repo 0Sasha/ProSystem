@@ -474,8 +474,8 @@ public partial class MainWindow : Window
             TabsTools.Items.Add(new TabItem()
             {
                 Header = Tools[^1].Name,
-                Width = 48,
-                Height = 18,
+                Width = 54,
+                Height = 24,
                 Content = GetGridTabTool(Tools[^1])
             });
             MySettings.ToolsByPriority.Add(MyTool.Name);
@@ -544,11 +544,20 @@ public partial class MainWindow : Window
         PlotGrid.RowDefinitions.Add(new() { MinHeight = 50, MaxHeight = 120 });
         PlotGrid.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star) });
 
-        OxyPlot.SkiaSharp.Wpf.PlotView PlotView = new() { Visibility = Visibility.Hidden };
+        OxyPlot.SkiaSharp.Wpf.PlotView PlotView = new()
+        {
+            Visibility = Visibility.Hidden,
+            Background = System.Windows.Media.Brushes.Black,
+            Foreground = System.Windows.Media.Brushes.White
+        };
         PlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Model") });
         PlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
 
-        OxyPlot.SkiaSharp.Wpf.PlotView MainPlotView = new();
+        OxyPlot.SkiaSharp.Wpf.PlotView MainPlotView = new()
+        {
+            Background = System.Windows.Media.Brushes.Black,
+            Foreground = System.Windows.Media.Brushes.White
+        };
         MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("MainModel") });
         MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
 
@@ -756,8 +765,12 @@ public partial class MainWindow : Window
         if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
 
         var Assets = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 3, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
-        var MaxVol = new OxyPlot.Series.BarSeries { FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black };
+        var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 3, StrokeColor = Theme.Gridline, StrokeThickness = 1 };
+        var MaxVol = new OxyPlot.Series.BarSeries
+        {
+            FillColor = OxyPlot.OxyColors.DarkGray,
+            StrokeColor = Theme.Gridline
+        };
         var Axis = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
@@ -772,6 +785,8 @@ public partial class MainWindow : Window
             },
             ExtraGridlineColor = OxyPlot.OxyColors.LightGray
         };
+        Theme.Color(Assets);
+        Theme.Color(Axis);
 
         string Filter = (string)ComboBoxDistrib.SelectedItem;
         Tool[] MyTools = Tools.Where(x => x.Active).ToArray();
@@ -789,7 +804,7 @@ public partial class MainWindow : Window
                     FactVol.Items.Add(new OxyPlot.Series.BarItem
                     {
                         Value = FactReq,
-                        Color = Pos.Saldo - shift > 0 ? OxyPlot.OxyColors.Green : OxyPlot.OxyColors.DarkGoldenrod
+                        Color = Pos.Saldo - shift > 0 ? Theme.GreenBar : OxyPlot.OxyColors.Goldenrod
                     });
                 }
                 else if (!(bool)OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
@@ -811,13 +826,15 @@ public partial class MainWindow : Window
         Model.Axes.Add(Assets);
         Model.Axes.Add(Axis);
         Model.PlotMargins = new OxyPlot.OxyThickness(55, 0, 0, 20);
+
+        Theme.Color(Model);
         DistributionPlot.Model = Model;
 
         var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
         var FactVolPorfolio = new OxyPlot.Series.BarSeries {
-            BarWidth = 2, FillColor = OxyPlot.OxyColors.DarkGoldenrod, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+            BarWidth = 2, FillColor = OxyPlot.OxyColors.Goldenrod, StrokeColor = Theme.Gridline, StrokeThickness = 1 };
         var MaxVolPorfolio = new OxyPlot.Series.BarSeries {
-            FillColor = OxyPlot.OxyColors.Black, StrokeColor = OxyPlot.OxyColors.Black, StrokeThickness = 1 };
+            FillColor = OxyPlot.OxyColors.DarkGray, StrokeColor = Theme.Gridline, StrokeThickness = 1 };
         var AxisPorfolio = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
@@ -831,6 +848,8 @@ public partial class MainWindow : Window
             },
             ExtraGridlineColor = OxyPlot.OxyColors.LightGray
         };
+        Theme.Color(AssetsPorfolio);
+        Theme.Color(AxisPorfolio);
 
         AssetsPorfolio.Labels.Add("Portfolio");
         FactVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.ShareInitReqs });
@@ -842,6 +861,7 @@ public partial class MainWindow : Window
         Model.Axes.Add(AssetsPorfolio);
         Model.Axes.Add(AxisPorfolio);
         Model.PlotMargins = new OxyPlot.OxyThickness(55, 0, 0, 20);
+        Theme.Color(Model);
         PortfolioPlot.Model = Model;
     }
 

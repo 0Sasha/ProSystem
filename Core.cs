@@ -327,8 +327,8 @@ public partial class MainWindow : Window
             TabsTools.Items.Add(new TabItem()
             {
                 Header = Tools[i].Name,
-                Width = 48,
-                Height = 18,
+                Width = 54,
+                Height = 24,
                 Content = GetGridTabTool(Tools[i])
             });
             Tools[i].Initialize(TabsTools.Items[i] as TabItem);

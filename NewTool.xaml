@@ -3,20 +3,20 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d"
+        mc:Ignorable="d" Style="{StaticResource UnresizableWindowStyle}"
         Title="Tool" Height="350" Width="460" ResizeMode="NoResize">
     <Grid>
         <TextBlock Text="Tool name" HorizontalAlignment="Left" Margin="10,12,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="ToolName" HorizontalAlignment="Left" Margin="100,10,0,0" VerticalAlignment="Top" Width="110" Height="20" FontWeight="Bold"/>
+        <TextBox Name="ToolName" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="100,10,0,0" VerticalAlignment="Top" Width="110" Height="20" FontWeight="Bold"/>
         <TextBlock Text="Traded security" HorizontalAlignment="Left" Margin="10,37,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="TradedSec" HorizontalAlignment="Left" Margin="100,35,0,0" VerticalAlignment="Top" Width="65" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <TextBox Name="TradedBoard" HorizontalAlignment="Left" Margin="170,35,0,0" VerticalAlignment="Top" Width="40" Height="20" IsReadOnly="True" FontWeight="Bold"/>
+        <TextBox Name="TradedSec" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="100,35,0,0" VerticalAlignment="Top" Width="65" Height="20" IsReadOnly="True" FontWeight="Bold"/>
+        <TextBox Name="TradedBoard" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="170,35,0,0" VerticalAlignment="Top" Width="40" Height="20" IsReadOnly="True" FontWeight="Bold"/>
         <TextBlock Text="Basic security" HorizontalAlignment="Left" Margin="10,62,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="BasicSec" HorizontalAlignment="Left" Margin="100,60,0,0" VerticalAlignment="Top" Width="65" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <TextBox Name="BasicBoard" HorizontalAlignment="Left" Margin="170,60,0,0" VerticalAlignment="Top" Width="40" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <ComboBox Name="BoxMarkets" SelectedValue="FORTS" HorizontalAlignment="Left" Margin="10,85,0,0" VerticalAlignment="Top" Width="80" Height="20"/>
-        <TextBox Name="SearchSec" HorizontalAlignment="Left" Margin="100,85,0,0" VerticalAlignment="Top" Width="110" Height="20" TextChanged="SearchSecChanged" FontWeight="Bold"/>
-        <ListView Name="SecuritiesView" HorizontalAlignment="Left" Margin="10,110,0,0" VerticalAlignment="Top" Width="200" Height="160">
+        <TextBox Name="BasicSec" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="100,60,0,0" VerticalAlignment="Top" Width="65" Height="20" IsReadOnly="True" FontWeight="Bold"/>
+        <TextBox Name="BasicBoard" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="170,60,0,0" VerticalAlignment="Top" Width="40" Height="20" IsReadOnly="True" FontWeight="Bold"/>
+        <ComboBox Name="BoxMarkets" Foreground="White" Template="{StaticResource typCombo}" SelectedValue="FORTS" HorizontalAlignment="Left" Margin="10,85,0,0" VerticalAlignment="Top" Width="80" Height="20"/>
+        <TextBox Name="SearchSec" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="100,85,0,0" VerticalAlignment="Top" Width="110" Height="20" TextChanged="SearchSecChanged" FontWeight="Bold"/>
+        <ListView Name="SecuritiesView" ItemContainerStyle="{StaticResource typViewItem}" HorizontalAlignment="Left" Margin="10,110,0,0" VerticalAlignment="Top" Width="200" Height="160">
             <ListView.View>
                 <GridView>
                     <GridViewColumn DisplayMemberBinding="{Binding Path=ShortName}" Width="90">Security name</GridViewColumn>
@@ -34,11 +34,11 @@
         </ListView>
         
         <TextBlock Text="Script name" HorizontalAlignment="Left" Margin="230,12,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="ScriptName" HorizontalAlignment="Left" Margin="320,10,0,0" VerticalAlignment="Top" Width="110" Height="20"/>
+        <TextBox Name="ScriptName" Template="{StaticResource typTxt}" Foreground="White" HorizontalAlignment="Left" Margin="320,10,0,0" VerticalAlignment="Top" Width="110" Height="20"/>
         <TextBlock Text="Script" HorizontalAlignment="Left" Margin="230,37,0,0" VerticalAlignment="Top"/>
-        <ComboBox Name="BoxScripts" HorizontalAlignment="Left" Margin="320,35,0,0" VerticalAlignment="Top" Width="85" Height="20" SelectionChanged="SelectionScriptChanged"/>
-        <Button Content="+" HorizontalAlignment="Left" Margin="410,35,0,0" VerticalAlignment="Top" Width="20" Click="AddScript" FontWeight="Bold"/>
-        <ListView Name="ScriptsView" HorizontalAlignment="Left" Margin="230,110,0,0" VerticalAlignment="Top" Width="200" Height="160">
+        <ComboBox Name="BoxScripts" Foreground="White" Template="{StaticResource typCombo}" HorizontalAlignment="Left" Margin="320,35,0,0" VerticalAlignment="Top" Width="85" Height="20" SelectionChanged="SelectionScriptChanged"/>
+        <Button Foreground="White" Template="{StaticResource typBtn}" Content="+" HorizontalAlignment="Left" Margin="410,35,0,0" VerticalAlignment="Top" Width="20" Click="AddScript"/>
+        <ListView Name="ScriptsView" ItemContainerStyle="{StaticResource typViewItem}" HorizontalAlignment="Left" Margin="230,110,0,0" VerticalAlignment="Top" Width="200" Height="160">
             <ListView.View>
                 <GridView>
                     <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="120">Script name</GridViewColumn>
@@ -52,6 +52,6 @@
             </ListView.ContextMenu>
         </ListView>
         
-        <Button Content="Save tool" HorizontalAlignment="Right" Margin="0,0,10,10" VerticalAlignment="Bottom" Width="80" Click="SaveTool"/>
+        <Button Foreground="White" Template="{StaticResource typBtn}" Content="Save tool" HorizontalAlignment="Right" Margin="0,0,10,10" VerticalAlignment="Bottom" Width="80" Click="SaveTool"/>
     </Grid>
 </Window>
