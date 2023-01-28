@@ -83,7 +83,7 @@ public partial class MainWindow : Window
                     {
                         Window.ConnectBtn.Content = "Connect";
                         Window.StCon.Fill =
-                        ConnectionSt == ConnectionState.Disconnected ? System.Windows.Media.Brushes.WhiteSmoke : System.Windows.Media.Brushes.Red;
+                        ConnectionSt == ConnectionState.Disconnected ? System.Windows.Media.Brushes.LightGray : System.Windows.Media.Brushes.Red;
                     }
                 });
             }

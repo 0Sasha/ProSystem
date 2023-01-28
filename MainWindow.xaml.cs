@@ -765,12 +765,8 @@ public partial class MainWindow : Window
         if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
 
         var Assets = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 3, StrokeColor = Theme.Gridline, StrokeThickness = 1 };
-        var MaxVol = new OxyPlot.Series.BarSeries
-        {
-            FillColor = OxyPlot.OxyColors.DarkGray,
-            StrokeColor = Theme.Gridline
-        };
+        var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 4, StrokeThickness = 0 };
+        var MaxVol = new OxyPlot.Series.BarSeries { FillColor = Theme.MaxVolume };
         var Axis = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
@@ -783,7 +779,6 @@ public partial class MainWindow : Window
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
                 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30
             },
-            ExtraGridlineColor = OxyPlot.OxyColors.LightGray
         };
         Theme.Color(Assets);
         Theme.Color(Axis);
@@ -804,7 +799,7 @@ public partial class MainWindow : Window
                     FactVol.Items.Add(new OxyPlot.Series.BarItem
                     {
                         Value = FactReq,
-                        Color = Pos.Saldo - shift > 0 ? Theme.GreenBar : OxyPlot.OxyColors.Goldenrod
+                        Color = Pos.Saldo - shift > 0 ? Theme.LongPosition : Theme.ShortPosition
                     });
                 }
                 else if (!(bool)OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
@@ -831,10 +826,8 @@ public partial class MainWindow : Window
         DistributionPlot.Model = Model;
 
         var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVolPorfolio = new OxyPlot.Series.BarSeries {
-            BarWidth = 2, FillColor = OxyPlot.OxyColors.Goldenrod, StrokeColor = Theme.Gridline, StrokeThickness = 1 };
-        var MaxVolPorfolio = new OxyPlot.Series.BarSeries {
-            FillColor = OxyPlot.OxyColors.DarkGray, StrokeColor = Theme.Gridline, StrokeThickness = 1 };
+        var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 4, FillColor = Theme.ShortPosition, StrokeThickness = 0 };
+        var MaxVolPorfolio = new OxyPlot.Series.BarSeries { FillColor = Theme.MaxVolume, StrokeThickness = 0 };
         var AxisPorfolio = new OxyPlot.Axes.LinearAxis
         {
             Position = OxyPlot.Axes.AxisPosition.Bottom,
@@ -846,7 +839,6 @@ public partial class MainWindow : Window
             {
                 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95
             },
-            ExtraGridlineColor = OxyPlot.OxyColors.LightGray
         };
         Theme.Color(AssetsPorfolio);
         Theme.Color(AxisPorfolio);

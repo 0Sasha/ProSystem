@@ -387,14 +387,13 @@
                 </Grid>
             </TabItem>
         </TabControl>
-        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Margin="2" Height="4" Width="90" 
-              Background="{StaticResource volBack}" BorderBrush="{StaticResource volStroke}">
-            <MenuItem HorizontalAlignment="Left" Height="4" Width="90">
+        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Margin="1,0" Height="30" Width="20">
+            <MenuItem HorizontalAlignment="Left" Height="28" Width="18">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
                 <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
                 <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
                 <MenuItem Header="Take login details" Click="TakeLoginDetails"></MenuItem>
-                <Separator/>
+                <Separator Background="{StaticResource txtStroke}"/>
                 <MenuItem Header="Resize control panel" Click="ResizeControlPanel"></MenuItem>
                 <MenuItem Header="Test">
                     <MenuItem Header="Test 1" Click="Test"></MenuItem>
@@ -409,7 +408,7 @@
             </TextBox.ContextMenu>
         </TextBox>
         <TextBlock Text="Connection" HorizontalAlignment="Left" Margin="5,1,0,0" VerticalAlignment="Top" Grid.Row="2"/>
-        <Rectangle Name="StCon" HorizontalAlignment="Left" Height="16" Width="16" Margin="75,2,0,0" Stroke="LightGray" VerticalAlignment="Top" Grid.Row="2"/>
+        <Rectangle Fill="LightGray" Name="StCon" HorizontalAlignment="Left" Height="16" Width="16" Margin="75,2,0,0" VerticalAlignment="Top" Grid.Row="2"/>
         <Button HorizontalAlignment="Right" Grid.Row="2" VerticalAlignment="Top" Width="20" Height="20" Click="ResizeInfoPanel" Background="White" BorderBrush="LightGray"/>
     </Grid>
 </Window>
