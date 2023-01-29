@@ -36,13 +36,12 @@ static class PlotColors
         (OxyColor)converter.ConvertBack(new Color() { R = 90, G = 90, B = 90, A = 255 }, typeof(OxyColor), null, null);
     private static readonly OxyColor longPos =
         (OxyColor)converter.ConvertBack(new Color() { R = 80, G = 180, B = 120, A = 255 }, typeof(OxyColor), null, null);
-    private static readonly OxyColor shortPos =
-        (OxyColor)converter.ConvertBack(new Color() { R = 215, G = 115, B = 25, A = 255 }, typeof(OxyColor), null, null);
+    private static readonly OxyColor orange = (OxyColor)converter.ConvertBack(Colors.Orange, typeof(OxyColor), null, null);
 
     private static readonly OxyColor[] blackIndicators = new OxyColor[]
     {
         greenBar, redBar,
-        OxyColors.Goldenrod, OxyColors.SkyBlue
+        orange, OxyColors.SkyBlue
     };
     private static readonly OxyColor[] whiteIndicators = new OxyColor[]
     {
@@ -53,7 +52,7 @@ static class PlotColors
     public static OxyColor Back { get => Colors.DarkTheme ? OxyColors.Black : OxyColors.White; }
     public static OxyColor Front { get => Colors.DarkTheme ? OxyColors.White : OxyColors.Black; }
     public static OxyColor Text { get => Colors.DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
-    public static OxyColor Indicator { get => Colors.DarkTheme ? OxyColors.Goldenrod : OxyColors.DarkBlue; }
+    public static OxyColor Indicator { get => Colors.DarkTheme ? orange : OxyColors.DarkBlue; }
     public static OxyColor GreenBar { get => Colors.DarkTheme ? greenBar : OxyColors.Green; }
     public static OxyColor RedBar { get => Colors.DarkTheme ? redBar : OxyColors.Red; }
     public static OxyColor FadedBar { get => Colors.DarkTheme ? OxyColors.LightGray : OxyColors.Black; }

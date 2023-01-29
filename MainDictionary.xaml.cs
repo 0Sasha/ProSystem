@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Windows;
+using System.Windows.Input;
 using System.Windows.Controls;
 namespace ProSystem;
 
@@ -11,25 +13,38 @@ public partial class MainDictionary
         Dictionary = this;
     }
 
-    private void AutoMinimize_Event(object sender, System.Windows.RoutedEventArgs e)
+    private void AutoMinimize_Event(object sender, RoutedEventArgs e)
     {
-        var Window = (sender as Button).TemplatedParent as System.Windows.Window;
+        var Window = (sender as Button).TemplatedParent as Window;
         if (Window == null) return;
-        Window.WindowState = Window.WindowState == System.Windows.WindowState.Maximized ?
-            Window.WindowState = System.Windows.WindowState.Normal : Window.WindowState = System.Windows.WindowState.Maximized;
+        Window.WindowState = Window.WindowState == WindowState.Maximized ?
+            Window.WindowState = WindowState.Normal : Window.WindowState = WindowState.Maximized;
     }
 
-    private void Minimize_Event(object sender, System.Windows.RoutedEventArgs e)
+    private void Minimize_Event(object sender, RoutedEventArgs e)
     {
-        var Window = (sender as Button).TemplatedParent as System.Windows.Window;
+        var Window = (sender as Button).TemplatedParent as Window;
         if (Window == null) return;
-        Window.WindowState = System.Windows.WindowState.Minimized;
+        Window.WindowState = WindowState.Minimized;
     }
 
-    private void CloseWindow_Event(object sender, System.Windows.RoutedEventArgs e)
+    private void CloseWindow_Event(object sender, RoutedEventArgs e)
     {
-        var Window = (sender as Button).TemplatedParent as System.Windows.Window;
+        var Window = (sender as Button).TemplatedParent as Window;
         if (Window == null) return;
         Window.Close();
+    }
+
+    private void TxtKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            Keyboard.ClearFocus();
+            try
+            {
+                (sender as TextBox).GetBindingExpression(TextBox.TextProperty).UpdateSource();
+            }
+            catch (Exception ex) { }
+        }
     }
 }

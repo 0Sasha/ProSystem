@@ -100,6 +100,10 @@ public partial class Tool : INotifyPropertyChanged
             (MyTabItem.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
+
+        Calculate();
+        UpdateModel();
+        UpdateMiniModel();
     }
     public void InitializeScript(IScript MyScript, TabItem TabTool, bool IsOSC, string[] UpperProperties,
         string[] MiddleProperties = null, string SpecProperty = null, NameMA[] SpecObjs = null)

@@ -4,23 +4,23 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" Style="{StaticResource UnresizableWindowStyle}"
-        Title="Tool" Height="350" Width="460" ResizeMode="NoResize">
+        Title="Tool" Height="371" Width="512" ResizeMode="NoResize" FontSize="14">
     <Grid>
-        <TextBlock Text="Tool name" HorizontalAlignment="Left" Margin="10,12,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="ToolName" HorizontalAlignment="Left" Margin="100,10,0,0" VerticalAlignment="Top" Width="110" Height="20" FontWeight="Bold"/>
-        <TextBlock Text="Traded security" HorizontalAlignment="Left" Margin="10,37,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="TradedSec" HorizontalAlignment="Left" Margin="100,35,0,0" VerticalAlignment="Top" Width="65" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <TextBox Name="TradedBoard" HorizontalAlignment="Left" Margin="170,35,0,0" VerticalAlignment="Top" Width="40" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <TextBlock Text="Basic security" HorizontalAlignment="Left" Margin="10,62,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="BasicSec" HorizontalAlignment="Left" Margin="100,60,0,0" VerticalAlignment="Top" Width="65" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <TextBox Name="BasicBoard" HorizontalAlignment="Left" Margin="170,60,0,0" VerticalAlignment="Top" Width="40" Height="20" IsReadOnly="True" FontWeight="Bold"/>
-        <ComboBox Name="BoxMarkets" SelectedValue="FORTS" HorizontalAlignment="Left" Margin="10,85,0,0" VerticalAlignment="Top" Width="80" Height="20"/>
-        <TextBox Name="SearchSec" HorizontalAlignment="Left" Margin="100,85,0,0" VerticalAlignment="Top" Width="110" Height="20" TextChanged="SearchSecChanged" FontWeight="Bold"/>
-        <ListView Name="SecuritiesView" HorizontalAlignment="Left" Margin="10,110,0,0" VerticalAlignment="Top" Width="200" Height="160">
+        <TextBlock Text="Tool name" HorizontalAlignment="Left" Margin="10,13,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="ToolName" HorizontalAlignment="Left" Margin="120,10,0,0" VerticalAlignment="Top" Width="130" Height="24" FontWeight="Bold" TextAlignment="Left"/>
+        <TextBlock Text="Traded security" HorizontalAlignment="Left" Margin="10,43,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="TradedSec" HorizontalAlignment="Left" Margin="120,40,0,0" VerticalAlignment="Top" Width="85" Height="24" IsReadOnly="True" FontWeight="Bold" TextAlignment="Left"/>
+        <TextBox Name="TradedBoard" HorizontalAlignment="Left" Margin="210,40,0,0" VerticalAlignment="Top" Width="40" Height="24" IsReadOnly="True" FontWeight="Bold" TextAlignment="Left"/>
+        <TextBlock Text="Basic security" HorizontalAlignment="Left" Margin="10,73,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="BasicSec" HorizontalAlignment="Left" Margin="120,70,0,0" VerticalAlignment="Top" Width="85" Height="24" IsReadOnly="True" FontWeight="Bold" TextAlignment="Left"/>
+        <TextBox Name="BasicBoard" HorizontalAlignment="Left" Margin="210,70,0,0" VerticalAlignment="Top" Width="40" Height="24" IsReadOnly="True" FontWeight="Bold" TextAlignment="Left"/>
+        <ComboBox Name="BoxMarkets" SelectedValue="FORTS" HorizontalAlignment="Left" Margin="10,100,0,0" VerticalAlignment="Top" Width="100" Height="24"/>
+        <TextBox Name="SearchSec" HorizontalAlignment="Left" Margin="120,100,0,0" VerticalAlignment="Top" Width="130" Height="24" TextChanged="SearchSecChanged" FontWeight="Bold" TextAlignment="Left"/>
+        <ListView Name="SecuritiesView" HorizontalAlignment="Left" Margin="10,130,0,0" VerticalAlignment="Top" Width="240" Height="170">
             <ListView.View>
                 <GridView>
-                    <GridViewColumn DisplayMemberBinding="{Binding Path=ShortName}" Width="90">Security name</GridViewColumn>
-                    <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="80">Seccode</GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path=ShortName}" Width="120">Security name</GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="90">Seccode</GridViewColumn>
                 </GridView>
             </ListView.View>
             <ListView.ContextMenu>
@@ -33,16 +33,16 @@
             </ListView.ContextMenu>
         </ListView>
         
-        <TextBlock Text="Script name" HorizontalAlignment="Left" Margin="230,12,0,0" VerticalAlignment="Top"/>
-        <TextBox Name="ScriptName" HorizontalAlignment="Left" Margin="320,10,0,0" VerticalAlignment="Top" Width="110" Height="20"/>
-        <TextBlock Text="Script" HorizontalAlignment="Left" Margin="230,37,0,0" VerticalAlignment="Top"/>
-        <ComboBox Name="BoxScripts" HorizontalAlignment="Left" Margin="320,35,0,0" VerticalAlignment="Top" Width="85" Height="20" SelectionChanged="SelectionScriptChanged"/>
-        <Button Content="+" HorizontalAlignment="Left" Margin="410,35,0,0" VerticalAlignment="Top" Width="20" Click="AddScript"/>
-        <ListView Name="ScriptsView" HorizontalAlignment="Left" Margin="230,110,0,0" VerticalAlignment="Top" Width="200" Height="160">
+        <TextBlock Text="Script name" HorizontalAlignment="Left" Margin="260,13,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="ScriptName" HorizontalAlignment="Left" Margin="370,10,0,0" VerticalAlignment="Top" Width="130" Height="24" TextAlignment="Left"/>
+        <TextBlock Text="Script" HorizontalAlignment="Left" Margin="260,43,0,0" VerticalAlignment="Top"/>
+        <ComboBox Name="BoxScripts" HorizontalAlignment="Left" Margin="370,40,0,0" VerticalAlignment="Top" Width="105" Height="24" SelectionChanged="SelectionScriptChanged"/>
+        <Button Content="+" HorizontalAlignment="Left" Margin="475,40,0,0" VerticalAlignment="Top" Width="25" Height="24" Click="AddScript"/>
+        <ListView Name="ScriptsView" HorizontalAlignment="Left" Margin="260,130,0,0" VerticalAlignment="Top" Width="240" Height="170">
             <ListView.View>
                 <GridView>
                     <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="120">Script name</GridViewColumn>
-                    <GridViewColumn Width="70">Script</GridViewColumn>
+                    <GridViewColumn Width="90">Script</GridViewColumn>
                 </GridView>
             </ListView.View>
             <ListView.ContextMenu>
@@ -51,7 +51,7 @@
                 </ContextMenu>
             </ListView.ContextMenu>
         </ListView>
-        
-        <Button Content="Save tool" HorizontalAlignment="Right" Margin="0,0,10,10" VerticalAlignment="Bottom" Width="80" Click="SaveTool"/>
+
+        <Button Content="Save tool" HorizontalAlignment="Left" Margin="370,310,0,0" VerticalAlignment="Top" Width="130" Height="24" Click="SaveTool"/>
     </Grid>
 </Window>

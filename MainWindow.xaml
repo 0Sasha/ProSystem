@@ -7,17 +7,17 @@
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
         Closing="ClosingMainWindow" Style="{StaticResource MainWindowStyle}"
-        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="725" FontSize="14">
+        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="1050" FontSize="14">
     <Window.Resources>
         <Style x:Key="Narrow" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Height" Value="16.5"/>
+            <Setter Property="Height" Value="18"/>
         </Style>
         <Style x:Key="Norm" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Height" Value="20"/>
+            <Setter Property="Height" Value="22"/>
         </Style>
         <DataTemplate x:Key="SaldoIn">
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn, StringFormat=### ### ###.##}"/>
@@ -57,87 +57,88 @@
             <RowDefinition Height="20"/>
         </Grid.RowDefinitions>
         <TabControl Name="MainTabs" BorderBrush="{StaticResource txtBorder}">
-            <TabItem Header="Main" Width="100" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Main" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
-                    <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <ComboBox Name="BoxConnectors" HorizontalAlignment="Left" Margin="75,0,0,0" VerticalAlignment="Top" FontSize="12" Width="125" Height="20"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Login" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBox Name="TxtLog" HorizontalAlignment="Left" Margin="75,25,0,0" VerticalAlignment="Top" Width="125" Height="20"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Password" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <PasswordBox Name="TxtPas" HorizontalAlignment="Left" Margin="75,50,0,0" VerticalAlignment="Top" Width="125"  Height="20"/>
-                        <Button Name="ConnectBtn" Content="Connect" HorizontalAlignment="Left" Margin="75,75,0,0" VerticalAlignment="Top" Click="ChangeСonnection" Width="125" Height="20"/>
+                    <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="240" Height="180" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Connector" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <ComboBox Name="BoxConnectors" HorizontalAlignment="Left" Margin="90,0,0,0" VerticalAlignment="Top" Width="150" Height="24"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Login" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <TextBox Name="TxtLog" HorizontalAlignment="Left" Margin="90,30,0,0" VerticalAlignment="Top" Width="150" Height="24" TextAlignment="Left"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Password" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <PasswordBox Name="TxtPas" HorizontalAlignment="Left" Margin="90,60,0,0" VerticalAlignment="Top" Width="150" Height="24" HorizontalContentAlignment="Left"/>
+                        <Button Name="ConnectBtn" Content="Connect" HorizontalAlignment="Left" Margin="90,90,0,0" VerticalAlignment="Top"
+                                Click="ChangeСonnection" Width="150" Height="24"/>
                     </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="10,140,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Logging level" VerticalAlignment="Top"/>
-                        <TextBox Name="ConnectorLogLevelTxt" HorizontalAlignment="Left" Margin="170,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Request timeout" VerticalAlignment="Top"/>
-                        <TextBox Name="RequestTxt" HorizontalAlignment="Left" Margin="170,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="1,76,0,0" Text="Session timeout" VerticalAlignment="Top"/>
-                        <TextBox Name="SessionTxt" HorizontalAlignment="Left" Margin="170,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                    <Grid HorizontalAlignment="Left" Margin="10,200,0,0" Width="240" Height="180" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Connector settings" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Logging level" VerticalAlignment="Top"/>
+                        <TextBox Name="ConnectorLogLevelTxt" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Request timeout" VerticalAlignment="Top"/>
+                        <TextBox Name="RequestTxt" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="1,93,0,0" Text="Session timeout" VerticalAlignment="Top"/>
+                        <TextBox Name="SessionTxt" HorizontalAlignment="Left" Margin="200,90,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
                     </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="220,10,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="General settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Model update interval" VerticalAlignment="Top"/>
-                        <TextBox Name="IntervalUpdateTxt" HorizontalAlignment="Left" Margin="170,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Recalculation interval" VerticalAlignment="Top"/>
-                        <TextBox Name="IntervalRecalcTxt" HorizontalAlignment="Left" Margin="170,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <CheckBox Name="ScheduleCheck" Content="Scheduled connection" HorizontalAlignment="Left" Margin="0,77,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="BackupServerCheck" Content="Backup server address" HorizontalAlignment="Left" Margin="0,102,0,0" VerticalAlignment="Top"/>
+                    <Grid HorizontalAlignment="Left" Margin="270,10,0,0" Width="240" Height="180" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="General settings" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Model update interval" VerticalAlignment="Top"/>
+                        <TextBox Name="IntervalUpdateTxt" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Recalculation interval" VerticalAlignment="Top"/>
+                        <TextBox Name="IntervalRecalcTxt" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
+                        <CheckBox Name="ScheduleCheck" Content="Scheduled connection" HorizontalAlignment="Left" Margin="0,93,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="BackupServerCheck" Content="Backup server address" HorizontalAlignment="Left" Margin="0,123,0,0" VerticalAlignment="Top"/>
                     </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="430,10,0,0" Width="410" Height="380" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
+                    <Grid HorizontalAlignment="Left" Margin="530,10,0,0" Width="490" Height="570" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Average equity for 3 days" VerticalAlignment="Top"/>
-                        <TextBlock Name="AverageEquityTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,25,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Average equity for 3 days" VerticalAlignment="Top"/>
+                        <TextBlock Name="AverageEquityTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="24" Width="130"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="InitReqs of the portfolio" VerticalAlignment="Top"/>
-                        <TextBlock Name="CurShareInitReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,50,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="InitReqs of the portfolio" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareInitReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="24" Width="130"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,76,0,0" Text="Potential InitReqs of the portfolio" VerticalAlignment="Top"/>
-                        <TextBlock Name="PotShareInitReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,75,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,93,0,0" Text="Potential InitReqs of the portfolio" VerticalAlignment="Top"/>
+                        <TextBlock Name="PotShareInitReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="200,90,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="24" Width="130"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,101,0,0" Text="MinReqs of the portfolio" VerticalAlignment="Top"/>
-                        <TextBlock Name="CurShareMinReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,100,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,123,0,0" Text="MinReqs of the portfolio" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareMinReqsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="200,120,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="24" Width="130"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,126,0,0" Text="InitReqs of base assets" VerticalAlignment="Top"/>
-                        <TextBlock Name="CurShareInitReqsBaseTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,125,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,153,0,0" Text="InitReqs of base assets" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareInitReqsBaseTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="200,150,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="24" Width="130"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,151,0,0" Text="FullReqs of base assets" VerticalAlignment="Top"/>
-                        <TextBlock Name="CurShareBaseAssetsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="180,150,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="20" Width="90"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,183,0,0" Text="FullReqs of base assets" VerticalAlignment="Top"/>
+                        <TextBlock Name="CurShareBaseAssetsTxt" FontWeight="DemiBold" HorizontalAlignment="Left" Margin="200,180,0,0" VerticalAlignment="Top" TextAlignment="Right" Height="24" Width="130"/>
 
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,176,0,0" Text="Optimal FullReqs of base assets" VerticalAlignment="Top"/>
-                        <TextBox Name="OptShareBaseAssetsTxt" HorizontalAlignment="Left" Margin="230,175,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,213,0,0" Text="Optimal FullReqs of base assets" VerticalAlignment="Top"/>
+                        <TextBox Name="OptShareBaseAssetsTxt" HorizontalAlignment="Left" Margin="280,210,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,201,0,0" Text="Tolerance of FullReqs of base assets" VerticalAlignment="Top"/>
-                        <TextBox Name="ToleranceBaseAssetsTxt" HorizontalAlignment="Left" Margin="230,200,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,243,0,0" Text="Tolerance of FullReqs of base assets" VerticalAlignment="Top"/>
+                        <TextBox Name="ToleranceBaseAssetsTxt" HorizontalAlignment="Left" Margin="280,240,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
                         
-                        <TextBlock HorizontalAlignment="Left" Margin="0,226,0,0" Text="Equity tolerance from the average" VerticalAlignment="Top"/>
-                        <TextBox Name="ToleranceEquityTxt" HorizontalAlignment="Left" Margin="230,225,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,273,0,0" Text="Equity tolerance from the average" VerticalAlignment="Top"/>
+                        <TextBox Name="ToleranceEquityTxt" HorizontalAlignment="Left" Margin="280,270,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,251,0,0" Text="Position tolerance multiplier" VerticalAlignment="Top"/>
-                        <TextBox Name="TolerancePositionTxt" HorizontalAlignment="Left" Margin="230,250,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,303,0,0" Text="Position tolerance multiplier" VerticalAlignment="Top"/>
+                        <TextBox Name="TolerancePositionTxt" HorizontalAlignment="Left" Margin="280,300,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,276,0,0" Text="Maximum InitReqs of the position " VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsPositionTxt" HorizontalAlignment="Left" Margin="230,275,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,333,0,0" Text="Maximum InitReqs of the position " VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsPositionTxt" HorizontalAlignment="Left" Margin="280,330,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,301,0,0" Text="Maximum InitReqs of the tool " VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsToolTxt" HorizontalAlignment="Left" Margin="230,300,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,363,0,0" Text="Maximum InitReqs of the tool " VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsToolTxt" HorizontalAlignment="Left" Margin="280,360,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,326,0,0" Text="Maximum MinReqs of the portfolio" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareMinReqsPortfolioTxt" HorizontalAlignment="Left" Margin="230,325,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,393,0,0" Text="Maximum MinReqs of the portfolio" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareMinReqsPortfolioTxt" HorizontalAlignment="Left" Margin="280,390,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="0,351,0,0" Text="Maximum InitReqs of the portfolio" VerticalAlignment="Top"/>
-                        <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="230,350,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,423,0,0" Text="Maximum InitReqs of the portfolio" VerticalAlignment="Top"/>
+                        <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="280,420,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
 
-                        <TextBlock HorizontalAlignment="Left" Margin="280,1,0,0" Text="Tools by priority" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <ListView Name="ToolsByPriorityView" Margin="280,25,0,0" Height="350" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="340,3,0,0" Text="Tools by priority" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <ListView Name="ToolsByPriorityView" Margin="340,33,0,0" Height="420" VerticalAlignment="Top">
                             <ListView.View>
                                 <GridView>
-                                    <GridViewColumn Width="100">Tool name</GridViewColumn>
+                                    <GridViewColumn Width="110">Tool name</GridViewColumn>
                                 </GridView>
                             </ListView.View>
                             <ListView.ContextMenu>
@@ -149,25 +150,25 @@
                         </ListView>
                     </Grid>
 
-                    <Grid HorizontalAlignment="Left" Margin="10,265,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Information panel settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <CheckBox Name="DisplayMessagesCheck" Content="Display messages" HorizontalAlignment="Left" Margin="0,27,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="DisplaySentOrdersCheck" Content="Display sent orders" HorizontalAlignment="Left" Margin="0,52,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="DisplayNewTradesCheck" Content="Display new trades" HorizontalAlignment="Left" Margin="0,77,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="DisplaySpecialInfoCheck" Content="Display special information" HorizontalAlignment="Left" Margin="0,102,0,0" VerticalAlignment="Top"/>
+                    <Grid HorizontalAlignment="Left" Margin="10,390,0,0" Width="240" Height="180" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Information panel settings" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <CheckBox Name="DisplayMessagesCheck" Content="Display messages" HorizontalAlignment="Left" Margin="0,30,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="DisplaySentOrdersCheck" Content="Display sent orders" HorizontalAlignment="Left" Margin="0,60,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="DisplayNewTradesCheck" Content="Display new trades" HorizontalAlignment="Left" Margin="0,90,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="DisplaySpecialInfoCheck" Content="Display special information" HorizontalAlignment="Left" Margin="0,120,0,0" VerticalAlignment="Top"/>
                     </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="220,265,0,0" Width="200" Height="125" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Data management" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,26,0,0" Text="Shelf life trades" VerticalAlignment="Top"/>
-                        <TextBox Name="ShelflifeTradesTxt" HorizontalAlignment="Left" Margin="170,25,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,51,0,0" Text="Shelf life orders scripts" VerticalAlignment="Top"/>
-                        <TextBox Name="ShelflifeOrdersScriptsTxt" HorizontalAlignment="Left" Margin="170,50,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,76,0,0" Text="Shelf life trades scripts" VerticalAlignment="Top"/>
-                        <TextBox Name="ShelflifeTradesScriptsTxt" HorizontalAlignment="Left" Margin="170,75,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="20" Width="30"/>
+                    <Grid HorizontalAlignment="Left" Margin="270,200,0,0" Width="240" Height="180" VerticalAlignment="Top">
+                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Data management" VerticalAlignment="Top" FontWeight="Bold"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Shelf life trades" VerticalAlignment="Top"/>
+                        <TextBox Name="ShelflifeTradesTxt" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Shelf life orders scripts" VerticalAlignment="Top"/>
+                        <TextBox Name="ShelflifeOrdersScriptsTxt" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
+                        <TextBlock HorizontalAlignment="Left" Margin="0,93,0,0" Text="Shelf life trades scripts" VerticalAlignment="Top"/>
+                        <TextBox Name="ShelflifeTradesScriptsTxt" HorizontalAlignment="Left" Margin="200,90,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
                     </Grid>
                 </Grid>
             </TabItem>
-            <TabItem Header="Portfolio" Width="100" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Portfolio" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
@@ -248,7 +249,7 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Toolbar" Width="100" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Toolbar" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
                     <ListView Name="ToolsView" ItemContainerStyle="{StaticResource Norm}">
                         <ListView.View>
@@ -259,7 +260,7 @@
                                 <GridViewColumn Width="50">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource specBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="15"/>
+                                            <Button Style="{StaticResource specBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="17"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -295,10 +296,10 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Tools" Width="100" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Tools" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <TabControl Name="TabsTools" FontSize="12"></TabControl>
             </TabItem>
-            <TabItem Header="Distribution" Width="100" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Distribution" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
                     <Grid.RowDefinitions>
                         <RowDefinition MinHeight="28" Height="28"/>
@@ -316,7 +317,7 @@
                     <oxyWpf:PlotView Name="PortfolioPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtBorder}" Grid.Row="2"/>
                 </Grid>
             </TabItem>
-            <TabItem Header="Info" Width="100" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Info" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
@@ -387,8 +388,8 @@
                 </Grid>
             </TabItem>
         </TabControl>
-        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,2" Height="28" Width="18">
-            <MenuItem HorizontalAlignment="Left" Height="28" Width="18">
+        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Height="28" Width="30" Margin="0,2" FontSize="14">
+            <MenuItem HorizontalAlignment="Left" Height="28" Width="30">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
                 <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
                 <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
