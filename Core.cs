@@ -64,7 +64,7 @@ public partial class MainWindow : Window
                     Window.Dispatcher.Invoke(() =>
                     {
                         Window.ConnectBtn.Content = "Disconnect";
-                        Window.StCon.Fill = System.Windows.Media.Brushes.Green;
+                        Window.StCon.Fill = Colors.Green;
                     });
                     Task.Run(() =>
                     {
@@ -77,13 +77,13 @@ public partial class MainWindow : Window
                     if (ConnectionSt == ConnectionState.Connecting)
                     {
                         Window.ConnectBtn.Content = "Disconnect";
-                        Window.StCon.Fill = System.Windows.Media.Brushes.Yellow;
+                        Window.StCon.Fill = Colors.Orange;
                     }
                     else
                     {
                         Window.ConnectBtn.Content = "Connect";
                         Window.StCon.Fill =
-                        ConnectionSt == ConnectionState.Disconnected ? System.Windows.Media.Brushes.LightGray : System.Windows.Media.Brushes.Red;
+                        ConnectionSt == ConnectionState.Disconnected ? Colors.Gray : Colors.Red;
                     }
                 });
             }

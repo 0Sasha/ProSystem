@@ -81,7 +81,7 @@ public partial class Tool
         set
         {
             StopTr = value;
-            if (Active) BrushState = StopTr ? System.Windows.Media.Brushes.Yellow : System.Windows.Media.Brushes.Green;
+            if (Active) BrushState = StopTr ? Colors.Orange : Colors.Green;
             NotifyChanged();
         }
     }
@@ -796,12 +796,12 @@ public partial class Tool
     {
         (MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor =
             NowBidding && (!ShowBasicSecurity || ShowBasicSecurity && BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
-            Theme.RedBar : Theme.FadedBar;
+            PlotColors.RedBar : PlotColors.FadedBar;
         MainModel.InvalidatePlot(false);
 
         Window.Dispatcher.Invoke(() =>
         {
-            BorderState.Background = ReadyToTrade ? System.Windows.Media.Brushes.LightGreen : System.Windows.Media.Brushes.Yellow;
+            BorderState.Background = ReadyToTrade ? Colors.Green : Colors.Orange;
 
             MainBlockInfo.Text = "\nReq " + Math.Round(RubReqs.Item1) + "/" + Math.Round(RubReqs.Item2) +
             "\nVols " + PosVolumes.Item1 + "/" + PosVolumes.Item2 + "\nOrderVols " + OrderVolumes.Item1 + "/" + OrderVolumes.Item2 +

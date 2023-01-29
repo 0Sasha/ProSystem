@@ -4,6 +4,13 @@ namespace ProSystem;
 
 public partial class MainDictionary
 {
+    public static MainDictionary Dictionary;
+    public MainDictionary()
+    {
+        InitializeComponent();
+        Dictionary = this;
+    }
+
     private void AutoMinimize_Event(object sender, System.Windows.RoutedEventArgs e)
     {
         var Window = (sender as Button).TemplatedParent as System.Windows.Window;

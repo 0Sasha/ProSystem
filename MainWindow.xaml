@@ -7,7 +7,7 @@
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
         Closing="ClosingMainWindow" Style="{StaticResource MainWindowStyle}"
-        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="725" FontSize="13">
+        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="725" FontSize="14">
     <Window.Resources>
         <Style x:Key="Narrow" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -56,8 +56,8 @@
             <RowDefinition Name="RowInfo" Height="1*"/>
             <RowDefinition Height="20"/>
         </Grid.RowDefinitions>
-        <TabControl Name="MainTabs" BorderBrush="{StaticResource txtStroke}">
-            <TabItem Header="Main" Width="90" Height="28" VerticalAlignment="Top">
+        <TabControl Name="MainTabs" BorderBrush="{StaticResource txtBorder}">
+            <TabItem Header="Main" Width="100" Height="28" VerticalAlignment="Top">
                 <Grid Margin="0,1">
                     <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="200" Height="125" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,1,0,0" Text="Connector" VerticalAlignment="Top" FontWeight="Bold"/>
@@ -167,7 +167,7 @@
                     </Grid>
                 </Grid>
             </TabItem>
-            <TabItem Header="Portfolio" Width="90" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Portfolio" Width="100" Height="28" VerticalAlignment="Top">
                 <Grid Margin="0,1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
@@ -248,7 +248,7 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Toolbar" Width="90" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Toolbar" Width="100" Height="28" VerticalAlignment="Top">
                 <Grid Margin="0,1">
                     <ListView Name="ToolsView" ItemContainerStyle="{StaticResource Norm}">
                         <ListView.View>
@@ -259,7 +259,7 @@
                                 <GridViewColumn Width="50">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource nonTypBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="15"/>
+                                            <Button Style="{StaticResource specBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="15"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -295,10 +295,10 @@
                     </ListView>
                 </Grid>
             </TabItem>
-            <TabItem Header="Tools" Width="90" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Tools" Width="100" Height="28" VerticalAlignment="Top">
                 <TabControl Name="TabsTools" FontSize="12"></TabControl>
             </TabItem>
-            <TabItem Header="Distribution" Width="90" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Distribution" Width="100" Height="28" VerticalAlignment="Top">
                 <Grid Margin="0,1">
                     <Grid.RowDefinitions>
                         <RowDefinition MinHeight="28" Height="28"/>
@@ -306,17 +306,17 @@
                         <RowDefinition/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" BorderThickness="1" BorderBrush="{StaticResource txtStroke}"></Border>
-                    <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Height="24" Width="110" SelectionChanged="ShowDistributionInfo"/>
-                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" IsChecked="True" HorizontalAlignment="Left" Margin="115,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
-                    <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" IsChecked="True" HorizontalAlignment="Left" Margin="248,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+                    <Border Grid.Row="0" BorderThickness="1" BorderBrush="{StaticResource txtBorder}"></Border>
+                    <ComboBox Name="ComboBoxDistrib" HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Height="24" Width="120" SelectionChanged="ShowDistributionInfo"/>
+                    <CheckBox Name="OnlyPosCheckBox" Content="Only with positions" IsChecked="True" HorizontalAlignment="Left" Margin="130,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
+                    <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" IsChecked="True" HorizontalAlignment="Left" Margin="275,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
 
-                    <Border Grid.Row="1" Grid.RowSpan="2" Margin="0,2" BorderThickness="1" BorderBrush="{StaticResource txtStroke}"></Border>
-                    <oxyWpf:PlotView Name="DistributionPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtStroke}" Grid.Row="1"/>
-                    <oxyWpf:PlotView Name="PortfolioPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtStroke}" Grid.Row="2"/>
+                    <Border Grid.Row="1" Grid.RowSpan="2" Margin="0,2" BorderThickness="1" BorderBrush="{StaticResource txtBorder}"></Border>
+                    <oxyWpf:PlotView Name="DistributionPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtBorder}" Grid.Row="1"/>
+                    <oxyWpf:PlotView Name="PortfolioPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtBorder}" Grid.Row="2"/>
                 </Grid>
             </TabItem>
-            <TabItem Header="Info" Width="90" Height="28" VerticalAlignment="Top">
+            <TabItem Header="Info" Width="100" Height="28" VerticalAlignment="Top">
                 <Grid Margin="0,1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*"/>
@@ -327,11 +327,11 @@
                         <RowDefinition/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Grid.ColumnSpan="2" BorderThickness="1" BorderBrush="{StaticResource txtStroke}"></Border>
-                    <ComboBox Name="ComboBoxTool" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Height="24" Width="110" SelectionChanged="ComboBoxToolChanged"/>
-                    <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="113,2,0,0" VerticalAlignment="Top" Height="24" Width="110" SelectionChanged="ShowScriptInfo"/>
-                    <Button Content="Show script info" HorizontalAlignment="Left" Margin="224,2,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowScriptInfo"/>
-                    <Button Content="Show system info" HorizontalAlignment="Left" Margin="335,2,0,0" VerticalAlignment="Top" Height="24" Width="110" Click="ShowSystemInfo"/>
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" BorderThickness="1" BorderBrush="{StaticResource txtBorder}"></Border>
+                    <ComboBox Name="ComboBoxTool" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="2,2,0,0" VerticalAlignment="Top" Height="24" Width="120" SelectionChanged="ComboBoxToolChanged"/>
+                    <ComboBox Name="ComboBoxScript" DisplayMemberPath="Name" HorizontalAlignment="Left" Margin="123,2,0,0" VerticalAlignment="Top" Height="24" Width="120" SelectionChanged="ShowScriptInfo"/>
+                    <Button Content="Show script info" HorizontalAlignment="Left" Margin="244,2,0,0" VerticalAlignment="Top" Height="24" Width="120" Click="ShowScriptInfo"/>
+                    <Button Content="Show system info" HorizontalAlignment="Left" Margin="365,2,0,0" VerticalAlignment="Top" Height="24" Width="120" Click="ShowSystemInfo"/>
 
                     <ListView Name="OrdersInfo" Grid.Row="1" Margin="0,3" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
@@ -387,28 +387,28 @@
                 </Grid>
             </TabItem>
         </TabControl>
-        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Margin="1,0" Height="30" Width="20">
+        <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,2" Height="28" Width="18">
             <MenuItem HorizontalAlignment="Left" Height="28" Width="18">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
                 <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
                 <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
                 <MenuItem Header="Take login details" Click="TakeLoginDetails"></MenuItem>
-                <Separator Background="{StaticResource txtStroke}"/>
+                <Separator Background="{StaticResource txtBorder}"/>
                 <MenuItem Header="Resize control panel" Click="ResizeControlPanel"></MenuItem>
                 <MenuItem Header="Test">
                     <MenuItem Header="Test 1" Click="Test"></MenuItem>
                 </MenuItem>
             </MenuItem>
         </Menu>
-        <TextBox Name="TxtBox" Style="{StaticResource nonFocusTxt}" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontSize="11" FontWeight="Bold" Grid.Row="1">
+        <TextBox Name="TxtBox" Style="{StaticResource nonFocusTxt}" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Grid.Row="1">
             <TextBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Clear" Click="ClearInfo"></MenuItem>
                 </ContextMenu>
             </TextBox.ContextMenu>
         </TextBox>
-        <TextBlock Text="Connection" HorizontalAlignment="Left" Margin="5,1,0,0" VerticalAlignment="Top" Grid.Row="2"/>
-        <Rectangle Fill="LightGray" Name="StCon" HorizontalAlignment="Left" Height="16" Width="16" Margin="75,2,0,0" VerticalAlignment="Top" Grid.Row="2"/>
+        <TextBlock Text="Connection" HorizontalAlignment="Left" Margin="5,0" VerticalAlignment="Center" Grid.Row="2"/>
+        <Rectangle Fill="LightGray" Name="StCon" HorizontalAlignment="Left" Height="16" Width="16" Margin="80,0" VerticalAlignment="Center" Grid.Row="2"/>
         <Button HorizontalAlignment="Right" Grid.Row="2" VerticalAlignment="Top" Width="20" Height="20" Click="ResizeInfoPanel" Background="White" BorderBrush="LightGray"/>
     </Grid>
 </Window>

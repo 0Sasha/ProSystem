@@ -3,11 +3,27 @@ using OxyPlot.Wpf;
 using OxyPlot.Axes;
 using OxyPlot.Series;
 using System.Windows.Media;
+using static ProSystem.MainDictionary;
 namespace ProSystem;
 
-static class Theme
+static class Colors
 {
-    private static bool black = true;
+    private static readonly SolidColorBrush lightGreen = new() { Color = new() { R = 90, G = 235, B = 140, A = 220 } };
+    private static readonly SolidColorBrush lightGreen2 = new() { Color = new() { R = 80, G = 180, B = 120, A = 255 } };
+    private static readonly SolidColorBrush lightRed = new() { Color = new() { R = 255, G = 80, B = 100, A = 255 } };
+    private static readonly SolidColorBrush orange = new() { Color = new() { R = 255, G = 190, B = 0, A = 255 } };
+
+    public static bool DarkTheme { get; set; } = true;
+    public static SolidColorBrush Back { get => Dictionary.txtBack; }
+    public static SolidColorBrush Front { get => Dictionary.txtFront; }
+    public static SolidColorBrush Border { get => Dictionary.txtBorder; }
+    public static SolidColorBrush Green { get => DarkTheme ? lightGreen : Brushes.Green; }
+    public static SolidColorBrush Red { get => DarkTheme ? lightRed : Brushes.Red; }
+    public static SolidColorBrush Orange { get => orange; }
+    public static SolidColorBrush Gray { get => DarkTheme ? Brushes.LightGray : Brushes.DarkGray; }
+}
+static class PlotColors
+{
     private static readonly OxyColorConverter converter = new();
 
     private static readonly OxyColor greenBar =
@@ -34,28 +50,19 @@ static class Theme
         OxyColors.DarkGoldenrod, OxyColors.DarkBlue
     };
 
-    public static bool Black
-    {
-        get => black;
-        set
-        {
-            black = value;
-        }
-    }
+    public static OxyColor Back { get => Colors.DarkTheme ? OxyColors.Black : OxyColors.White; }
+    public static OxyColor Front { get => Colors.DarkTheme ? OxyColors.White : OxyColors.Black; }
+    public static OxyColor Text { get => Colors.DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
+    public static OxyColor Indicator { get => Colors.DarkTheme ? OxyColors.Goldenrod : OxyColors.DarkBlue; }
+    public static OxyColor GreenBar { get => Colors.DarkTheme ? greenBar : OxyColors.Green; }
+    public static OxyColor RedBar { get => Colors.DarkTheme ? redBar : OxyColors.Red; }
+    public static OxyColor FadedBar { get => Colors.DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
+    public static OxyColor Gridline { get => Colors.DarkTheme ? almostBlack : OxyColors.LightGray; }
+    public static OxyColor[] Indicators { get => Colors.DarkTheme ? blackIndicators : whiteIndicators; }
 
-    public static OxyColor Back { get => Black ? OxyColors.Black : OxyColors.White; }
-    public static OxyColor Front { get => Black ? OxyColors.White : OxyColors.Black; }
-    public static OxyColor Text { get => Black ? OxyColors.LightGray : OxyColors.Black; }
-    public static OxyColor Indicator { get => Black ? OxyColors.Goldenrod : OxyColors.DarkBlue; }
-    public static OxyColor GreenBar { get => Black ? greenBar : OxyColors.Green; }
-    public static OxyColor RedBar { get => Black ? redBar : OxyColors.Red; }
-    public static OxyColor FadedBar { get => Black ? OxyColors.LightGray : OxyColors.Black; }
-    public static OxyColor Gridline { get => Black ? almostBlack : OxyColors.LightGray; }
-    public static OxyColor[] Indicators { get => Black ? blackIndicators : whiteIndicators; }
-
-    public static OxyColor LongPosition { get => Black ? longPos : OxyColors.Green; }
-    public static OxyColor ShortPosition { get => Black ? OxyColors.Goldenrod : OxyColors.DarkGoldenrod; }
-    public static OxyColor MaxVolume { get => Black ? darkGray : OxyColors.LightGray; }
+    public static OxyColor LongPosition { get => Colors.DarkTheme ? longPos : OxyColors.Green; }
+    public static OxyColor ShortPosition { get => Colors.DarkTheme ? OxyColors.Orange : OxyColors.DarkGoldenrod; }
+    public static OxyColor MaxVolume { get => Colors.DarkTheme ? darkGray : OxyColors.Black; }
 
     public static void Color(PlotModel model)
     {

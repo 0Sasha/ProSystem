@@ -73,7 +73,7 @@ public partial class Tool : INotifyPropertyChanged
         Controller = new PlotController();
         Controller.BindMouseDown(OxyMouseButton.Left, PlotCommands.PanAt);
         Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
-        BrushState = Brushes.Red;
+        BrushState = Colors.Red;
     }
     #endregion
 
@@ -90,13 +90,13 @@ public partial class Tool : INotifyPropertyChanged
 
         if (Active)
         {
-            BrushState = Brushes.Green;
+            BrushState = Colors.Green;
             (MyTabItem.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
         }
         else
         {
-            BrushState = Brushes.Red;
+            BrushState = Colors.Red;
             (MyTabItem.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
@@ -142,7 +142,7 @@ public partial class Tool : INotifyPropertyChanged
                 });
             }
 
-            BrushState = Brushes.Red;
+            BrushState = Colors.Red;
             ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
                 .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
@@ -170,7 +170,7 @@ public partial class Tool : INotifyPropertyChanged
                     return true;
                 })) return;
             }
-            BrushState = StopTrading ? Brushes.Yellow : Brushes.Green;
+            BrushState = StopTrading ? Colors.Orange : Colors.Green;
             Active = true;
             ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
                 .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
@@ -243,10 +243,10 @@ public partial class Tool : INotifyPropertyChanged
             TrackerFormatString = "High: {3:0.0000}\nLow: {4:0.0000}\nOpen: {5:0.0000}\nClose: {6:0.0000}"
         };
 
-        Theme.Color(NewModel);
-        Theme.Color(xAxis);
-        Theme.Color(yAxis);
-        Theme.Color(Candles);
+        PlotColors.Color(NewModel);
+        PlotColors.Color(xAxis);
+        PlotColors.Color(yAxis);
+        PlotColors.Color(Candles);
 
         NewModel.Axes.Add(xAxis);
         NewModel.Axes.Add(yAxis);
@@ -336,7 +336,7 @@ public partial class Tool : INotifyPropertyChanged
             if (MyScript.Result.Centre != -1)
                 Gridlines = new double[] { MyScript.Result.Centre + MyScript.Result.Level, MyScript.Result.Centre - MyScript.Result.Level };
 
-            List<OxyColor> colors = Theme.Indicators.ToList();
+            List<OxyColor> colors = PlotColors.Indicators.ToList();
             foreach (double[] Indicator in MyScript.Result.Indicators)
             {
                 if (Indicator != null)
@@ -359,9 +359,9 @@ public partial class Tool : INotifyPropertyChanged
         xAxis.Minimum = xAxis.Maximum - Range > 1 ? xAxis.Maximum - Range : 1;
         yAxis.ExtraGridlines = Gridlines;
 
-        Theme.Color(Model);
-        Theme.Color(xAxis, false);
-        Theme.Color(yAxis, false);
+        PlotColors.Color(Model);
+        PlotColors.Color(xAxis, false);
+        PlotColors.Color(yAxis, false);
 
         Model.Axes.Add(xAxis);
         Model.Axes.Add(yAxis);
@@ -420,13 +420,13 @@ public partial class Tool : INotifyPropertyChanged
 
             if (trade.BuySell == "B")
             {
-                MyColor = Theme.GreenBar;
+                MyColor = PlotColors.GreenBar;
                 yStartPoint = MySecurity.Bars.Low[i] - MySecurity.Bars.Low[i] * 0.001;
                 yEndPoint = MySecurity.Bars.Low[i];
             }
             else
             {
-                MyColor = Theme.RedBar;
+                MyColor = PlotColors.RedBar;
                 yStartPoint = MySecurity.Bars.High[i] + MySecurity.Bars.High[i] * 0.001;
                 yEndPoint = MySecurity.Bars.High[i];
             }
@@ -468,7 +468,7 @@ public partial class Tool : INotifyPropertyChanged
                 Type = LineAnnotationType.Horizontal,
                 Y = ActiveOrder.Price,
                 MinimumX = MainModel.Axes[0].ActualMaximum - 20,
-                Color = ActiveOrder.BuySell == "B" ? Theme.GreenBar : Theme.RedBar,
+                Color = ActiveOrder.BuySell == "B" ? PlotColors.GreenBar : PlotColors.RedBar,
                 ToolTip = ActiveOrder.Sender,
                 Text = ActiveOrder.Signal,
                 StrokeThickness = 2
@@ -479,7 +479,7 @@ public partial class Tool : INotifyPropertyChanged
     {
         DataPoint[] Points = new DataPoint[Indicator.Length];
         for (int i = 0; i < Indicator.Length; i++) Points[i] = new DataPoint(i, Indicator[i]);
-        return new LineSeries() { ItemsSource = Points, Color = Theme.Indicator, Title = Name };
+        return new LineSeries() { ItemsSource = Points, Color = PlotColors.Indicator, Title = Name };
     }
     private static void AutoScaling(CandleStickSeries Candles, DateTimeAxis xAxis, LinearAxis yAxis)
     {
