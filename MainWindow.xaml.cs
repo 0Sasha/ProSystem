@@ -544,20 +544,11 @@ public partial class MainWindow : Window
         PlotGrid.RowDefinitions.Add(new() { MinHeight = 50, MaxHeight = 120 });
         PlotGrid.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star) });
 
-        OxyPlot.SkiaSharp.Wpf.PlotView PlotView = new()
-        {
-            Visibility = Visibility.Hidden,
-            Background = Colors.Back,
-            Foreground = Colors.Front
-        };
+        OxyPlot.SkiaSharp.Wpf.PlotView PlotView = new() { Visibility = Visibility.Hidden };
         PlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Model") });
         PlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
 
-        OxyPlot.SkiaSharp.Wpf.PlotView MainPlotView = new()
-        {
-            Background = Colors.Back,
-            Foreground = Colors.Front
-        };
+        OxyPlot.SkiaSharp.Wpf.PlotView MainPlotView = new();
         MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("MainModel") });
         MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
 

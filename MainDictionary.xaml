@@ -23,8 +23,10 @@
     <Color x:Key="white3" R="220" B="220" G="220" A="255"></Color>
 
     <Color x:Key="purpleBlack" R="20" B="27" G="20" A="255"></Color>
+    <Color x:Key="purpleBlack2" R="30" B="37" G="30" A="255"></Color>
     <Color x:Key="purpleVeryDark" R="60" B="80" G="60" A="255"></Color>
     <Color x:Key="purpleDark" R="80" B="110" G="80" A="255"></Color>
+    <Color x:Key="purpleDark1" R="100" B="130" G="100" A="255"></Color>
     <Color x:Key="purpleDeep" R="110" B="150" G="110" A="255"></Color>
     <Color x:Key="purpleMid" R="120" B="160" G="120" A="255"></Color>
     <Color x:Key="purpleLight" R="150" B="190" G="150" A="255"></Color>
@@ -45,14 +47,14 @@
     </LinearGradientBrush>
 
     <SolidColorBrush x:Key="nonVolBorder" Color="{StaticResource purpleVeryDark}"/>
-    <SolidColorBrush x:Key="nonVolBack" Color="{StaticResource purpleDeep}"/>
-    <SolidColorBrush x:Key="nonVolFocused" Color="{StaticResource purpleLight}"/>
-    <SolidColorBrush x:Key="nonVolPressed" Color="{StaticResource purpleDark}"/>
+    <SolidColorBrush x:Key="nonVolBack" Color="{StaticResource purpleDark}"/>
+    <SolidColorBrush x:Key="nonVolFocused" Color="{StaticResource purpleDeep}"/>
+    <SolidColorBrush x:Key="nonVolPressed" Color="{StaticResource purpleVeryDark}"/>
 
     <SolidColorBrush x:Key="txtBorder" x:Name="txtBorder" Color="{StaticResource purpleDeep}"/>
     <SolidColorBrush x:Key="txtFocusedBorder" Color="{StaticResource purpleVeryLight}"/>
     <SolidColorBrush x:Key="txtFocusedBack" Color="{StaticResource purpleDark}"/>
-    <SolidColorBrush x:Key="txtBack" x:Name="txtBack" Color="{StaticResource purpleBlack}"/>
+    <SolidColorBrush x:Key="txtBack" x:Name="txtBack" Color="{StaticResource black}"/>
     <SolidColorBrush x:Key="txtFront" x:Name="txtFront" Color="{StaticResource white1}"/>
     <SolidColorBrush x:Key="txtSelectedFront" Color="Black"/>
 
@@ -61,6 +63,9 @@
     <SolidColorBrush x:Key="checkBackFocused" Color="{StaticResource purpleLight}"/>
     <SolidColorBrush x:Key="checkBackPressed" Color="{StaticResource purpleDark}"/>
     <SolidColorBrush x:Key="checkBackChecked" Color="{StaticResource purpleMid}"/>
+
+    <SolidColorBrush x:Key="listItemBorder" Color="{StaticResource purpleBlack}"/>
+    <SolidColorBrush x:Key="comboItemBorder" Color="{StaticResource purpleVeryDark}"/>
 
     <ControlTemplate x:Key="track">
         <oxyshared:TrackerControl Position="{Binding Position}" LineStroke="{StaticResource txtFront}" Background="{StaticResource txtFocusedBack}"
@@ -359,7 +364,7 @@
         <Setter Property="VerticalContentAlignment" Value="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"/>
         <Setter Property="Foreground" Value="{StaticResource txtFront}"/>
         <Setter Property="Background" Value="{StaticResource txtBack}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource txtBorder}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource comboItemBorder}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
         <Setter Property="Template">
@@ -675,7 +680,7 @@
         <Setter Property="Height" Value="22"/>
         <Setter Property="FontWeight" Value="DemiBold"/>
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource listItemBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
         <Setter Property="Template" Value="{StaticResource templateViewItem}"/>
@@ -688,7 +693,7 @@
         <Setter Property="Height" Value="22"/>
         <Setter Property="FontWeight" Value="DemiBold"/>
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource listItemBorder}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}"/>
         <Setter Property="Template" Value="{StaticResource templateViewItem}"/>

@@ -13,7 +13,6 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Height" Value="18"/>
-            <Setter Property="Background" Value="Black"/>
         </Style>
         <DataTemplate x:Key="SaldoIn">
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn, StringFormat=### ### ###.##}"/>

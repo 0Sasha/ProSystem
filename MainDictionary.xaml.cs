@@ -6,7 +6,7 @@ namespace ProSystem;
 
 public partial class MainDictionary
 {
-    public static MainDictionary Dictionary;
+    public static MainDictionary Dictionary { get; private set; }
     public MainDictionary()
     {
         InitializeComponent();

@@ -8,8 +8,7 @@ namespace ProSystem;
 
 static class Colors
 {
-    private static readonly SolidColorBrush lightGreen = new() { Color = new() { R = 90, G = 235, B = 140, A = 220 } };
-    private static readonly SolidColorBrush lightGreen2 = new() { Color = new() { R = 80, G = 180, B = 120, A = 255 } };
+    private static readonly SolidColorBrush lightGreen = new() { Color = new() { R = 80, G = 210, B = 125, A = 255 } };
     private static readonly SolidColorBrush lightRed = new() { Color = new() { R = 255, G = 80, B = 100, A = 255 } };
     private static readonly SolidColorBrush orange = new() { Color = new() { R = 255, G = 190, B = 0, A = 255 } };
 
@@ -27,15 +26,13 @@ static class PlotColors
     private static readonly OxyColorConverter converter = new();
 
     private static readonly OxyColor greenBar =
-        (OxyColor)converter.ConvertBack(new Color() { R = 90, G = 235, B = 140, A = 220 }, typeof(OxyColor), null, null);
+        (OxyColor)converter.ConvertBack(new Color() { R = 80, G = 210, B = 125, A = 255 }, typeof(OxyColor), null, null);
     private static readonly OxyColor redBar =
         (OxyColor)converter.ConvertBack(new Color() { R = 255, G = 80, B = 100, A = 255 }, typeof(OxyColor), null, null);
     private static readonly OxyColor almostBlack =
         (OxyColor)converter.ConvertBack(new Color() { R = 50, G = 50, B = 50, A = 255 }, typeof(OxyColor), null, null);
     private static readonly OxyColor darkGray =
         (OxyColor)converter.ConvertBack(new Color() { R = 90, G = 90, B = 90, A = 255 }, typeof(OxyColor), null, null);
-    private static readonly OxyColor longPos =
-        (OxyColor)converter.ConvertBack(new Color() { R = 80, G = 180, B = 120, A = 255 }, typeof(OxyColor), null, null);
     private static readonly OxyColor orange = (OxyColor)converter.ConvertBack(Colors.Orange, typeof(OxyColor), null, null);
 
     private static readonly OxyColor[] blackIndicators = new OxyColor[]
@@ -60,7 +57,7 @@ static class PlotColors
     public static OxyColor[] Indicators { get => Colors.DarkTheme ? blackIndicators : whiteIndicators; }
 
     public static OxyColor LongPosition { get => Colors.DarkTheme ? greenBar : OxyColors.Green; }
-    public static OxyColor ShortPosition { get => Colors.DarkTheme ? OxyColors.Orange : OxyColors.DarkGoldenrod; }
+    public static OxyColor ShortPosition { get => Colors.DarkTheme ? orange : OxyColors.DarkGoldenrod; }
     public static OxyColor MaxVolume { get => Colors.DarkTheme ? darkGray : OxyColors.Black; }
 
     public static void Color(PlotModel model)
