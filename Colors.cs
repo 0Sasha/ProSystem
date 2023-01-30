@@ -59,7 +59,7 @@ static class PlotColors
     public static OxyColor Gridline { get => Colors.DarkTheme ? almostBlack : OxyColors.LightGray; }
     public static OxyColor[] Indicators { get => Colors.DarkTheme ? blackIndicators : whiteIndicators; }
 
-    public static OxyColor LongPosition { get => Colors.DarkTheme ? longPos : OxyColors.Green; }
+    public static OxyColor LongPosition { get => Colors.DarkTheme ? greenBar : OxyColors.Green; }
     public static OxyColor ShortPosition { get => Colors.DarkTheme ? OxyColors.Orange : OxyColors.DarkGoldenrod; }
     public static OxyColor MaxVolume { get => Colors.DarkTheme ? darkGray : OxyColors.Black; }
 

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:oxyWpf="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf" 
+        xmlns:oxyskiawpf="http://oxyplot.org/skiawpf"
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
         Closing="ClosingMainWindow" Style="{StaticResource MainWindowStyle}"
@@ -13,11 +13,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Height" Value="18"/>
-        </Style>
-        <Style x:Key="Norm" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Height" Value="22"/>
+            <Setter Property="Background" Value="Black"/>
         </Style>
         <DataTemplate x:Key="SaldoIn">
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn, StringFormat=### ### ###.##}"/>
@@ -175,7 +171,7 @@
                         <ColumnDefinition/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="1*"/>
+                        <RowDefinition Height="0.8*"/>
                         <RowDefinition/>
                     </Grid.RowDefinitions>
                     <ListView Name="OrdersView" ItemContainerStyle="{StaticResource Narrow}">
@@ -231,7 +227,7 @@
                             </ContextMenu>
                         </ListView.ContextMenu>
                     </ListView>
-                    <ListView Grid.Row="1" Name="PortfolioView" Grid.ColumnSpan="3" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Grid.Row="1" Margin="0,3" Name="PortfolioView" Grid.ColumnSpan="3" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MarketName}" Width="100">Market</GridViewColumn>
@@ -251,16 +247,16 @@
             </TabItem>
             <TabItem Header="Toolbar" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
-                    <ListView Name="ToolsView" ItemContainerStyle="{StaticResource Norm}">
+                    <ListView Name="ToolsView">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="60">Name</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ShortName}" Width="90">Security</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource LastTrade}" Width="70">Last trade</GridViewColumn>
-                                <GridViewColumn Width="50">State
+                                <GridViewColumn Width="60">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource specBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="17"/>
+                                            <Button Style="{StaticResource specBtn}" Background="{Binding Path=BrushState}" Click="ChangeActivityTool" Width="35" Height="15"/>
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
@@ -313,8 +309,8 @@
                     <CheckBox Name="ExcludeBaseCheckBox" Content="Exclude base balance" IsChecked="True" HorizontalAlignment="Left" Margin="275,2,0,0" VerticalAlignment="Center" Click="ShowDistributionInfo"/>
 
                     <Border Grid.Row="1" Grid.RowSpan="2" Margin="0,2" BorderThickness="1" BorderBrush="{StaticResource txtBorder}"></Border>
-                    <oxyWpf:PlotView Name="DistributionPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtBorder}" Grid.Row="1"/>
-                    <oxyWpf:PlotView Name="PortfolioPlot" Margin="2,3" Background="{StaticResource txtBack}" Foreground="{StaticResource txtFront}" BorderBrush="{StaticResource txtBorder}" Grid.Row="2"/>
+                    <oxyskiawpf:PlotView Name="DistributionPlot" Margin="2,3" Grid.Row="1"/>
+                    <oxyskiawpf:PlotView Name="PortfolioPlot" Margin="2,3" Grid.Row="2"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Info" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
@@ -334,7 +330,7 @@
                     <Button Content="Show script info" HorizontalAlignment="Left" Margin="244,2,0,0" VerticalAlignment="Top" Height="24" Width="120" Click="ShowScriptInfo"/>
                     <Button Content="Show system info" HorizontalAlignment="Left" Margin="365,2,0,0" VerticalAlignment="Top" Height="24" Width="120" Click="ShowSystemInfo"/>
 
-                    <ListView Name="OrdersInfo" Grid.Row="1" Margin="0,3" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Name="OrdersInfo" Grid.Row="1" Margin="0,3">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Sender}" Width="120">Sender</GridViewColumn>
@@ -364,7 +360,7 @@
                             </ContextMenu>
                         </ListView.ContextMenu>
                     </ListView>
-                    <ListView Name="TradesInfo" Grid.Row="1" Margin="0,2" Grid.Column="1" ItemContainerStyle="{StaticResource Narrow}">
+                    <ListView Name="TradesInfo" Grid.Row="1" Margin="0,2" Grid.Column="1">
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
@@ -401,7 +397,7 @@
                 </MenuItem>
             </MenuItem>
         </Menu>
-        <TextBox Name="TxtBox" Style="{StaticResource nonFocusTxt}" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Grid.Row="1">
+        <TextBox Name="TxtBox" Style="{StaticResource nonFocusTxt}" VerticalScrollBarVisibility="Auto" Grid.Row="1">
             <TextBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Clear" Click="ClearInfo"></MenuItem>
@@ -410,6 +406,6 @@
         </TextBox>
         <TextBlock Text="Connection" HorizontalAlignment="Left" Margin="5,0" VerticalAlignment="Center" Grid.Row="2"/>
         <Rectangle Fill="LightGray" Name="StCon" HorizontalAlignment="Left" Height="16" Width="16" Margin="80,0" VerticalAlignment="Center" Grid.Row="2"/>
-        <Button HorizontalAlignment="Right" Grid.Row="2" VerticalAlignment="Top" Width="20" Height="20" Click="ResizeInfoPanel" Background="White" BorderBrush="LightGray"/>
+        <Button HorizontalAlignment="Right" Grid.Row="2" VerticalAlignment="Top" Width="20" Height="20" Click="ResizeInfoPanel"/>
     </Grid>
 </Window>

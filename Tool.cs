@@ -34,6 +34,7 @@ public partial class Tool : INotifyPropertyChanged
             {
                 ShBasSec = value;
                 UpdateModel();
+                UpdateMiniModel();
             }
             else AddInfo("У инструмента нет базисного актива.");
         }
@@ -86,7 +87,12 @@ public partial class Tool : INotifyPropertyChanged
         Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
 
         UpdateModel();
-        foreach (IScript MyScript in Scripts) MyScript.Initialize(this, MyTabItem);
+        foreach (IScript script in Scripts)
+        {
+            script.Initialize(this, MyTabItem);
+            script.Calculate(BasicSecurity ?? MySecurity);
+            UpdateModelsAndPanel(script);
+        }
 
         if (Active)
         {
@@ -101,7 +107,6 @@ public partial class Tool : INotifyPropertyChanged
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
 
-        Calculate();
         UpdateModel();
         UpdateMiniModel();
     }

@@ -42,9 +42,9 @@ public partial class MainDictionary
             Keyboard.ClearFocus();
             try
             {
-                (sender as TextBox).GetBindingExpression(TextBox.TextProperty).UpdateSource();
+                if (sender is TextBox tbx) tbx.GetBindingExpression(TextBox.TextProperty).UpdateSource();
             }
-            catch (Exception ex) { }
+            catch (Exception ex) { MainWindow.AddInfo("TxtKeyDown: " + ex.Message); }
         }
     }
 }
