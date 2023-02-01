@@ -4,8 +4,11 @@ using System.Xml;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using static ProSystem.MainWindow;
+using WinRT;
+
 namespace ProSystem;
 
 internal static class TXmlConnector
@@ -14,20 +17,9 @@ internal static class TXmlConnector
     private delegate bool CallBackDelegate(IntPtr Data);
     private static readonly CallBackDelegate CallbackDel = new(CallBack);
 
-    private static Tool MyTool;
-    private static Trade MyTrade;
-    private static Order MyOrder;
-    private static Order[] MyOrders;
     private static bool Scheduled;
     private static int WaitingTime = 18000;
     private static DateTime TriggerDataProcessing = DateTime.Now;
-
-    private static readonly List<double> sOpen = new();
-    private static readonly List<double> sHigh = new();
-    private static readonly List<double> sLow = new();
-    private static readonly List<double> sClose = new();
-    private static readonly List<double> sVolume = new();
-    private static readonly List<DateTime> sDateTime = new();
 
     private static readonly XmlReaderSettings XS = new()
     {
@@ -51,33 +43,15 @@ internal static class TXmlConnector
     }
     private static void ProcessDataQueue()
     {
-        bool ShowInfo = false;
         while (true)
         {
             string Data = null;
             try
             {
-                if (DataQueue.Count > 24 && DateTime.Now > TriggerDataProcessing && Connection == ConnectionState.Connected)
-                {
-                    if (DateTime.Now < DateTime.Today.AddMinutes(840) || DateTime.Now > DateTime.Today.AddMinutes(1140) ||
-                        DateTime.Now > DateTime.Today.AddMinutes(845) && DateTime.Now < DateTime.Today.AddMinutes(1125))
-                    {
-                        ShowInfo = true;
-                        string[] Queue = DataQueue.ToArray();
-                        AddInfo("ProcessDataQueue: данных в очереди: " + DataQueue.Count + " Данные: " +
-                            Queue[0][0..12] + "/" + Queue[1][0..12] + "//" + Queue[23][0..12] + "/" + Queue[24][0..12] + "//" + Queue[^1][0..12], false);
-                    }
-                    TriggerDataProcessing = DateTime.Now.AddSeconds(15);
-                }
                 while (!DataQueue.IsEmpty)
                 {
                     if (DataQueue.TryDequeue(out Data)) ProcessData(Data);
                     else AddInfo("ProcessDataQueue: не удалось взять объект из очереди.");
-                }
-                if (ShowInfo)
-                {
-                    ShowInfo = false;
-                    AddInfo("ProcessDataQueue: Обработка очереди данных завершена.", false);
                 }
             }
             catch (Exception e)
@@ -101,13 +75,13 @@ internal static class TXmlConnector
 
         while (XR.Read())
         {
-            // Определение секции
             Section = XR.Name;
 
-            // Обработка
             // Высокочастотные секции
             if (Section == "alltrades")
             {
+                Tool MyTool;
+                Trade MyTrade;
                 while (XR.Read())
                 {
                     if (!XR.ReadToFollowing("time")) { XR.Close(); return Section; }
@@ -128,14 +102,12 @@ internal static class TXmlConnector
             }
             else if (Section == "candles")
             {
-                // Проверка статуса
                 if (XR.GetAttribute("status") == "3")
                 {
                     AddInfo("candles: Запрошенные данные недоступны. Запросите позже.");
                     XR.Close(); return Section;
                 }
 
-                // Идентификация инструмента
                 Security MySecurity;
                 int i = Array.FindIndex(Tools.ToArray(), x => x.MySecurity.Seccode == XR.GetAttribute("seccode"));
                 if (i > -1) MySecurity = Tools[i].MySecurity;
@@ -153,369 +125,29 @@ internal static class TXmlConnector
                     }
                 }
 
-                // Проверка ТФ
-                int TF = TimeFrames.Single(x => x.ID == XR.GetAttribute("period")).Period / 60;
-                if (MySecurity.SourceBars == null || MySecurity.SourceBars.TF != TF) MySecurity.SourceBars = new Bars(TF);
-
-                // Подготовка коллекций
-                sDateTime.Clear(); sOpen.Clear(); sHigh.Clear();
-                sLow.Clear(); sClose.Clear(); sVolume.Clear();
-
-                // Обработка данных
-                bool Filter = MySecurity.Market != "4";
-                while (XR.Read())
-                {
-                    if (Filter && XR.HasAttributes && (sDateTime.Count == 0 ||
-                        sDateTime[^1].Date != DateTime.ParseExact(XR.GetAttribute("date"), DTForm, IC).Date) &&
-                        double.Parse(XR.GetAttribute("high"), IC) - double.Parse(XR.GetAttribute("low"), IC) < 0.00001) XR.Read();
-                    if (XR.HasAttributes) // Чтение и запись данных
-                    {
-                        sDateTime.Add(DateTime.ParseExact(XR.GetAttribute("date"), DTForm, IC));
-                        sOpen.Add(double.Parse(XR.GetAttribute("open"), IC));
-                        sHigh.Add(double.Parse(XR.GetAttribute("high"), IC));
-                        sLow.Add(double.Parse(XR.GetAttribute("low"), IC));
-                        sClose.Add(double.Parse(XR.GetAttribute("close"), IC));
-                        sVolume.Add(double.Parse(XR.GetAttribute("volume"), IC));
-                    }
-                    else if (XR.NodeType == XmlNodeType.EndElement)
-                    {
-                        // Оценка соответствия данных и их запись
-                        if (MySecurity.SourceBars.DateTime == null) // Исходные данные отсутсвуют
-                        {
-                            MySecurity.SourceBars = new Bars(MySecurity.SourceBars.TF)
-                            {
-                                DateTime = sDateTime.ToArray(),
-                                Open = sOpen.ToArray(),
-                                High = sHigh.ToArray(),
-                                Low = sLow.ToArray(),
-                                Close = sClose.ToArray(),
-                                Volume = sVolume.ToArray()
-                            };
-                        }
-                        else if (sDateTime.Count == 0) // Новые данные отсутствуют
-                        {
-                            XR.Close();
-                            return Section;
-                        }
-                        else if (MySecurity.SourceBars.DateTime[0] > sDateTime[^1]) // Исходные данные свежее полученных
-                        {
-                            MySecurity.SourceBars.DateTime = sDateTime.Concat(MySecurity.SourceBars.DateTime).ToArray();
-                            MySecurity.SourceBars.Open = sOpen.Concat(MySecurity.SourceBars.Open).ToArray();
-                            MySecurity.SourceBars.High = sHigh.Concat(MySecurity.SourceBars.High).ToArray();
-                            MySecurity.SourceBars.Low = sLow.Concat(MySecurity.SourceBars.Low).ToArray();
-                            MySecurity.SourceBars.Close = sClose.Concat(MySecurity.SourceBars.Close).ToArray();
-                            MySecurity.SourceBars.Volume = sVolume.Concat(MySecurity.SourceBars.Volume).ToArray();
-                        }
-                        else if (MySecurity.SourceBars.DateTime[^1] <= sDateTime[^1]) // Полученные данные свежее исходных
-                        {
-                            // Поиск первого общего бара
-                            int y = Array.FindIndex(MySecurity.SourceBars.DateTime, x => x == sDateTime[0]);
-                            if (y == -1) y = Array.FindIndex(MySecurity.SourceBars.DateTime, x => x == sDateTime[1]);
-
-                            // Проверка наличия общего бара
-                            if (y > -1) // Есть общие бары
-                            {
-                                MySecurity.SourceBars.DateTime = MySecurity.SourceBars.DateTime[0..y].Concat(sDateTime).ToArray();
-                                MySecurity.SourceBars.Open = MySecurity.SourceBars.Open[0..y].Concat(sOpen).ToArray();
-                                MySecurity.SourceBars.High = MySecurity.SourceBars.High[0..y].Concat(sHigh).ToArray();
-                                MySecurity.SourceBars.Low = MySecurity.SourceBars.Low[0..y].Concat(sLow).ToArray();
-                                MySecurity.SourceBars.Close = MySecurity.SourceBars.Close[0..y].Concat(sClose).ToArray();
-                                MySecurity.SourceBars.Volume = MySecurity.SourceBars.Volume[0..y].Concat(sVolume).ToArray();
-                            }
-                            else MySecurity.SourceBars = new Bars(MySecurity.SourceBars.TF) // Отсутствует общий бар
-                            {
-                                DateTime = sDateTime.ToArray(),
-                                Open = sOpen.ToArray(),
-                                High = sHigh.ToArray(),
-                                Low = sLow.ToArray(),
-                                Close = sClose.ToArray(),
-                                Volume = sVolume.ToArray()
-                            };
-                        }
-
-                        // Обработка данных
-                        Task.Run(() => UpdateBars(Tools[i], MySecurity == Tools[i].BasicSecurity));
-
-                        XR.Close();
-                        return Section;
-                    }
-                }
-                AddInfo("candles: Не найден EndElement");
+                ProcessBars(XR, Tools[i], MySecurity);
                 XR.Close();
                 return Section;
             }
             // Базовые секции
-            else if (Section == "orders") // Идентификаторы заявок: transactionid и oderno
+            else if (Section == "orders")
             {
-                while (XR.Read())
-                {
-                    if (!XR.HasAttributes && !XR.ReadToFollowing("order")) { XR.Close(); return Section; }
-
-                    // Первичная идентификация
-                    int TrID = int.Parse(XR.GetAttribute("transactionid"), IC);
-                    MyOrders = Orders.ToArray();
-                    if (MyOrders.Where(x => x.TrID == TrID).Count() > 1)
-                    {
-                        AddInfo("orders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", notify: true);
-                        Window.Dispatcher.Invoke(() =>
-                        {
-                            while (MyOrders.Where(x => x.TrID == TrID).Count() > 1)
-                            {
-                                Orders.Remove(MyOrders.First(x => x.TrID == TrID));
-                                MyOrders = Orders.ToArray();
-                            }
-                        });
-                    }
-
-                    MyOrder = MyOrders.SingleOrDefault(x => x.TrID == TrID); // Проверка наличия заявки с данным TrID
-                    if (MyOrder == null) MyOrder = new Order(TrID); // Создание новой заявки с данным TrID
-
-                    // Вторичная идентификация
-                    if (!XR.ReadToFollowing("orderno"))
-                    {
-                        AddInfo("orders: Не найден orderno заявки: " + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read();
-
-                    if (XR.Value == "0") MyOrder.OrderNo = 0;
-                    else if (MyOrders.SingleOrDefault(x => x.OrderNo == long.Parse(XR.Value, IC)) == null) MyOrder.OrderNo = long.Parse(XR.Value, IC);
-                    else // Заявка с данным биржевым номером уже есть в коллекции, обновление TrID и её фиксация
-                    {
-                        MyOrders.Single(x => x.OrderNo == long.Parse(XR.Value, IC)).TrID = TrID;
-                        MyOrder = MyOrders.Single(x => x.TrID == TrID); // Фиксация существующей заявки
-                    }
-
-                    if (!XR.ReadToFollowing("seccode"))
-                    {
-                        AddInfo("orders: Не найден seccode заявки: " + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.Seccode = XR.Value;
-
-                    if (!XR.ReadToFollowing("status"))
-                    {
-                        AddInfo("orders: Не найден status заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.Status = XR.Value;
-
-                    if (!XR.ReadToFollowing("buysell"))
-                    {
-                        AddInfo("orders: Не найден buysell заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.BuySell = XR.Value;
-
-                    XR.Read(); XR.Read();
-                    if (XR.Name == "time")
-                    {
-                        XR.Read(); MyOrder.Time = DateTime.ParseExact(XR.Value, DTForm, IC);
-                        XR.Read(); XR.Read();
-                        if (XR.Name == "accepttime")
-                        {
-                            XR.Read();
-                            MyOrder.AcceptTime = DateTime.ParseExact(XR.Value, DTForm, IC);
-                        }
-                    }
-                    else if (XR.Name == "accepttime")
-                    {
-                        XR.Read();
-                        MyOrder.AcceptTime = DateTime.ParseExact(XR.Value, DTForm, IC);
-                    }
-                    else if (MyOrder.Status == "active" && MyOrder.OrderNo == 0) { }
-
-                    if (!XR.ReadToFollowing("balance"))
-                    {
-                        AddInfo("orders: Не найден balance заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.Balance = int.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("price"))
-                    {
-                        AddInfo("orders: Не найдена price заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.Price = double.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("quantity"))
-                    {
-                        AddInfo("orders: Не найдено quantity заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.Quantity = int.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("withdrawtime"))
-                    {
-                        AddInfo("orders: Не найдено withdrawtime заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); if (XR.Value != "0") MyOrder.WithdrawTime = DateTime.ParseExact(XR.Value, DTForm, IC);
-
-                    if (!XR.ReadToFollowing("condition"))
-                    {
-                        AddInfo("orders: Не найдено condition заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); MyOrder.Condition = XR.Value;
-
-                    if (MyOrder.Condition != "None")
-                    {
-                        if (!XR.ReadToFollowing("conditionvalue"))
-                        {
-                            AddInfo("orders: Не найдено conditionvalue заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                            continue;
-                        }
-                        XR.Read(); MyOrder.ConditionValue = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("validafter"))
-                        {
-                            AddInfo("orders: Не найдено validafter заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                            continue;
-                        }
-                        XR.Read(); if (XR.Value != "0") MyOrder.ValidAfter = DateTime.ParseExact(XR.Value, DTForm, IC);
-
-                        if (!XR.ReadToFollowing("validbefore"))
-                        {
-                            AddInfo("orders: Не найдено validbefore заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                            continue;
-                        }
-                        XR.Read(); if (XR.Value != "") MyOrder.ValidBefore = DateTime.ParseExact(XR.Value, DTForm, IC);
-                    }
-                    if (!XR.ReadToFollowing("result"))
-                    {
-                        AddInfo("orders: Не найден result заявки: " + MyOrder.Seccode + "/" + MyOrder.TrID);
-                        continue;
-                    }
-                    XR.Read(); if (XR.HasValue)
-                    {
-                        if (XR.Value.StartsWith("{37}", SC) || XR.Value.StartsWith("{42}", SC))
-                            AddInfo(MyOrder.Seccode + "/" + MyOrder.TrID + ": OrderReply: " + XR.Value, false);
-                        else AddInfo(MyOrder.Seccode + "/" + MyOrder.TrID + ": OrderReply: " + XR.Value);
-                    }
-
-                    int i = Array.FindIndex(Orders.ToArray(), x => x.TrID == MyOrder.TrID);
-                    Window.Dispatcher.Invoke(() =>
-                    {
-                        if (i > -1) Orders[i] = MyOrder;
-                        else Orders.Add(MyOrder);
-                    });
-                }
+                ProcessOrders(XR, Orders);
+                XR.Close();
+                return Section;
             }
             else if (Section == "positions")
             {
                 XR.Read();
-                string Subsection = XR.Name, Value;
-                while (XR.Read())
-                {
-                    if (Subsection is "sec_position" or "forts_position")
-                    {
-                        if (!XR.ReadToFollowing("seccode")) { XR.Close(); return Section; }
-                        XR.Read(); Value = XR.Value;
-
-                        if (Portfolio.Positions.SingleOrDefault(x => x.Seccode == Value) == null)
-                            Portfolio.Positions.Add(new Position(Value));
-                        Position MyPosition = Portfolio.Positions.Single(x => x.Seccode == Value);
-
-                        if (!XR.ReadToFollowing("market")) { AddInfo("Не найден market позиции"); continue; }
-                        XR.Read(); MyPosition.Market = XR.Value;
-
-                        if (Subsection == "forts_position")
-                        {
-                            if (!XR.ReadToFollowing("startnet")) { AddInfo("Не найден startnet позиции"); continue; }
-                            XR.Read(); MyPosition.SaldoIn = int.Parse(XR.Value, IC);
-
-                            if (!XR.ReadToFollowing("totalnet")) { AddInfo("Не найден totalnet позиции"); continue; }
-                            XR.Read(); MyPosition.Saldo = int.Parse(XR.Value, IC);
-
-                            if (!XR.ReadToFollowing("varmargin")) { AddInfo("Не найдена varmargin позиции"); continue; }
-                            XR.Read(); MyPosition.PL = double.Parse(XR.Value, IC);
-                        }
-                        else
-                        {
-                            if (!XR.ReadToFollowing("saldoin")) { AddInfo("Не найдено saldoin позиции"); continue; }
-                            XR.Read(); MyPosition.SaldoIn = int.Parse(XR.Value, IC);
-
-                            if (!XR.ReadToFollowing("saldo")) { AddInfo("Не найдено saldo позиции"); continue; }
-                            XR.Read(); MyPosition.Saldo = int.Parse(XR.Value, IC);
-
-                            if (!XR.ReadToFollowing("amount")) { AddInfo("Не найдено amount позиции"); continue; }
-                            XR.Read(); MyPosition.Amount = double.Parse(XR.Value, IC);
-
-                            if (!XR.ReadToFollowing("equity")) { AddInfo("Не найдено equity позиции"); continue; }
-                            XR.Read(); MyPosition.Equity = double.Parse(XR.Value, IC);
-                        }
-                    }
-                    else if (Subsection == "united_limits")
-                    {
-                        if (!XR.ReadToFollowing("equity")) { XR.Close(); return Section; }
-                        XR.Read(); Portfolio.Saldo = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("requirements")) { AddInfo("Нет requirements портфеля."); XR.Close(); return Section; }
-                        XR.Read(); Portfolio.InitReqs = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("free")) { AddInfo("Нет free портфеля."); XR.Close(); return Section; }
-                        XR.Read(); Portfolio.Free = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("vm")) { AddInfo("Нет vm портфеля."); XR.Close(); return Section; }
-                        XR.Read(); Portfolio.VarMargin = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("finres")) { AddInfo("Нет finres портфеля."); XR.Close(); return Section; }
-                        XR.Read(); Portfolio.FinRes = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("go")) { AddInfo("Нет go портфеля."); XR.Close(); return Section; }
-                        XR.Read(); Portfolio.GO = double.Parse(XR.Value, IC);
-                        XR.Close(); return Section;
-                    }
-                    else if (Subsection == "money_position")
-                    {
-                        if (!XR.ReadToFollowing("shortname")) { XR.Close(); return Section; }
-                        XR.Read(); Value = XR.Value;
-                        if (Portfolio.MoneyPositions.SingleOrDefault(x => x.ShortName == XR.Value) == null)
-                            Portfolio.MoneyPositions.Add(new Position() { ShortName = Value });
-
-                        if (!XR.ReadToFollowing("saldoin")) { AddInfo("Не найдено saldoin позиции"); continue; }
-                        XR.Read(); Portfolio.MoneyPositions.Single(x => x.ShortName == Value).SaldoIn = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("saldo")) { AddInfo("Не найдено saldo позиции"); continue; }
-                        XR.Read(); Portfolio.MoneyPositions.Single(x => x.ShortName == Value).Saldo = double.Parse(XR.Value, IC);
-                    }
-                    else { AddInfo("Пришла неизвестная позиция:" + Subsection); XR.Close(); return Section; }
-                }
+                ProcessPositions(XR, XR.Name, Portfolio);
+                XR.Close();
+                return Section;
             }
             else if (Section == "trades")
             {
-                while (XR.Read())
-                {
-                    if (!XR.ReadToFollowing("tradeno")) { XR.Close(); return Section; }
-                    XR.Read();
-
-                    if (Trades.SingleOrDefault(x => x.TradeNo == long.Parse(XR.Value, IC)) != null) continue;
-                    else MyTrade = new Trade(long.Parse(XR.Value, IC));
-
-                    if (!XR.ReadToFollowing("orderno")) { AddInfo("Нет orderno моей сделки."); continue; }
-                    XR.Read(); MyTrade.OrderNo = long.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("seccode")) { AddInfo("Нет seccode моей сделки."); continue; }
-                    XR.Read(); MyTrade.Seccode = XR.Value;
-
-                    if (!XR.ReadToFollowing("buysell")) { AddInfo("Нет buysell моей сделки."); continue; }
-                    XR.Read(); MyTrade.BuySell = XR.Value;
-
-                    if (!XR.ReadToFollowing("time")) { AddInfo("Нет time моей сделки."); continue; }
-                    XR.Read(); MyTrade.DateTime = DateTime.ParseExact(XR.Value, DTForm, IC);
-
-                    if (!XR.ReadToFollowing("price")) { AddInfo("Нет price моей сделки."); continue; }
-                    XR.Read(); MyTrade.Price = double.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("quantity")) { AddInfo("Нет quantity моей сделки."); continue; }
-                    XR.Read(); MyTrade.Quantity = int.Parse(XR.Value, IC);
-
-                    Window.Dispatcher.Invoke(() => Trades.Add(MyTrade));
-                    AddInfo("Новая сделка: " + MyTrade.Seccode + "/" + MyTrade.BuySell + "/" +
-                        MyTrade.Price + "/" + MyTrade.Quantity, MySettings.DisplayNewTrades);
-                }
+                ProcessTrades(XR, Trades);
+                XR.Close();
+                return Section;
             }
             else if (Section == "server_status")
             {
@@ -564,42 +196,9 @@ internal static class TXmlConnector
             }
             else if (Section == "mc_portfolio")
             {
-                Portfolio.Union = XR.GetAttribute("union");
-                if (!XR.ReadToFollowing("open_equity")) { AddInfo("Нет open_equity портфеля."); XR.Close(); return Section; }
-                XR.Read(); Portfolio.SaldoIn = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("equity")) { AddInfo("Нет equity портфеля."); XR.Close(); return Section; }
-                XR.Read(); Portfolio.Saldo = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("pl")) { AddInfo("Нет pl портфеля."); XR.Close(); return Section; }
-                XR.Read(); Portfolio.PL = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("init_req")) { AddInfo("Нет init_req портфеля."); XR.Close(); return Section; }
-                XR.Read(); Portfolio.InitReqs = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("maint_req")) { AddInfo("Нет maint_req портфеля."); XR.Close(); return Section; }
-                XR.Read(); Portfolio.MinReqs = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("unrealized_pnl")) { AddInfo("Нет unrealized_pnl портфеля."); XR.Close(); return Section; }
-                XR.Read(); Portfolio.UnrealPL = double.Parse(XR.Value, IC);
-
-                string Value;
-                while (XR.Read())
-                {
-                    if (!XR.ReadToFollowing("seccode")) { XR.Close(); return Section; }
-                    XR.Read(); Value = XR.Value;
-                    if (Portfolio.Positions.SingleOrDefault(x => x.Seccode == Value) == null)
-                        Portfolio.Positions.Add(new Position(Value));
-
-                    if (!XR.ReadToFollowing("open_balance")) { AddInfo("Не найден open_balance позиции"); continue; }
-                    XR.Read(); Portfolio.Positions.Single(x => x.Seccode == Value).SaldoIn = int.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("balance")) { AddInfo("Не найден balance позиции"); continue; }
-                    XR.Read(); Portfolio.Positions.Single(x => x.Seccode == Value).Saldo = int.Parse(XR.Value, IC);
-
-                    if (!XR.ReadToFollowing("pl")) { AddInfo("Нет pl позиции."); continue; }
-                    XR.Read(); Portfolio.Positions.Single(x => x.Seccode == Value).PL = double.Parse(XR.Value, IC);
-                }
+                ProcessPortfolio(XR, Portfolio);
+                XR.Close();
+                return Section;
             }
             // Второстепенные секции
             else if (Section == "sec_info_upd")
@@ -612,6 +211,7 @@ internal static class TXmlConnector
                 }
                 XR.Read();
 
+                Tool MyTool;
                 if (Tools.SingleOrDefault(x => x.MySecurity.Seccode == XR.Value) == null) { XR.Close(); return Section; }
                 else MyTool = Tools.Single(x => x.MySecurity.Seccode == XR.Value);
 
@@ -641,6 +241,7 @@ internal static class TXmlConnector
                 }
                 XR.Read();
 
+                Tool MyTool;
                 if (Tools.SingleOrDefault(x => x.MySecurity.Seccode == XR.Value) == null) { XR.Close(); return Section; }
                 else MyTool = Tools.Single(x => x.MySecurity.Seccode == XR.Value);
 
@@ -866,6 +467,617 @@ internal static class TXmlConnector
         }
         XR.Close();
         return Section;
+    }
+    private static void ProcessBars(XmlReader xr, Tool tool, Security security)
+    {
+        int tf = TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Period / 60;
+        if (security.SourceBars == null || security.SourceBars.TF != tf) security.SourceBars = new Bars(tf);
+
+        List<DateTime> dateTime = new();
+        List<double> open = new();
+        List<double> high = new();
+        List<double> low = new();
+        List<double> close = new();
+        List<double> volume = new();
+
+        bool Filter = security.Market != "4";
+        while (xr.Read())
+        {
+            if (Filter && xr.HasAttributes && (dateTime.Count == 0 ||
+                dateTime[^1].Date != DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC).Date) &&
+                double.Parse(xr.GetAttribute("high"), IC) - double.Parse(xr.GetAttribute("low"), IC) < 0.00001) xr.Read();
+
+            if (xr.HasAttributes)
+            {
+                dateTime.Add(DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC));
+                open.Add(double.Parse(xr.GetAttribute("open"), IC));
+                high.Add(double.Parse(xr.GetAttribute("high"), IC));
+                low.Add(double.Parse(xr.GetAttribute("low"), IC));
+                close.Add(double.Parse(xr.GetAttribute("close"), IC));
+                volume.Add(double.Parse(xr.GetAttribute("volume"), IC));
+            }
+            else if (xr.NodeType == XmlNodeType.EndElement)
+            {
+                if (security.SourceBars.DateTime == null) // Исходные данные отсутсвуют
+                {
+                    security.SourceBars = new Bars(tf)
+                    {
+                        DateTime = dateTime.ToArray(),
+                        Open = open.ToArray(),
+                        High = high.ToArray(),
+                        Low = low.ToArray(),
+                        Close = close.ToArray(),
+                        Volume = volume.ToArray()
+                    };
+                }
+                else if (dateTime.Count == 0) return;
+                else if (dateTime[^1] >= security.SourceBars.DateTime[^1]) // Полученные данные свежее исходных
+                {
+                    // Поиск первого общего бара
+                    int y = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[0]);
+                    if (y == -1) y = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[1]);
+
+                    if (y > -1) // Есть общие бары
+                    {
+                        security.SourceBars.DateTime = security.SourceBars.DateTime[..y].Concat(dateTime).ToArray();
+                        security.SourceBars.Open = security.SourceBars.Open[..y].Concat(open).ToArray();
+                        security.SourceBars.High = security.SourceBars.High[..y].Concat(high).ToArray();
+                        security.SourceBars.Low = security.SourceBars.Low[..y].Concat(low).ToArray();
+                        security.SourceBars.Close = security.SourceBars.Close[..y].Concat(close).ToArray();
+                        security.SourceBars.Volume = security.SourceBars.Volume[..y].Concat(volume).ToArray();
+                    }
+                    else security.SourceBars = new Bars(tf) // Отсутствует общий бар
+                    {
+                        DateTime = dateTime.ToArray(),
+                        Open = open.ToArray(),
+                        High = high.ToArray(),
+                        Low = low.ToArray(),
+                        Close = close.ToArray(),
+                        Volume = volume.ToArray()
+                    };
+                }
+                else if (dateTime[^1] < security.SourceBars.DateTime[0]) // Полученные данные глубже исходных
+                {
+                    if (dateTime[^1].AddDays(5) < security.SourceBars.DateTime[0])
+                    {
+                        AddInfo("ProcessBars: Полученные данные слишком старые: " + security.ShortName + " LastBar: " + dateTime[^1]);
+                        return;
+                    }
+                    security.SourceBars.DateTime = dateTime.Concat(security.SourceBars.DateTime).ToArray();
+                    security.SourceBars.Open = open.Concat(security.SourceBars.Open).ToArray();
+                    security.SourceBars.High = high.Concat(security.SourceBars.High).ToArray();
+                    security.SourceBars.Low = low.Concat(security.SourceBars.Low).ToArray();
+                    security.SourceBars.Close = close.Concat(security.SourceBars.Close).ToArray();
+                    security.SourceBars.Volume = volume.Concat(security.SourceBars.Volume).ToArray();
+                }
+                else // Полученные данные располагаются внутри массива исходных данных
+                {
+                    // Поиск общих баров
+                    int x = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[0]);
+                    int y = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[^1]);
+
+                    if (x > -1 && y > -1) // Найдены общие бары
+                    {
+                        var sourceInnerArr = security.SourceBars.DateTime[x..(y + 1)];
+                        int sourceInnerLength = security.SourceBars.DateTime.Length - x - (security.SourceBars.DateTime.Length - y - 1);
+                        if (dateTime.Count != sourceInnerArr.Length)
+                        {
+                            AddInfo("ProcessBars: Массив полученных баров не соответствуют массиву исходных по количеству: " +
+                                security.ShortName + " Исх/получ: " + sourceInnerLength + "/" + dateTime.Count + " Период: " +
+                                dateTime[0].Date + "-" + dateTime[^1].Date + " Возможно, требуется перезагрузка баров.",
+                                Math.Abs(dateTime.Count - sourceInnerArr.Length) < 15);
+                            return;
+                        }
+
+                        security.SourceBars.DateTime =
+                            security.SourceBars.DateTime[..x].Concat(dateTime.Concat(security.SourceBars.DateTime[(y + 1)..])).ToArray();
+
+                        security.SourceBars.Open =
+                            security.SourceBars.Open[..x].Concat(open.Concat(security.SourceBars.Open[(y + 1)..])).ToArray();
+
+                        security.SourceBars.High =
+                            security.SourceBars.High[..x].Concat(high.Concat(security.SourceBars.High[(y + 1)..])).ToArray();
+
+                        security.SourceBars.Low =
+                            security.SourceBars.Low[..x].Concat(low.Concat(security.SourceBars.Low[(y + 1)..])).ToArray();
+
+                        security.SourceBars.Close =
+                            security.SourceBars.Close[..x].Concat(close.Concat(security.SourceBars.Close[(y + 1)..])).ToArray();
+
+                        security.SourceBars.Volume =
+                            security.SourceBars.Volume[..x].Concat(volume.Concat(security.SourceBars.Volume[(y + 1)..])).ToArray();
+                    }
+                    else
+                    {
+                        AddInfo("ProcessBars: Не найдены общие бары полученных и исходных баров: " + security.ShortName);
+                        return;
+                    }
+                }
+
+                Task.Run(() => UpdateBars(tool, security == tool.BasicSecurity));
+                return;
+            }
+        }
+        AddInfo("ProcessBars: Не найден EndElement");
+    }
+    private static void ProcessOrders(XmlReader xr, ObservableCollection<Order> orders)
+    {
+        while (xr.Read())
+        {
+            if (!xr.HasAttributes && !xr.ReadToFollowing("order")) return;
+
+            // Первичная идентификация
+            int trID = int.Parse(xr.GetAttribute("transactionid"), IC);
+            Order[] arrOrders = orders.ToArray();
+            if (arrOrders.Where(x => x.TrID == trID).Count() > 1)
+            {
+                AddInfo("orders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", notify: true);
+                Window.Dispatcher.Invoke(() =>
+                {
+                    while (arrOrders.Where(x => x.TrID == trID).Count() > 1)
+                    {
+                        orders.Remove(arrOrders.First(x => x.TrID == trID));
+                        arrOrders = orders.ToArray();
+                    }
+                });
+            }
+
+            Order myOrder = arrOrders.SingleOrDefault(x => x.TrID == trID); // Проверка наличия заявки с данным TrID
+            if (myOrder == null) myOrder = new Order(trID); // Создание новой заявки с данным TrID
+
+            // Вторичная идентификация
+            if (!xr.ReadToFollowing("orderno"))
+            {
+                AddInfo("orders: Не найден orderno заявки: " + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+
+            if (xr.Value == "0") myOrder.OrderNo = 0;
+            else if (arrOrders.SingleOrDefault(x => x.OrderNo == long.Parse(xr.Value, IC)) == null) myOrder.OrderNo = long.Parse(xr.Value, IC);
+            else // Заявка с данным биржевым номером уже есть в коллекции, обновление TrID и её фиксация
+            {
+                arrOrders.Single(x => x.OrderNo == long.Parse(xr.Value, IC)).TrID = trID;
+                myOrder = arrOrders.Single(x => x.TrID == trID); // Фиксация существующей заявки
+            }
+
+            if (!xr.ReadToFollowing("seccode"))
+            {
+                AddInfo("orders: Не найден seccode заявки: " + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.Seccode = xr.Value;
+
+            if (!xr.ReadToFollowing("status"))
+            {
+                AddInfo("orders: Не найден status заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.Status = xr.Value;
+
+            if (!xr.ReadToFollowing("buysell"))
+            {
+                AddInfo("orders: Не найден buysell заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.BuySell = xr.Value;
+
+            xr.Read();
+            xr.Read();
+            if (xr.Name == "time")
+            {
+                xr.Read();
+                myOrder.Time = DateTime.ParseExact(xr.Value, DTForm, IC);
+                xr.Read(); xr.Read();
+                if (xr.Name == "accepttime")
+                {
+                    xr.Read();
+                    myOrder.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+                }
+            }
+            else if (xr.Name == "accepttime")
+            {
+                xr.Read();
+                myOrder.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+            }
+            else if (myOrder.Status == "active" && myOrder.OrderNo == 0) { }
+
+            if (!xr.ReadToFollowing("balance"))
+            {
+                AddInfo("orders: Не найден balance заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.Balance = int.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("price"))
+            {
+                AddInfo("orders: Не найдена price заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.Price = double.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("quantity"))
+            {
+                AddInfo("orders: Не найдено quantity заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.Quantity = int.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("withdrawtime"))
+            {
+                AddInfo("orders: Не найдено withdrawtime заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            if (xr.Value != "0") myOrder.WithdrawTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+
+            if (!xr.ReadToFollowing("condition"))
+            {
+                AddInfo("orders: Не найдено condition заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            myOrder.Condition = xr.Value;
+
+            if (myOrder.Condition != "None")
+            {
+                if (!xr.ReadToFollowing("conditionvalue"))
+                {
+                    AddInfo("orders: Не найдено conditionvalue заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                    continue;
+                }
+                xr.Read();
+                myOrder.ConditionValue = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("validafter"))
+                {
+                    AddInfo("orders: Не найдено validafter заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                    continue;
+                }
+                xr.Read();
+                if (xr.Value != "0") myOrder.ValidAfter = DateTime.ParseExact(xr.Value, DTForm, IC);
+
+                if (!xr.ReadToFollowing("validbefore"))
+                {
+                    AddInfo("orders: Не найдено validbefore заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                    continue;
+                }
+                xr.Read();
+                if (xr.Value != "" && xr.Value != "0") myOrder.ValidBefore = DateTime.ParseExact(xr.Value, DTForm, IC);
+            }
+            if (!xr.ReadToFollowing("result"))
+            {
+                AddInfo("orders: Не найден result заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                continue;
+            }
+            xr.Read();
+            if (xr.HasValue)
+            {
+                if (xr.Value.StartsWith("{37}", SC) || xr.Value.StartsWith("{42}", SC))
+                    AddInfo(myOrder.Seccode + "/" + myOrder.TrID + ": OrderReply: " + xr.Value, false);
+                else AddInfo(myOrder.Seccode + "/" + myOrder.TrID + ": OrderReply: " + xr.Value);
+            }
+
+            int i = Array.FindIndex(orders.ToArray(), x => x.TrID == myOrder.TrID);
+            Window.Dispatcher.Invoke(() =>
+            {
+                if (i > -1) orders[i] = myOrder;
+                else orders.Add(myOrder);
+            });
+        }
+    }
+    private static void ProcessTrades(XmlReader xr, ObservableCollection<Trade> trades)
+    {
+        Trade trade;
+        while (xr.Read())
+        {
+            if (!xr.ReadToFollowing("tradeno")) return;
+            xr.Read();
+
+            if (trades.SingleOrDefault(x => x.TradeNo == long.Parse(xr.Value, IC)) != null) continue;
+            else trade = new Trade(long.Parse(xr.Value, IC));
+
+            if (!xr.ReadToFollowing("orderno"))
+            {
+                AddInfo("Нет orderno моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.OrderNo = long.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("seccode"))
+            {
+                AddInfo("Нет seccode моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.Seccode = xr.Value;
+
+            if (!xr.ReadToFollowing("buysell"))
+            {
+                AddInfo("Нет buysell моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.BuySell = xr.Value;
+
+            if (!xr.ReadToFollowing("time"))
+            {
+                AddInfo("Нет time моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.DateTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+
+            if (!xr.ReadToFollowing("price"))
+            {
+                AddInfo("Нет price моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.Price = double.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("quantity"))
+            {
+                AddInfo("Нет quantity моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.Quantity = int.Parse(xr.Value, IC);
+
+            Window.Dispatcher.Invoke(() => trades.Add(trade));
+            AddInfo("Новая сделка: " + trade.Seccode + "/" + trade.BuySell + "/" +
+                trade.Price + "/" + trade.Quantity, MySettings.DisplayNewTrades);
+        }
+    }
+    private static void ProcessPositions(XmlReader xr, string subsection, UnitedPortfolio portfolio)
+    {
+        while (xr.Read())
+        {
+            if (subsection is "sec_position" or "forts_position")
+            {
+                if (!xr.ReadToFollowing("seccode")) return;
+                xr.Read();
+
+                Position pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
+                if (pos == null)
+                {
+                    pos = new(xr.Value);
+                    portfolio.Positions.Add(pos);
+                }
+
+                if (!xr.ReadToFollowing("market"))
+                {
+                    AddInfo("Не найден market позиции");
+                    continue;
+                }
+                xr.Read();
+                pos.Market = xr.Value;
+
+                if (subsection == "forts_position")
+                {
+                    if (!xr.ReadToFollowing("startnet"))
+                    {
+                        AddInfo("Не найден startnet позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.SaldoIn = int.Parse(xr.Value, IC);
+
+                    if (!xr.ReadToFollowing("totalnet"))
+                    {
+                        AddInfo("Не найден totalnet позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.Saldo = int.Parse(xr.Value, IC);
+
+                    if (!xr.ReadToFollowing("varmargin"))
+                    {
+                        AddInfo("Не найдена varmargin позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.PL = double.Parse(xr.Value, IC);
+                }
+                else
+                {
+                    if (!xr.ReadToFollowing("saldoin"))
+                    {
+                        AddInfo("Не найдено saldoin позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.SaldoIn = int.Parse(xr.Value, IC);
+
+                    if (!xr.ReadToFollowing("saldo"))
+                    {
+                        AddInfo("Не найдено saldo позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.Saldo = int.Parse(xr.Value, IC);
+
+                    if (!xr.ReadToFollowing("amount"))
+                    {
+                        AddInfo("Не найдено amount позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.Amount = double.Parse(xr.Value, IC);
+
+                    if (!xr.ReadToFollowing("equity"))
+                    {
+                        AddInfo("Не найдено equity позиции");
+                        continue;
+                    }
+                    xr.Read();
+                    pos.Equity = double.Parse(xr.Value, IC);
+                }
+            }
+            else if (subsection == "united_limits")
+            {
+                if (!xr.ReadToFollowing("equity"))
+                {
+                    AddInfo("Нет equity портфеля.");
+                    return;
+                }
+                xr.Read();
+                portfolio.Saldo = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("requirements"))
+                {
+                    AddInfo("Нет requirements портфеля.");
+                    return;
+                }
+                xr.Read();
+                portfolio.InitReqs = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("free")) return;
+                xr.Read();
+                portfolio.Free = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("vm")) return;
+                xr.Read();
+                portfolio.VarMargin = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("finres")) return;
+                xr.Read();
+                portfolio.FinRes = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("go")) return;
+                xr.Read();
+                portfolio.GO = double.Parse(xr.Value, IC);
+                return;
+            }
+            else if (subsection == "money_position")
+            {
+                if (!xr.ReadToFollowing("shortname")) return;
+                xr.Read();
+
+                Position pos = portfolio.MoneyPositions.SingleOrDefault(x => x.ShortName == xr.Value);
+                if (pos == null)
+                {
+                    pos = new() { ShortName = xr.Value };
+                    portfolio.MoneyPositions.Add(pos);
+                }
+
+                if (!xr.ReadToFollowing("saldoin"))
+                {
+                    AddInfo("Не найдено saldoin позиции");
+                    continue;
+                }
+                xr.Read();
+                pos.SaldoIn = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("saldo"))
+                {
+                    AddInfo("Не найдено saldo позиции");
+                    continue;
+                }
+                xr.Read();
+                pos.Saldo = double.Parse(xr.Value, IC);
+            }
+            else
+            {
+                AddInfo("Неизвестная позиция:" + subsection);
+                return;
+            }
+        }
+    }
+    private static void ProcessPortfolio(XmlReader xr, UnitedPortfolio portfolio)
+    {
+        portfolio.Union = xr.GetAttribute("union");
+        if (!xr.ReadToFollowing("open_equity"))
+        {
+            AddInfo("Нет open_equity портфеля.");
+            return;
+        }
+        xr.Read();
+        portfolio.SaldoIn = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("equity"))
+        {
+            AddInfo("Нет equity портфеля.");
+            return;
+        }
+        xr.Read();
+        portfolio.Saldo = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("pl"))
+        {
+            AddInfo("Нет pl портфеля.");
+            return;
+        }
+        xr.Read();
+        portfolio.PL = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("init_req"))
+        {
+            AddInfo("Нет init_req портфеля.");
+            return;
+        }
+        xr.Read();
+        portfolio.InitReqs = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("maint_req"))
+        {
+            AddInfo("Нет maint_req портфеля.");
+            return;
+        }
+        xr.Read();
+        portfolio.MinReqs = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("unrealized_pnl"))
+        {
+            AddInfo("Нет unrealized_pnl портфеля.");
+            return;
+        }
+        xr.Read();
+        portfolio.UnrealPL = double.Parse(xr.Value, IC);
+
+        while (xr.Read())
+        {
+            if (!xr.ReadToFollowing("seccode")) return;
+            xr.Read();
+
+            Position pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
+            if (pos == null)
+            {
+                pos = new Position(xr.Value);
+                portfolio.Positions.Add(pos);
+            }
+
+            if (!xr.ReadToFollowing("open_balance"))
+            {
+                AddInfo("Не найден open_balance позиции");
+                continue;
+            }
+            xr.Read();
+            pos.SaldoIn = int.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("balance"))
+            {
+                AddInfo("Не найден balance позиции");
+                continue;
+            }
+            xr.Read();
+            pos.Saldo = int.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("pl"))
+            {
+                AddInfo("Нет pl позиции.");
+                continue;
+            }
+            xr.Read();
+            pos.PL = double.Parse(xr.Value, IC);
+        }
     }
     #endregion
 

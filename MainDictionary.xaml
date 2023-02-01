@@ -64,7 +64,7 @@
     <SolidColorBrush x:Key="checkBackPressed" Color="{StaticResource purpleDark}"/>
     <SolidColorBrush x:Key="checkBackChecked" Color="{StaticResource purpleMid}"/>
 
-    <SolidColorBrush x:Key="listItemBorder" Color="{StaticResource purpleBlack}"/>
+    <SolidColorBrush x:Key="listItemBorder" Color="{StaticResource purpleBlack2}"/>
     <SolidColorBrush x:Key="comboItemBorder" Color="{StaticResource purpleVeryDark}"/>
 
     <ControlTemplate x:Key="track">

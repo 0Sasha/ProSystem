@@ -33,8 +33,7 @@ public partial class Tool : INotifyPropertyChanged
             if (value == false || BasicSecurity != null)
             {
                 ShBasSec = value;
-                UpdateModel();
-                UpdateMiniModel();
+                UpdateView(true);
             }
             else AddInfo("У инструмента нет базисного актива.");
         }
@@ -71,14 +70,19 @@ public partial class Tool : INotifyPropertyChanged
         this.Scripts = Scripts;
 
         BaseTF = 30;
-        Controller = new PlotController();
-        Controller.BindMouseDown(OxyMouseButton.Left, PlotCommands.PanAt);
-        Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
+        Controller = GetController();
         BrushState = Colors.Red;
     }
     #endregion
 
     #region Methods
+    public static PlotController GetController()
+    {
+        var Controller = new PlotController();
+        Controller.BindMouseDown(OxyMouseButton.Left, PlotCommands.PanAt);
+        Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
+        return Controller;
+    }
     public void Initialize(TabItem MyTabItem)
     {
         if (BaseTF < 1) BaseTF = 30;
@@ -93,6 +97,8 @@ public partial class Tool : INotifyPropertyChanged
             script.Calculate(BasicSecurity ?? MySecurity);
             UpdateModelsAndPanel(script);
         }
+        UpdateModel();
+        UpdateMiniModel();
 
         if (Active)
         {
@@ -106,9 +112,6 @@ public partial class Tool : INotifyPropertyChanged
             (MyTabItem.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
-
-        UpdateModel();
-        UpdateMiniModel();
     }
     public void InitializeScript(IScript MyScript, TabItem TabTool, bool IsOSC, string[] UpperProperties,
         string[] MiddleProperties = null, string SpecProperty = null, NameMA[] SpecObjs = null)
@@ -192,6 +195,7 @@ public partial class Tool : INotifyPropertyChanged
         {
             while (Connection == ConnectionState.Connected && !SystemReadyToTrading) await System.Threading.Tasks.Task.Delay(100);
             ChangeActivity();
+            await System.Threading.Tasks.Task.Delay(250);
         }
         MySecurity.SourceBars = null;
         MySecurity.Bars = null;
@@ -209,6 +213,21 @@ public partial class Tool : INotifyPropertyChanged
         }
     }
 
+    public void UpdateView(bool recalculateScripts)
+    {
+        try
+        {
+            if (MainModel == null) UpdateModel();
+            foreach (var script in Scripts)
+            {
+                if (recalculateScripts) script.Calculate(BasicSecurity ?? MySecurity);
+                UpdateModelsAndPanel(script);
+            }
+            UpdateModel();
+            UpdateMiniModel();
+        }
+        catch (Exception ex) { AddInfo("UpdateView: " + ex.Message); }
+    }
     public void UpdateModel()
     {
         // Обработка баров
@@ -440,10 +459,12 @@ public partial class Tool : INotifyPropertyChanged
                 yEndPoint = MySecurity.Bars.High[i];
             }
 
+            string text = trade.SignalOrder is "BuyAtLimit" or "SellAtLimit" or "BuyAtStop" or "SellAtStop" ?
+                trade.Price + "; " + trade.Quantity : trade.SignalOrder + "; " + trade.Price + "; " + trade.Quantity;
             MainModel.Annotations.Add(new ArrowAnnotation()
             {
                 Color = MyColor,
-                Text = trade.SignalOrder + "; " + trade.Quantity + "; " + trade.Price,
+                Text = text,
                 StartPoint = new DataPoint(i, yStartPoint),
                 EndPoint = new DataPoint(i, yEndPoint),
                 ToolTip = trade.SenderOrder

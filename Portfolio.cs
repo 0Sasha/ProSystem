@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using static ProSystem.MainWindow;
@@ -23,8 +24,11 @@ public class UnitedPortfolio : INotifyPropertyChanged
         {
             inReqs = value;
             ShareInitReqs = Math.Round(inReqs / Saldo * 100, 2);
-            UpdatePositions();
-            NotifyChanged();
+            Task.Run(() =>
+            {
+                UpdatePositions();
+                NotifyChanged();
+            });
         }
     } // Начальные требования
     public double MinReqs
@@ -55,7 +59,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
         get
         {
             if (Equity == null || Equity.Count == 0) return 500000;
-            if (Equity.Count > 2) return (int)Equity.TakeLast(3).Select(x => x.Value).Average();
+            if (Equity.Count > 4) return (int)Equity.TakeLast(5).Select(x => x.Value).Average();
             return Equity.Last().Value;
         }
     }
@@ -120,7 +124,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
             AllPositions = new(MoneyPositions.Concat(Positions.OrderBy(x => x.ShortName))) { this };
             Window.Dispatcher.Invoke(() =>
             {
-                Window.PortfolioView.ItemsSource = Portfolio.AllPositions;
+                Window.PortfolioView.ItemsSource = AllPositions;
                 Window.PortfolioView.ScrollIntoView(this);
             });
         }

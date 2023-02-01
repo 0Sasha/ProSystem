@@ -50,7 +50,15 @@ public partial class MainWindow : Window
     }
     private void Test(object sender, RoutedEventArgs e)
     {
-
+        Task.Run(() =>
+        {
+            GetHistoryData(Tools[16].BasicSecurity.Board, Tools[16].BasicSecurity.Seccode, "3", 10000);
+            GetHistoryData(Tools[17].BasicSecurity.Board, Tools[17].BasicSecurity.Seccode, "3", 10000);
+            GetHistoryData(Tools[18].BasicSecurity.Board, Tools[18].BasicSecurity.Seccode, "3", 10000);
+            GetHistoryData(Tools[19].BasicSecurity.Board, Tools[19].BasicSecurity.Seccode, "3", 10000);
+            GetHistoryData(Tools[20].BasicSecurity.Board, Tools[20].BasicSecurity.Seccode, "3", 10000);
+            GetHistoryData(Tools[21].BasicSecurity.Board, Tools[21].BasicSecurity.Seccode, "3", 10000);
+        });
     }
 
     private void ClearOutdatedData()
@@ -299,9 +307,10 @@ public partial class MainWindow : Window
         if (ToolsView.SelectedItem != null)
         {
             int i = Tools.IndexOf(Tools.Single(x => x == ToolsView.SelectedItem));
-            MessageBoxResult Res = MessageBox.Show("Are you sure you want to reload bars of " + Tools[i].Name + "?", "Reloading bars", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            MessageBoxResult Res = MessageBox.Show("Are you sure you want to reload bars of " + Tools[i].Name + "?",
+                "Reloading bars", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (Res == MessageBoxResult.No) return;
-            Tools[i].ReloadBars();
+            Task.Run(() => Tools[i].ReloadBars());
         }
     }
     private void WriteSourceBarsToolContext(object sender, RoutedEventArgs e)
@@ -336,27 +345,33 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RaisePriorityTool(object sender, RoutedEventArgs e)
+    private void ChangePriorityTool(object sender, RoutedEventArgs e)
     {
+        string header = (string)(sender as MenuItem).Header;
         int i = ToolsByPriorityView.SelectedIndex;
-        if (i > 0)
+        int n = int.Parse(header[^1].ToString());
+
+        if (header.StartsWith("Raise") && i >= n)
         {
-            string ReplaceableTool = MySettings.ToolsByPriority[i - 1];
-            MySettings.ToolsByPriority[i - 1] = MySettings.ToolsByPriority[i];
-            MySettings.ToolsByPriority[i] = ReplaceableTool;
-            ToolsByPriorityView.Items.Refresh();
+            while (n > 0)
+            {
+                (MySettings.ToolsByPriority[i], MySettings.ToolsByPriority[i - 1]) =
+                    (MySettings.ToolsByPriority[i - 1], MySettings.ToolsByPriority[i]);
+                n--;
+                i--;
+            }
         }
-    }
-    private void LowerPriorityTool(object sender, RoutedEventArgs e)
-    {
-        int i = ToolsByPriorityView.SelectedIndex;
-        if (i > -1 && i < MySettings.ToolsByPriority.Count - 1)
+        else if (header.StartsWith("Downgrade") && i > -1 && i < MySettings.ToolsByPriority.Count - n)
         {
-            string ReplaceableTool = MySettings.ToolsByPriority[i + 1];
-            MySettings.ToolsByPriority[i + 1] = MySettings.ToolsByPriority[i];
-            MySettings.ToolsByPriority[i] = ReplaceableTool;
-            ToolsByPriorityView.Items.Refresh();
+            while (n > 0)
+            {
+                (MySettings.ToolsByPriority[i], MySettings.ToolsByPriority[i + 1]) =
+                    (MySettings.ToolsByPriority[i + 1], MySettings.ToolsByPriority[i]);
+                n--;
+                i++;
+            }
         }
+        ToolsByPriorityView.Items.Refresh();
     }
 
     private async void CancelOrderContext(object sender, RoutedEventArgs e)
@@ -419,11 +434,6 @@ public partial class MainWindow : Window
             }
         }
     }
-    private void UpdateOrdersAndTradesContext(object sender, RoutedEventArgs e)
-    {
-        OrdersView.Items.Refresh();
-        TradesView.Items.Refresh();
-    }
     private void RemoveTradeContext(object sender, RoutedEventArgs e)
     {
         if ((MainTabs.SelectedItem as TabItem).Header.ToString() == "Portfolio")
@@ -459,6 +469,12 @@ public partial class MainWindow : Window
                 AddInfo("Не найдена сделка для удаления.");
             }
         }
+    }
+    private void UpdatePortfolioViewContext(object sender, RoutedEventArgs e)
+    {
+        OrdersView.Items.Refresh();
+        TradesView.Items.Refresh();
+        Task.Run(() => Portfolio.UpdatePositions());
     }
 
     private void ClearInfo(object sender, RoutedEventArgs e) => TxtBox.Clear();
@@ -814,6 +830,7 @@ public partial class MainWindow : Window
 
         PlotColors.Color(Model);
         DistributionPlot.Model = Model;
+        DistributionPlot.Controller = Tool.GetController();
 
         var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
         var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 4, FillColor = PlotColors.ShortPosition, StrokeThickness = 0 };
@@ -845,6 +862,7 @@ public partial class MainWindow : Window
         Model.PlotMargins = new OxyPlot.OxyThickness(55, 0, 0, 20);
         PlotColors.Color(Model);
         PortfolioPlot.Model = Model;
+        PortfolioPlot.Controller = Tool.GetController();
     }
 
     private void ResizeInfoPanel(object sender, RoutedEventArgs e)
