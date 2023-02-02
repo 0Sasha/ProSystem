@@ -50,15 +50,7 @@ public partial class MainWindow : Window
     }
     private void Test(object sender, RoutedEventArgs e)
     {
-        Task.Run(() =>
-        {
-            GetHistoryData(Tools[16].BasicSecurity.Board, Tools[16].BasicSecurity.Seccode, "3", 10000);
-            GetHistoryData(Tools[17].BasicSecurity.Board, Tools[17].BasicSecurity.Seccode, "3", 10000);
-            GetHistoryData(Tools[18].BasicSecurity.Board, Tools[18].BasicSecurity.Seccode, "3", 10000);
-            GetHistoryData(Tools[19].BasicSecurity.Board, Tools[19].BasicSecurity.Seccode, "3", 10000);
-            GetHistoryData(Tools[20].BasicSecurity.Board, Tools[20].BasicSecurity.Seccode, "3", 10000);
-            GetHistoryData(Tools[21].BasicSecurity.Board, Tools[21].BasicSecurity.Seccode, "3", 10000);
-        });
+        
     }
 
     private void ClearOutdatedData()
@@ -213,21 +205,12 @@ public partial class MainWindow : Window
                     return false;
                 }
 
-                foreach (var path in paths)
-                {
-                    using FileStream sourceStream = new(path, FileMode.Open);
-                    using FileStream targetStream = File.Create(path + ".zip");
+                string newDir = directory + "/" + partName + " " + DateTime.Now.TimeOfDay.ToString("hhmmss");
+                Directory.CreateDirectory(newDir);
+                foreach (var path in paths) File.Move(path, newDir + "/" + path.Replace(directory, ""));
 
-                    using GZipStream compressionStream = new(targetStream, CompressionLevel.SmallestSize);
-                    await sourceStream.CopyToAsync(compressionStream);
-
-                    if (targetStream.Length > 0)
-                    {
-                        sourceStream.Close();
-                        File.Delete(path);
-                    }
-                    else AddInfo("CompressFiles: Исходный файл не удалён, поскольку поток целевого файла пустой.");
-                }
+                await Task.Run(() => ZipFile.CreateFromDirectory(newDir, newDir + ".zip", CompressionLevel.SmallestSize, false));
+                Directory.Delete(newDir, true);
                 return true;
             }
             else
@@ -487,13 +470,7 @@ public partial class MainWindow : Window
         if (NewTool)
         {
             Tools.Add(MyTool);
-            TabsTools.Items.Add(new TabItem()
-            {
-                Header = Tools[^1].Name,
-                Width = 54,
-                Height = 24,
-                Content = GetGridTabTool(Tools[^1])
-            });
+            TabsTools.Items.Add(GetTabItem(MyTool));
             MySettings.ToolsByPriority.Add(MyTool.Name);
             ToolsByPriorityView.Items.Refresh();
             k = Tools.Count - 1;
@@ -538,12 +515,22 @@ public partial class MainWindow : Window
         else Tools[TabsTools.SelectedIndex].ChangeActivity();
         MyButton.IsEnabled = true;
     }
-    private void UpdateModelsAndPanel(object sender, SelectionChangedEventArgs e)
+    private void UpdateViewTool(object sender, SelectionChangedEventArgs e)
     {
         Tool MyTool = (sender as ComboBox).DataContext as Tool;
         Task.Run(() => MyTool.UpdateView(true));
     }
 
+    private TabItem GetTabItem(Tool tool)
+    {
+        return new TabItem()
+        {
+            Header = tool.Name,
+            Width = 54,
+            Height = 24,
+            Content = GetGridTabTool(tool)
+        };
+    }
     private Grid GetGridTabTool(Tool MyTool)
     {
         Grid GlobalGrid = new();
@@ -636,7 +623,7 @@ public partial class MainWindow : Window
             SelectedValue = "AllScripts",
             DataContext = MyTool
         };
-        ScriptsBox.SelectionChanged += UpdateModelsAndPanel;
+        ScriptsBox.SelectionChanged += UpdateViewTool;
 
         Border BorderState = new()
         {

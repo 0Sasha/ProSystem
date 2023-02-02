@@ -829,8 +829,9 @@ internal static class TXmlConnector
             trade.Quantity = int.Parse(xr.Value, IC);
 
             Window.Dispatcher.Invoke(() => trades.Add(trade));
-            AddInfo("Новая сделка: " + trade.Seccode + "/" + trade.BuySell + "/" +
-                trade.Price + "/" + trade.Quantity, MySettings.DisplayNewTrades);
+            bool display = MySettings.DisplayNewTrades && trades.Count > 1 && (trades[^2].Seccode != trade.Seccode ||
+                trades[^2].BuySell != trade.BuySell || trades[^2].DateTime < trade.DateTime.AddMinutes(-30));
+            AddInfo("Новая сделка: " + trade.Seccode + "/" + trade.BuySell + "/" + trade.Price + "/" + trade.Quantity, display);
         }
     }
     private static void ProcessPositions(XmlReader xr, string subsection, UnitedPortfolio portfolio)
