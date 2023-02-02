@@ -518,7 +518,7 @@ public partial class MainWindow : Window
         {
             await Task.Run(() =>
             {
-                RequestBars(Tools[k]);
+                Tools[k].RequestBars();
                 GetSecurityInfo(Tools[k].MySecurity.Market, Tools[k].MySecurity.Seccode);
                 System.Threading.Thread.Sleep(2000);
 
@@ -527,7 +527,7 @@ public partial class MainWindow : Window
         }
         else AddInfo("SaveTool: отсутствует соединение.");
 
-        if (Tools[k].MySecurity.Bars != null) UpdateModels(Tools[k]);
+        if (Tools[k].MySecurity.Bars != null) Tools[k].UpdateView(true);
         AddInfo("Saved tool: " + Tools[k].Name);
     }
     private void ChangeActivityTool(object sender, RoutedEventArgs e)
@@ -541,12 +541,7 @@ public partial class MainWindow : Window
     private void UpdateModelsAndPanel(object sender, SelectionChangedEventArgs e)
     {
         Tool MyTool = (sender as ComboBox).DataContext as Tool;
-        Task.Run(() =>
-        {
-            UpdateModels(MyTool);
-            foreach (IScript Script in MyTool.Scripts)
-                MyTool.UpdateModelsAndPanel(Script);
-        });
+        Task.Run(() => MyTool.UpdateView(true));
     }
 
     private Grid GetGridTabTool(Tool MyTool)
@@ -830,7 +825,7 @@ public partial class MainWindow : Window
 
         PlotColors.Color(Model);
         DistributionPlot.Model = Model;
-        DistributionPlot.Controller = Tool.GetController();
+        DistributionPlot.Controller ??= Tool.GetController();
 
         var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
         var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 4, FillColor = PlotColors.ShortPosition, StrokeThickness = 0 };
@@ -862,7 +857,7 @@ public partial class MainWindow : Window
         Model.PlotMargins = new OxyPlot.OxyThickness(55, 0, 0, 20);
         PlotColors.Color(Model);
         PortfolioPlot.Model = Model;
-        PortfolioPlot.Controller = Tool.GetController();
+        PortfolioPlot.Controller ??= Tool.GetController();
     }
 
     private void ResizeInfoPanel(object sender, RoutedEventArgs e)

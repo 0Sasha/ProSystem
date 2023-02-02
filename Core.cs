@@ -342,7 +342,7 @@ public partial class MainWindow : Window
         if (SystemReadyToTrading)
         {
             GetPortfolio(Clients[0].Union);
-            for (int i = 0; i < Tools.Count; i++) RequestBars(Tools[i]);
+            for (int i = 0; i < Tools.Count; i++) Tools[i].RequestBars();
             AddInfo("PrepareToTrading: Bars updated.", false);
             return;
         }
@@ -398,7 +398,7 @@ public partial class MainWindow : Window
                 if (Tools[i].BasicSecurity != null) SubUnsub(true, Tools[i].BasicSecurity.Board, Tools[i].BasicSecurity.Seccode);
             }
 
-            RequestBars(Tools[i]);
+            Tools[i].RequestBars();
             GetSecurityInfo(Tools[i].MySecurity.Market, Tools[i].MySecurity.Seccode);
         }
 
@@ -436,14 +436,14 @@ public partial class MainWindow : Window
                             if (MyTool.Active)
                             {
                                 if (DateTime.Now > MyTool.TimeNextRecalc) MyTool.Calculate();
-                                UpdateModels(MyTool);
+                                MyTool.UpdateView(false);
                             }
                         }
                     }
                     else if (DateTime.Now > TriggerUpdatingModels)
                     {
                         TriggerUpdatingModels = DateTime.Now.AddSeconds(MySettings.ModelUpdateInterval);
-                        foreach (Tool MyTool in Tools) if (MyTool.Active) UpdateModels(MyTool);
+                        foreach (Tool MyTool in Tools) if (MyTool.Active) MyTool.UpdateView(false);
                     }
 
                     // Запрос информации
@@ -748,63 +748,7 @@ public partial class MainWindow : Window
         foreach (Tool MyTool in Tools.ToArray())
         {
             GetClnSecPermissions(MyTool.MySecurity.Board, MyTool.MySecurity.Seccode, MyTool.MySecurity.Market);
-            if (!MyTool.Active) RequestBars(MyTool);
-        }
-    }
-
-    public static void RequestBars(Tool MyTool)
-    {
-        string IdTF;
-        if (TimeFrames.Count > 0) IdTF = TimeFrames.Last(x => x.Period / 60 <= MyTool.BaseTF).ID;
-        else { AddInfo("RequestBars: пустой массив таймфреймов."); return; }
-
-        int Count = 25;
-        if (MyTool.BasicSecurity != null)
-        {
-            if (MyTool.BasicSecurity.SourceBars == null || MyTool.BasicSecurity.SourceBars.Close.Length < 500 ||
-                MyTool.BasicSecurity.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-                MyTool.BaseTF != MyTool.BasicSecurity.SourceBars.TF && MyTool.BaseTF != MyTool.BasicSecurity.Bars.TF) Count = 10000;
-
-            GetHistoryData(MyTool.BasicSecurity.Board, MyTool.BasicSecurity.Seccode, IdTF, Count);
-        }
-
-        Count = 25;
-        if (MyTool.MySecurity.SourceBars == null || MyTool.MySecurity.SourceBars.Close.Length < 500 ||
-            MyTool.MySecurity.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-            MyTool.BaseTF != MyTool.MySecurity.SourceBars.TF && MyTool.BaseTF != MyTool.MySecurity.Bars.TF) Count = 10000;
-
-        GetHistoryData(MyTool.MySecurity.Board, MyTool.MySecurity.Seccode, IdTF, Count);
-    }
-    public static void UpdateBars(Tool MyTool, bool UpdateBasicSecurity)
-    {
-        if (UpdateBasicSecurity)
-        {
-            if (MyTool.BasicSecurity.SourceBars.TF == MyTool.BaseTF) MyTool.BasicSecurity.Bars = MyTool.BasicSecurity.SourceBars;
-            else MyTool.BasicSecurity.Bars = Bars.Compress(MyTool.BasicSecurity.SourceBars, MyTool.BaseTF);
-        }
-        else
-        {
-            if (MyTool.MySecurity.SourceBars.TF == MyTool.BaseTF) MyTool.MySecurity.Bars = MyTool.MySecurity.SourceBars;
-            else MyTool.MySecurity.Bars = Bars.Compress(MyTool.MySecurity.SourceBars, MyTool.BaseTF);
-        }
-    }
-
-    private static void UpdateModels(Tool MyTool)
-    {
-        try
-        {
-            MyTool.UpdateModel();
-            if (MyTool.Model != null) MyTool.UpdateMiniModel();
-        }
-        catch (Exception e)
-        {
-            AddInfo("UpdateModels: " + MyTool.Name + ": Исключение: " + e.Message);
-            AddInfo("Трассировка стека: " + e.StackTrace);
-            if (e.InnerException != null)
-            {
-                AddInfo("Внутреннее исключение: " + e.InnerException.Message);
-                AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
-            }
+            if (!MyTool.Active) MyTool.RequestBars();
         }
     }
     #endregion

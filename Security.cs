@@ -76,7 +76,7 @@ public class Security
 
                     MyTool.Calculate(1.5);
                     MyTool.MainModel.InvalidatePlot(true);
-                    RequestBars(MyTool);
+                    MyTool.RequestBars();
                 });
             }
         }

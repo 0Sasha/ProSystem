@@ -224,7 +224,7 @@ public partial class Tool
             MyScript.Calculate(BasicSymbol);
 
             // Обновление моделей, информационной панели скрипта и логирование
-            UpdateModelsAndPanel(MyScript);
+            UpdateScriptView(MyScript);
             if (NowLogging) WriteLogScript(MyScript);
 
             // Выравнивание данных и проверка условий для выхода
@@ -312,7 +312,7 @@ public partial class Tool
         else if (MySecurity.Bars == null || BasicSecurity != null && BasicSecurity.Bars == null)
         {
             AddInfo(Name + ": Базовых баров не существует. Запрос баров и выход.", notify: true);
-            RequestBars(this);
+            RequestBars();
             return false;
         }
         else if (BasicSecurity == null && MySecurity.Bars.Close.Length < 200 ||
@@ -321,7 +321,7 @@ public partial class Tool
             string Counts = MySecurity.Bars.Close.Length.ToString();
             if (BasicSecurity != null) Counts += "/" + BasicSecurity.Bars.Close.Length;
             AddInfo(Name + ": Недостаточно базовых баров: " + Counts + " Запрос баров и выход.", notify: true);
-            RequestBars(this);
+            RequestBars();
             return false;
         }
         else if (Scripts.Length > 2)
@@ -1064,7 +1064,7 @@ public partial class Tool
         }
     }
 
-    public void UpdateModelsAndPanel(IScript MyScript)
+    private void UpdateScriptView(IScript MyScript)
     {
         string SelectedScript = null;
         Window.Dispatcher.Invoke(() =>
@@ -1146,7 +1146,7 @@ public partial class Tool
     }
     #endregion
 }
-internal static class Extensions
+public static class Extensions
 {
     public static bool UpdateOrdersAndPosition(this IScript MyScript)
     {

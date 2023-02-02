@@ -45,6 +45,10 @@
         <GradientStop Color="{StaticResource purpleDark}"/>
         <GradientStop Color="Black" Offset="1"/>
     </LinearGradientBrush>
+    <LinearGradientBrush x:Key="volPressedDark" EndPoint="0.5,2" StartPoint="0.5,0">
+        <GradientStop Color="{StaticResource purpleDark}"/>
+        <GradientStop Color="Black" Offset="0.5"/>
+    </LinearGradientBrush>
 
     <SolidColorBrush x:Key="nonVolBorder" Color="{StaticResource purpleVeryDark}"/>
     <SolidColorBrush x:Key="nonVolBack" Color="{StaticResource purpleDark}"/>
@@ -858,7 +862,7 @@
                     <Grid x:Name="templateRoot" SnapsToDevicePixels="true">
                         <Border x:Name="mainBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="1,1,1,0" Margin="0">
-                            <Border x:Name="innerBorder" Background="{StaticResource volPressed}"
+                            <Border x:Name="innerBorder" Background="{StaticResource volPressedDark}"
                                     BorderBrush="{StaticResource volBorder}" BorderThickness="1,1,1,0" Margin="-1" Opacity="0"/>
                         </Border>
                         <ContentPresenter x:Name="contentPresenter" ContentSource="Header" Focusable="False" HorizontalAlignment="{Binding HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"/>

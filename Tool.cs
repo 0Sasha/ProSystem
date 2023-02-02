@@ -73,9 +73,6 @@ public partial class Tool : INotifyPropertyChanged
         Controller = GetController();
         BrushState = Colors.Red;
     }
-    #endregion
-
-    #region Methods
     public static PlotController GetController()
     {
         var Controller = new PlotController();
@@ -83,6 +80,9 @@ public partial class Tool : INotifyPropertyChanged
         Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
         return Controller;
     }
+    #endregion
+
+    #region Methods
     public void Initialize(TabItem MyTabItem)
     {
         if (BaseTF < 1) BaseTF = 30;
@@ -95,7 +95,7 @@ public partial class Tool : INotifyPropertyChanged
         {
             script.Initialize(this, MyTabItem);
             script.Calculate(BasicSecurity ?? MySecurity);
-            UpdateModelsAndPanel(script);
+            UpdateScriptView(script);
         }
         UpdateModel();
         UpdateMiniModel();
@@ -155,8 +155,9 @@ public partial class Tool : INotifyPropertyChanged
             }
 
             BrushState = Colors.Red;
+            Window.Dispatcher.Invoke(() =>
             ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
-                .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
+            .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool");
         }
         else
         {
@@ -164,7 +165,7 @@ public partial class Tool : INotifyPropertyChanged
             {
                 if (!await System.Threading.Tasks.Task.Run(() =>
                 {
-                    RequestBars(this);
+                    RequestBars();
                     TXmlConnector.GetClnSecPermissions(MySecurity.Board, MySecurity.Seccode, MySecurity.Market);
                     if (MySecurity.Bars == null || BasicSecurity != null && BasicSecurity.Bars == null)
                     {
@@ -178,16 +179,54 @@ public partial class Tool : INotifyPropertyChanged
 
                     TXmlConnector.SubUnsub(true, MySecurity.Board, MySecurity.Seccode);
                     if (BasicSecurity != null) TXmlConnector.SubUnsub(true, BasicSecurity.Board, BasicSecurity.Seccode);
-                    RequestBars(this);
+                    RequestBars();
                     return true;
                 })) return;
             }
             BrushState = StopTrading ? Colors.Orange : Colors.Green;
             Active = true;
+            Window.Dispatcher.Invoke(() =>
             ((Window.TabsTools.Items[Tools.IndexOf(this)] as TabItem).Content as Grid).Children.OfType<Grid>()
-                .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
+                .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool");
         }
         NotifyChanged();
+    }
+
+    public void RequestBars()
+    {
+        string IdTF;
+        if (TimeFrames.Count > 0) IdTF = TimeFrames.Last(x => x.Period / 60 <= BaseTF).ID;
+        else { AddInfo("RequestBars: пустой массив таймфреймов."); return; }
+
+        int Count = 25;
+        if (BasicSecurity != null)
+        {
+            if (BasicSecurity.SourceBars == null || BasicSecurity.SourceBars.Close.Length < 500 ||
+                BasicSecurity.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
+                BaseTF != BasicSecurity.SourceBars.TF && BaseTF != BasicSecurity.Bars.TF) Count = 10000;
+
+            TXmlConnector.GetHistoryData(BasicSecurity.Board, BasicSecurity.Seccode, IdTF, Count);
+        }
+
+        Count = 25;
+        if (MySecurity.SourceBars == null || MySecurity.SourceBars.Close.Length < 500 ||
+            MySecurity.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
+            BaseTF != MySecurity.SourceBars.TF && BaseTF != MySecurity.Bars.TF) Count = 10000;
+
+        TXmlConnector.GetHistoryData(MySecurity.Board, MySecurity.Seccode, IdTF, Count);
+    }
+    public void UpdateBars(bool updateBasicSecurity)
+    {
+        if (updateBasicSecurity)
+        {
+            if (BasicSecurity.SourceBars.TF == BaseTF) BasicSecurity.Bars = BasicSecurity.SourceBars;
+            else BasicSecurity.Bars = Bars.Compress(BasicSecurity.SourceBars, BaseTF);
+        }
+        else
+        {
+            if (MySecurity.SourceBars.TF == BaseTF) MySecurity.Bars = MySecurity.SourceBars;
+            else MySecurity.Bars = Bars.Compress(MySecurity.SourceBars, BaseTF);
+        }
     }
     public async void ReloadBars()
     {
@@ -207,26 +246,38 @@ public partial class Tool : INotifyPropertyChanged
 
         if (Connection == ConnectionState.Connected)
         {
-            RequestBars(this);
+            RequestBars();
             await System.Threading.Tasks.Task.Delay(500);
-            if (MySecurity.Bars != null) UpdateModel();
+            if (MySecurity.Bars != null) UpdateView(true);
         }
     }
 
-    public void UpdateView(bool recalculateScripts)
+    public void UpdateView(bool updateScriptView)
     {
         try
         {
-            if (MainModel == null) UpdateModel();
-            foreach (var script in Scripts)
+            if (updateScriptView)
             {
-                if (recalculateScripts) script.Calculate(BasicSecurity ?? MySecurity);
-                UpdateModelsAndPanel(script);
+                if (MainModel == null) UpdateModel();
+                foreach (var script in Scripts)
+                {
+                    script.Calculate(BasicSecurity ?? MySecurity);
+                    UpdateScriptView(script);
+                }
             }
             UpdateModel();
-            UpdateMiniModel();
+            if (Model != null) UpdateMiniModel();
         }
-        catch (Exception ex) { AddInfo("UpdateView: " + ex.Message); }
+        catch (Exception ex)
+        {
+            AddInfo("UpdateView: " + Name + ": Исключение: " + ex.Message);
+            AddInfo("Трассировка стека: " + ex.StackTrace);
+            if (ex.InnerException != null)
+            {
+                AddInfo("Внутреннее исключение: " + ex.InnerException.Message);
+                AddInfo("Трассировка стека внутреннего исключения: " + ex.InnerException.StackTrace);
+            }
+        }
     }
     public void UpdateModel()
     {
