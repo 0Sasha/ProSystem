@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
 using static ProSystem.MainWindow;
-namespace ProSystem;
+namespace ProSystem.Services;
 
 internal static class Notifier
 {

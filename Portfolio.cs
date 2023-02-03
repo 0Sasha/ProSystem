@@ -4,6 +4,9 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using OxyPlot;
+using OxyPlot.Axes;
+using OxyPlot.Series;
 using static ProSystem.MainWindow;
 namespace ProSystem;
 
@@ -144,6 +147,103 @@ public class UnitedPortfolio : INotifyPropertyChanged
             return false;
         }
         return true;
+    }
+
+    public PlotModel GetDistributionPlot(IEnumerable<Tool> tools, string filter, bool onlyWithPositions, bool excludeBaseBals)
+    {
+        var Assets = new CategoryAxis { Position = AxisPosition.Left };
+        var FactVol = new BarSeries { BarWidth = 4, StrokeThickness = 0 };
+        var MaxVol = new BarSeries { FillColor = PlotColors.MaxVolume, StrokeThickness = 0 };
+        var Axis = new LinearAxis
+        {
+            Position = AxisPosition.Bottom,
+            MinimumPadding = 0,
+            MaximumPadding = 0.1,
+            AbsoluteMinimum = 0,
+            AbsoluteMaximum = 250,
+            ExtraGridlines = new double[]
+            {
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30
+            },
+        };
+
+        Tool[] MyTools = tools.Where(x => x.Active).ToArray();
+        for (int i = MyTools.Length - 1; i >= 0; i--)
+        {
+            if (filter == "All tools" ||
+                filter == "First part" && i < MyTools.Length / 2 || filter == "Second part" && i >= MyTools.Length / 2)
+            {
+                Position Pos = Positions.SingleOrDefault(x => x.Seccode == MyTools[i].MySecurity.Seccode);
+                if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
+                {
+                    int shift = excludeBaseBals ? MyTools[i].BaseBalance : 0;
+                    double FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqLong :
+                        (-Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqShort) / Saldo * 100);
+                    FactVol.Items.Add(new BarItem
+                    {
+                        Value = FactReq,
+                        Color = Pos.Saldo - shift > 0 ? PlotColors.LongPosition : PlotColors.ShortPosition
+                    });
+                }
+                else if (!onlyWithPositions) FactVol.Items.Add(new BarItem { Value = 0 });
+                else continue;
+
+                Assets.Labels.Add(MyTools[i].Name);
+                MaxVol.Items.Add(new BarItem
+                {
+                    Value = excludeBaseBals || !MyTools[i].UseShiftBalance ?
+                    MyTools[i].ShareOfFunds : (MyTools[i].BaseBalance > 0 ?
+                    MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqLong / Saldo * 100) :
+                    MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqShort / Saldo * 100))
+                });
+            }
+        }
+        PlotColors.Color(Assets);
+        PlotColors.Color(Axis);
+
+        var Model = new PlotModel();
+        Model.Series.Add(MaxVol);
+        Model.Series.Add(FactVol);
+        Model.Axes.Add(Assets);
+        Model.Axes.Add(Axis);
+        Model.PlotMargins = new OxyThickness(55, 0, 0, 20);
+
+        PlotColors.Color(Model);
+        return Model;
+    }
+    public PlotModel GetPortfolioPlot()
+    {
+        var AssetsPorfolio = new CategoryAxis { Position = AxisPosition.Left };
+        var FactVolPorfolio = new BarSeries { BarWidth = 4, FillColor = PlotColors.ShortPosition, StrokeThickness = 0 };
+        var MaxVolPorfolio = new BarSeries { FillColor = PlotColors.MaxVolume, StrokeThickness = 0 };
+        var AxisPorfolio = new LinearAxis
+        {
+            Position = AxisPosition.Bottom,
+            MinimumPadding = 0,
+            MaximumPadding = 0.1,
+            AbsoluteMinimum = 0,
+            AbsoluteMaximum = 250,
+            ExtraGridlines = new double[]
+            {
+                5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95
+            },
+        };
+
+        AssetsPorfolio.Labels.Add("Portfolio");
+        FactVolPorfolio.Items.Add(new BarItem { Value = ShareInitReqs });
+        MaxVolPorfolio.Items.Add(new BarItem { Value = PotentialShareInitReqs });
+        PlotColors.Color(AssetsPorfolio);
+        PlotColors.Color(AxisPorfolio);
+
+        var Model = new PlotModel();
+        Model.Series.Add(MaxVolPorfolio);
+        Model.Series.Add(FactVolPorfolio);
+        Model.Axes.Add(AssetsPorfolio);
+        Model.Axes.Add(AxisPorfolio);
+        Model.PlotMargins = new OxyThickness(55, 0, 0, 20);
+        PlotColors.Color(Model);
+        return Model;
     }
 }
 

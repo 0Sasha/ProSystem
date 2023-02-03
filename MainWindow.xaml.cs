@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using ProSystem.Services;
 using static ProSystem.TXmlConnector;
 namespace ProSystem;
 
@@ -752,98 +753,11 @@ public partial class MainWindow : Window
     {
         if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
 
-        var Assets = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVol = new OxyPlot.Series.BarSeries { BarWidth = 4, StrokeThickness = 0 };
-        var MaxVol = new OxyPlot.Series.BarSeries { FillColor = PlotColors.MaxVolume };
-        var Axis = new OxyPlot.Axes.LinearAxis
-        {
-            Position = OxyPlot.Axes.AxisPosition.Bottom,
-            MinimumPadding = 0,
-            MaximumPadding = 0.1,
-            AbsoluteMinimum = 0,
-            AbsoluteMaximum = 250,
-            ExtraGridlines = new double[]
-            {
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-                16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30
-            },
-        };
-        PlotColors.Color(Assets);
-        PlotColors.Color(Axis);
-
-        string Filter = (string)ComboBoxDistrib.SelectedItem;
-        Tool[] MyTools = Tools.Where(x => x.Active).ToArray();
-        for (int i = MyTools.Length - 1; i >= 0; i--)
-        {
-            if (Filter == "All tools" ||
-                Filter == "First part" && i < MyTools.Length / 2 || Filter == "Second part" && i >= MyTools.Length / 2)
-            {
-                Position Pos = Portfolio.Positions.SingleOrDefault(x => x.Seccode == MyTools[i].MySecurity.Seccode);
-                if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
-                {
-                    int shift = (bool)ExcludeBaseCheckBox.IsChecked ? MyTools[i].BaseBalance : 0;
-                    double FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqLong :
-                        (-Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqShort) / Portfolio.Saldo * 100);
-                    FactVol.Items.Add(new OxyPlot.Series.BarItem
-                    {
-                        Value = FactReq,
-                        Color = Pos.Saldo - shift > 0 ? PlotColors.LongPosition : PlotColors.ShortPosition
-                    });
-                }
-                else if (!(bool)OnlyPosCheckBox.IsChecked) FactVol.Items.Add(new OxyPlot.Series.BarItem { Value = 0 });
-                else continue;
-                
-                Assets.Labels.Add(MyTools[i].Name);
-                MaxVol.Items.Add(new OxyPlot.Series.BarItem {
-                    Value = (bool)ExcludeBaseCheckBox.IsChecked || !MyTools[i].UseShiftBalance ?
-                    MyTools[i].ShareOfFunds : (MyTools[i].BaseBalance > 0 ?
-                    MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqLong / Portfolio.Saldo * 100) :
-                    MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqShort / Portfolio.Saldo * 100))
-                });
-            }
-        }
-
-        var Model = new OxyPlot.PlotModel();
-        Model.Series.Add(MaxVol);
-        Model.Series.Add(FactVol);
-        Model.Axes.Add(Assets);
-        Model.Axes.Add(Axis);
-        Model.PlotMargins = new OxyPlot.OxyThickness(55, 0, 0, 20);
-
-        PlotColors.Color(Model);
-        DistributionPlot.Model = Model;
+        DistributionPlot.Model = Portfolio.GetDistributionPlot(Tools,
+            (string)ComboBoxDistrib.SelectedItem, (bool)OnlyPosCheckBox.IsChecked, (bool)ExcludeBaseCheckBox.IsChecked);
         DistributionPlot.Controller ??= Tool.GetController();
 
-        var AssetsPorfolio = new OxyPlot.Axes.CategoryAxis { Position = OxyPlot.Axes.AxisPosition.Left };
-        var FactVolPorfolio = new OxyPlot.Series.BarSeries { BarWidth = 4, FillColor = PlotColors.ShortPosition, StrokeThickness = 0 };
-        var MaxVolPorfolio = new OxyPlot.Series.BarSeries { FillColor = PlotColors.MaxVolume, StrokeThickness = 0 };
-        var AxisPorfolio = new OxyPlot.Axes.LinearAxis
-        {
-            Position = OxyPlot.Axes.AxisPosition.Bottom,
-            MinimumPadding = 0,
-            MaximumPadding = 0.1,
-            AbsoluteMinimum = 0,
-            AbsoluteMaximum = 250,
-            ExtraGridlines = new double[]
-            {
-                5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95
-            },
-        };
-        PlotColors.Color(AssetsPorfolio);
-        PlotColors.Color(AxisPorfolio);
-
-        AssetsPorfolio.Labels.Add("Portfolio");
-        FactVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.ShareInitReqs });
-        MaxVolPorfolio.Items.Add(new OxyPlot.Series.BarItem { Value = Portfolio.PotentialShareInitReqs });
-
-        Model = new OxyPlot.PlotModel();
-        Model.Series.Add(MaxVolPorfolio);
-        Model.Series.Add(FactVolPorfolio);
-        Model.Axes.Add(AssetsPorfolio);
-        Model.Axes.Add(AxisPorfolio);
-        Model.PlotMargins = new OxyPlot.OxyThickness(55, 0, 0, 20);
-        PlotColors.Color(Model);
-        PortfolioPlot.Model = Model;
+        PortfolioPlot.Model = Portfolio.GetPortfolioPlot();
         PortfolioPlot.Controller ??= Tool.GetController();
     }
 

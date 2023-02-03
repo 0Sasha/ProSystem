@@ -550,8 +550,7 @@ internal static class TXmlConnector
                 }
                 else // Полученные данные располагаются внутри массива исходных данных
                 {
-                    return;
-                    /*// Поиск общих баров
+                    // Поиск общих баров
                     int x = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[0]);
                     int y = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[^1]);
 
@@ -562,11 +561,12 @@ internal static class TXmlConnector
                         {
                             AddInfo("ProcessBars: Массив полученных баров не соответствуют массиву исходных по количеству: " +
                                 security.ShortName + " Исх/получ: " + sourceInnerArr.Length + "/" + dateTime.Count + " Период: " +
-                                dateTime[0].Date + "-" + dateTime[^1].Date + " Возможно, требуется перезагрузка баров.");
+                                dateTime[0].Date + "-" + dateTime[^1].Date + " Возможно, требуется перезагрузка баров.", false);
                             return;
                         }
+                        return; // Только анализ баров
 
-                        security.SourceBars.DateTime =
+                        /*security.SourceBars.DateTime =
                             security.SourceBars.DateTime[..x].Concat(dateTime.Concat(security.SourceBars.DateTime[(y + 1)..])).ToArray();
 
                         security.SourceBars.Open =
@@ -582,13 +582,13 @@ internal static class TXmlConnector
                             security.SourceBars.Close[..x].Concat(close.Concat(security.SourceBars.Close[(y + 1)..])).ToArray();
 
                         security.SourceBars.Volume =
-                            security.SourceBars.Volume[..x].Concat(volume.Concat(security.SourceBars.Volume[(y + 1)..])).ToArray();
+                            security.SourceBars.Volume[..x].Concat(volume.Concat(security.SourceBars.Volume[(y + 1)..])).ToArray();*/
                     }
                     else
                     {
-                        AddInfo("ProcessBars: Не найдены общие бары полученных и исходных баров: " + security.ShortName);
+                        AddInfo("ProcessBars: Не найдены общие бары полученных и исходных баров: " + security.ShortName, false);
                         return;
-                    }*/
+                    }
                 }
 
                 Task.Run(() => tool.UpdateBars(security == tool.BasicSecurity));

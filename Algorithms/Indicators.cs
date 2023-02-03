@@ -1,5 +1,5 @@
 ﻿using System;
-namespace ProSystem;
+namespace ProSystem.Algorithms;
 
 public static class Indicators
 {
@@ -208,16 +208,16 @@ public static class Indicators
             if (i > Period)
             {
                 SSI[i] = Math.Abs(Close[i] - Close[i - Period]) / Sum * 0.60215 + 0.06425;
-                KAMA[i] = Round == -1 ? KAMA[i - 1] + (SSI[i] * SSI[i]) * (Close[i] - KAMA[i - 1]) :
-                    Math.Round(KAMA[i - 1] + (SSI[i] * SSI[i]) * (Close[i] - KAMA[i - 1]), Round);
+                KAMA[i] = Round == -1 ? KAMA[i - 1] + SSI[i] * SSI[i] * (Close[i] - KAMA[i - 1]) :
+                    Math.Round(KAMA[i - 1] + SSI[i] * SSI[i] * (Close[i] - KAMA[i - 1]), Round);
                 Sum -= Math.Abs(Close[i - Period + 1] - Close[i - Period]);
             }
             else if (i == Period)
             {
                 SumMA += Close[i];
                 SSI[i] = Math.Abs(Close[i] - Close[i - Period]) / Sum * 0.60215 + 0.06425;
-                KAMA[i] = Round == -1 ? SumMA / Period + (SSI[i] * SSI[i]) * (Close[i] - SumMA / Period) :
-                    Math.Round(SumMA / Period + (SSI[i] * SSI[i]) * (Close[i] - SumMA / Period), Round);
+                KAMA[i] = Round == -1 ? SumMA / Period + SSI[i] * SSI[i] * (Close[i] - SumMA / Period) :
+                    Math.Round(SumMA / Period + SSI[i] * SSI[i] * (Close[i] - SumMA / Period), Round);
                 Sum -= Math.Abs(Close[i - Period + 1] - Close[i - Period]);
             }
             else SumMA += Close[i];
@@ -335,7 +335,7 @@ public static class Indicators
             else { Up = 0; Down = 0; }
             WilderUp[i] = (WilderUp[i - 1] * (Period - 1) + Up) / Period;
             WilderDown[i] = (WilderDown[i - 1] * (Period - 1) + Down) / Period;
-            if (i >= Period) RSI[i] = 100 - (100 / (1 + (WilderUp[i] / WilderDown[i])));
+            if (i >= Period) RSI[i] = 100 - 100 / (1 + WilderUp[i] / WilderDown[i]);
         }
         return RSI;
     }
@@ -377,7 +377,7 @@ public static class Indicators
                     SumPos += PositiveMF[i - x];
                     SumNeg += NegativeMF[i - x];
                 }
-                MFI[i] = 100 - (100 / (1 + SumPos / SumNeg));
+                MFI[i] = 100 - 100 / (1 + SumPos / SumNeg);
             }
         }
         return MFI;
@@ -398,7 +398,7 @@ public static class Indicators
 
             if (i >= Period)
             {
-                DeMarker[i] = (SumMax / Period) / (SumMax / Period + SumMin / Period) * 100;
+                DeMarker[i] = SumMax / Period / (SumMax / Period + SumMin / Period) * 100;
                 SumMax -= DeMax[i - Period + 1];
                 SumMin -= DeMin[i - Period + 1];
             }
@@ -447,13 +447,13 @@ public static class Indicators
         {
             SumVol += Volume[i];
             Dif = High[i] - Low[i] > 0.000001 ? High[i] - Low[i] : Step;
-            Sum += ((Close[i] - Low[i]) - (High[i] - Close[i])) / Dif * Volume[i];
+            Sum += (Close[i] - Low[i] - (High[i] - Close[i])) / Dif * Volume[i];
             if (i >= Period - 1)
             {
                 CMF[i] = Sum / SumVol * 100;
                 SumVol -= Volume[i - Period + 1];
                 Dif = High[i - Period + 1] - Low[i - Period + 1] > 0.000001 ? High[i - Period + 1] - Low[i - Period + 1] : Step;
-                Sum -= ((Close[i - Period + 1] - Low[i - Period + 1]) - (High[i - Period + 1] - Close[i - Period + 1])) / Dif * Volume[i - Period + 1];
+                Sum -= (Close[i - Period + 1] - Low[i - Period + 1] - (High[i - Period + 1] - Close[i - Period + 1])) / Dif * Volume[i - Period + 1];
             }
         }
         return CMF;
@@ -466,15 +466,15 @@ public static class Indicators
         double[] Denominator = new double[Close.Length];
         for (int i = 3; i < Close.Length; i++)
         {
-            Numerator[i] = ((Close[i] - Open[i]) + 2 * (Close[i - 1] - Open[i - 1]) + 2 * (Close[i - 2] - Open[i - 2]) + (Close[i - 3] - Open[i - 3])) / 6;
-            Denominator[i] = ((High[i] - Low[i]) + 2 * (High[i - 1] - Low[i - 1]) + 2 * (High[i - 2] - Low[i - 2]) + (High[i - 3] - Low[i - 3])) / 6;
+            Numerator[i] = (Close[i] - Open[i] + 2 * (Close[i - 1] - Open[i - 1]) + 2 * (Close[i - 2] - Open[i - 2]) + (Close[i - 3] - Open[i - 3])) / 6;
+            Denominator[i] = (High[i] - Low[i] + 2 * (High[i - 1] - Low[i - 1]) + 2 * (High[i - 2] - Low[i - 2]) + (High[i - 3] - Low[i - 3])) / 6;
 
             SumNum += Numerator[i];
             SumDenom += Denominator[i];
 
             if (i > Period + 1)
             {
-                RVI[i] = (SumNum / Period) / (SumDenom / Period) * 100;
+                RVI[i] = SumNum / Period / (SumDenom / Period) * 100;
                 SumNum -= Numerator[i - Period + 1];
                 SumDenom -= Denominator[i - Period + 1];
             }
@@ -637,7 +637,7 @@ public static class Indicators
         for (int i = 1; i < High.Length; i++)
         {
             if (Volume[i] > 0.1 && High[i] - Low[i] > 0.000001)
-                EMV[i] = ((High[i] + Low[i]) / 2 - (High[i - 1] + Low[i - 1]) / 2) / ((Volume[i] / 1000000) / (High[i] - Low[i]));
+                EMV[i] = ((High[i] + Low[i]) / 2 - (High[i - 1] + Low[i - 1]) / 2) / (Volume[i] / 1000000 / (High[i] - Low[i]));
             else EMV[i] = EMV[i - 1];
         }
         EMV = SMA(EMV, Period);
@@ -654,7 +654,7 @@ public static class Indicators
         {
             DM[i] = High[i] - Low[i];
 
-            if ((High[i] + Low[i] + Close[i]) - (High[i - 1] + Low[i - 1] + Close[i - 1]) > 0.000001) Trend[i] = 1;
+            if (High[i] + Low[i] + Close[i] - (High[i - 1] + Low[i - 1] + Close[i - 1]) > 0.000001) Trend[i] = 1;
             else Trend[i] = -1;
 
             if (Trend[i] == Trend[i - 1]) CM[i] = CM[i - 1] + DM[i];
@@ -780,14 +780,6 @@ public static class Indicators
             }
 
             if (x > 1) SyncIndicator[i] = Indicator[x - 2];
-
-            /*if (Bars.DateTime[i].Date != Bars.DateTime[i + 1].Date) x = Array.FindIndex(iBars.DateTime, x, y => y > Bars.DateTime[i]);
-            else if (Bars.DateTime[i].AddMinutes(Bars.TF) == iBars.DateTime[x].AddMinutes(iBars.TF)) x++;
-            else if (Bars.DateTime[i].AddMinutes(Bars.TF) > iBars.DateTime[x].AddMinutes(iBars.TF))
-                x = Array.FindIndex(iBars.DateTime, x, y => y.AddMinutes(iBars.TF) > Bars.DateTime[i].AddMinutes(Bars.TF));
-
-            SyncIndicator[i] =
-                Bars.DateTime[i + 1].AddMinutes(Bars.TF) > iBars.DateTime[x].AddMinutes(iBars.TF) || x == 0 ? Indicator[x] : Indicator[x - 1];*/
         }
         SyncIndicator[^1] = Bars.DateTime[^1].AddMinutes(Bars.TF) >= iBars.DateTime[^1].AddMinutes(iBars.TF) ? Indicator[^1] : Indicator[^2];
         return SyncIndicator;

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Controls;
 using System.Collections.ObjectModel;
+using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
 using static ProSystem.TXmlConnector;
 namespace ProSystem;

@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using static ProSystem.MainWindow;
-namespace ProSystem;
+namespace ProSystem.Services;
 
 public static class Logger
 {
