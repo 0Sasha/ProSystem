@@ -27,9 +27,8 @@ public partial class MainWindow : Window
         }
         else AddInfo("Введите логин и пароль.");
     }
-    private async void ClosingMainWindow(object sender, CancelEventArgs e)
+    private void ClosingMainWindow(object sender, CancelEventArgs e)
     {
-        // Подтверждение выхода и сохранение данных
         MessageBoxResult Res =
             MessageBox.Show("Are you sure you want to exit?", "Closing", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (Res == MessageBoxResult.No || !SaveData(true))
@@ -38,20 +37,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Подготовка потока проверки условий
         CheckingInterval = 1000;
-        System.Threading.Thread.Sleep(2000);
+        System.Threading.Thread.Sleep(50);
+        if (Connection != ConnectionState.Disconnected) Disconnect();
 
-        // Отсоединение
-        if (Connection != ConnectionState.Disconnected) await Task.Run(() => Disconnect());
-
-        // Выход
-        if (!ConnectorInitialized || ConnectorUnInitialize()) { Logger.StopLogging(); return; }
+        if (!ConnectorInitialized || ConnectorUnInitialize()) Logger.StopLogging();
         else MessageBox.Show("UnInitialization failed.");
     }
     private void Test(object sender, RoutedEventArgs e)
     {
-        
+
     }
 
     private void ClearOutdatedData()
@@ -104,30 +99,32 @@ public partial class MainWindow : Window
     }
     private bool SaveData(bool SaveInfoPanel = false)
     {
-        AddInfo("SaveData: Сериализация", false);
-        bool Result = true;
-
-        if (!SerializeObject("Tools", Tools) || !SerializeObject("Portfolio", Portfolio) ||
-            !SerializeObject("Settings", MySettings) || !SerializeObject("Trades", Trades)) Result = false;
-        if (SaveInfoPanel)
-        {
-            try { Dispatcher.Invoke(() => File.WriteAllText("Data/Info.txt", TxtBox.Text)); }
-            catch (Exception e) { AddInfo("Исключение записи информационной панели: " + e.Message); Result = false; }
-        }
-
         TriggerSerialization = DateTime.Now.AddSeconds(60);
-        return Result;
+        AddInfo("SaveData: Сериализация", false);
+        try
+        {
+            MySerializer.SerializeObject(Tools, "Tools", (info) => AddInfo(info, true, true));
+            MySerializer.SerializeObject(Portfolio, "Portfolio", (info) => AddInfo(info, true, true));
+            MySerializer.SerializeObject(MySettings, "Settings", (info) => AddInfo(info, true, true));
+            MySerializer.SerializeObject(Trades, "Trades", (info) => AddInfo(info, true, true));
+            if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(MySerializer.DataDirectory + "/Info.txt", TxtBox.Text));
+            return true;
+        }
+        catch (Exception ex) { AddInfo("SaveData: " + ex.Message); return false; }
     }
     private void SaveData(object sender, RoutedEventArgs e)
     {
-        if (SaveData(true)) AddInfo("Данные сохранены.");
-        else AddInfo("Данные не сохранены.");
+        Task.Run(() =>
+        {
+            if (SaveData(true)) AddInfo("Данные сохранены.");
+            else AddInfo("Данные не сохранены.");
+        });
     }
     private void SaveData(object sender, PropertyChangedEventArgs e)
     {
         if (DateTime.Now > TriggerSerialization)
         {
-            TriggerSerialization = DateTime.Now.AddSeconds(5);
+            TriggerSerialization = DateTime.Now.AddSeconds(15);
             Task.Run(() => SaveData());
         }
     }
@@ -147,51 +144,6 @@ public partial class MainWindow : Window
             AddInfo("Тестовое уведомление отправлено.");
         }
         catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
-    }
-    private static bool SerializeObject(string nameFile, object obj)
-    {
-        if (!Directory.Exists("Data")) try { Directory.CreateDirectory("Data"); }
-            catch (Exception ex)
-            {
-                AddInfo("SerializeObject: не удалось создать директорию Data: " + ex.Message);
-                return false;
-            }
-
-        try
-        {
-            if (File.Exists("Data/" + nameFile + " copy.bin"))
-            {
-                AddInfo("SerializeObject: копия " + nameFile + " уже существует", notify: true);
-                File.Move("Data/" + nameFile + " copy.bin", "Data/" + nameFile + " copy " +
-                    DateTime.Now.ToString("dd.MM.yyyy HH.mm.ss") + ".bin", true);
-            }
-
-            if (File.Exists("Data/" + nameFile + ".bin"))
-                File.Copy("Data/" + nameFile + ".bin", "Data/" + nameFile + " copy.bin", true);
-
-            using Stream MyStream = new FileStream("Data/" + nameFile + ".bin", FileMode.Create, FileAccess.Write, FileShare.None);
-            var Formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-            Formatter.Serialize(MyStream, obj);
-
-            if (File.Exists("Data/" + nameFile + " copy.bin")) File.Delete("Data/" + nameFile + " copy.bin");
-            return true;
-        }
-        catch (Exception e)
-        {
-            AddInfo("Исключение сериализации " + nameFile + ": " + e.Message, notify: true);
-            if (File.Exists("Data/" + nameFile + " copy.bin"))
-            {
-                System.Threading.Thread.Sleep(3000);
-                try
-                {
-                    File.Move("Data/" + nameFile + " copy.bin", "Data/" + nameFile + ".bin", true);
-                    AddInfo("Исходный файл восстановлен.");
-                }
-                catch (Exception ex) { AddInfo("Исходный файл не восстановлен: " + ex.Message); }
-            }
-            else AddInfo("Исходный файл не восстановлен, поскольку нет копии файла");
-            return false;
-        }
     }
     private static async Task<bool> CompressFilesAndRemove(string directory, string partName)
     {

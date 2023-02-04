@@ -123,7 +123,6 @@ public class UnitedPortfolio : INotifyPropertyChanged
     {
         try
         {
-            Positions.RemoveAll(x => x.Saldo == 0);
             AllPositions = new(MoneyPositions.Concat(Positions.OrderBy(x => x.ShortName))) { this };
             Window.Dispatcher.Invoke(() =>
             {
@@ -133,6 +132,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
         }
         catch (Exception ex) { AddInfo("UpdatePositions исключение: " + ex.Message); }
     }
+    public void ClearOldPositions() => Positions.RemoveAll(x => x.Saldo == 0);
     public void UpdateEquity(DateTime dateTimeOpenPeriod)
     {
         Equity[dateTimeOpenPeriod] = (int)Portfolio.Saldo;

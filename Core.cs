@@ -49,6 +49,7 @@ public partial class MainWindow : Window
 
     #region Properties
     public static MainWindow Window { get; private set; }
+    public static Serializer MySerializer { get; set; } = new BinarySerializer("Data");
     public static UnitedPortfolio Portfolio { get; set; } = new();
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
@@ -146,39 +147,23 @@ public partial class MainWindow : Window
     }
     private void DeserializeData()
     {
-        if (!Directory.Exists("Data")) return;
-
-        var Formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
         try
         {
-            using Stream MyStream = new FileStream("Data/Settings.bin", FileMode.Open, FileAccess.Read, FileShare.Read);
-            MySettings = (Settings)Formatter.Deserialize(MyStream);
+            MySettings = (Settings)MySerializer.DeserializeObject("Settings.bin");
+            Tools = new ObservableCollection<Tool>((IEnumerable<Tool>)MySerializer.DeserializeObject("Tools.bin"));
+            Portfolio = (UnitedPortfolio)MySerializer.DeserializeObject("Portfolio.bin");
+            Trades = new ObservableCollection<Trade>((IEnumerable<Trade>)MySerializer.DeserializeObject("Trades.bin"));
         }
-        catch (Exception e) { AddInfo("Исключение десериализации Settings." + e.Message); } // Settings
-        try
+        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+        if (File.Exists(MySerializer.DataDirectory + "/Info.txt"))
         {
-            using Stream MyStream = new FileStream("Data/Tools.bin", FileMode.Open, FileAccess.Read, FileShare.Read);
-            Tools = new ObservableCollection<Tool>((IEnumerable<Tool>)Formatter.Deserialize(MyStream));
+            try
+            {
+                string Info = File.ReadAllText(MySerializer.DataDirectory + "/Info.txt");
+                if (Info != "") TxtBox.Text = "Начало восстановленного фрагмента.\n" + Info + "\nКонец восстановленного фрагмента.";
+            }
+            catch (Exception ex) { AddInfo("Исключение чтения Info." + ex.Message); }
         }
-        catch (Exception e) { AddInfo("Исключение десериализации Tools." + e.Message); } // Tools
-        try
-        {
-            using Stream MyStream = new FileStream("Data/Portfolio.bin", FileMode.Open, FileAccess.Read, FileShare.Read);
-            Portfolio = (UnitedPortfolio)Formatter.Deserialize(MyStream);
-        }
-        catch (Exception e) { AddInfo("Исключение десериализации Portfolio." + e.Message); } // Portfolio
-        try
-        {
-            using Stream MyStream = new FileStream("Data/Trades.bin", FileMode.Open, FileAccess.Read, FileShare.Read);
-            Trades = new ObservableCollection<Trade>((IEnumerable<Trade>)Formatter.Deserialize(MyStream));
-        }
-        catch (Exception e) { AddInfo("Исключение десериализации Trades." + e.Message); } // Trades
-        try
-        {
-            string Info = File.ReadAllText("Data/Info.txt");
-            if (Info != "") TxtBox.Text = "Начало восстановленного фрагмента.\n" + Info + "\nКонец восстановленного фрагмента.";
-        }
-        catch (Exception e) { AddInfo("Исключение чтения Info." + e.Message); } // Info
     }
     private void BindData()
     {
@@ -492,6 +477,7 @@ public partial class MainWindow : Window
                         Logger.StartLogging();
                         Portfolio.UpdateEquity(DateTime.Today.AddDays(-1));
                         Portfolio.CheckEquity(MySettings.ToleranceEquity);
+                        Portfolio.ClearOldPositions();
                         _ = CompressFilesAndRemove("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"));
                     });
                     System.Threading.Thread.Sleep(18000);
