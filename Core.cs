@@ -49,7 +49,7 @@ public partial class MainWindow : Window
 
     #region Properties
     public static MainWindow Window { get; private set; }
-    public static Serializer MySerializer { get; set; } = new BinarySerializer("Data");
+    public static Serializer MySerializer { get; set; } = new BinarySerializer("Data", (info) => AddInfo(info, true, true));
     public static UnitedPortfolio Portfolio { get; set; } = new();
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
@@ -103,7 +103,6 @@ public partial class MainWindow : Window
     public static bool SystemReadyToTrading { get; set; }
     public static bool ServerAvailable { get; set; }
     public static DateTime TriggerReconnection { get; set; } = DateTime.Now.AddMinutes(3);
-    public static DateTime TriggerNotification { get; set; }
 
     public static ObservableCollection<Tool> Tools { get; set; } = new();
     public static ObservableCollection<Trade> Trades { get; set; } = new();

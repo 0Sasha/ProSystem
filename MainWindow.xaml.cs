@@ -103,10 +103,10 @@ public partial class MainWindow : Window
         AddInfo("SaveData: Сериализация", false);
         try
         {
-            MySerializer.SerializeObject(Tools, "Tools", (info) => AddInfo(info, true, true));
-            MySerializer.SerializeObject(Portfolio, "Portfolio", (info) => AddInfo(info, true, true));
-            MySerializer.SerializeObject(MySettings, "Settings", (info) => AddInfo(info, true, true));
-            MySerializer.SerializeObject(Trades, "Trades", (info) => AddInfo(info, true, true));
+            MySerializer.SerializeObject(Tools, "Tools");
+            MySerializer.SerializeObject(Portfolio, "Portfolio");
+            MySerializer.SerializeObject(MySettings, "Settings");
+            MySerializer.SerializeObject(Trades, "Trades");
             if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(MySerializer.DataDirectory + "/Info.txt", TxtBox.Text));
             return true;
         }
@@ -122,11 +122,7 @@ public partial class MainWindow : Window
     }
     private void SaveData(object sender, PropertyChangedEventArgs e)
     {
-        if (DateTime.Now > TriggerSerialization)
-        {
-            TriggerSerialization = DateTime.Now.AddSeconds(15);
-            Task.Run(() => SaveData());
-        }
+        if (DateTime.Now > TriggerSerialization) Task.Run(() => SaveData());
     }
     private void TakeLoginDetails(object sender, RoutedEventArgs e)
     {
