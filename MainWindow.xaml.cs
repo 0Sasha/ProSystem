@@ -99,14 +99,13 @@ public partial class MainWindow : Window
     }
     private bool SaveData(bool SaveInfoPanel = false)
     {
-        TriggerSerialization = DateTime.Now.AddSeconds(60);
         AddInfo("SaveData: Сериализация", false);
         try
         {
-            MySerializer.SerializeObject(Tools, "Tools");
-            MySerializer.SerializeObject(Portfolio, "Portfolio");
-            MySerializer.SerializeObject(MySettings, "Settings");
-            MySerializer.SerializeObject(Trades, "Trades");
+            MySerializer.Serialize(Tools, "Tools");
+            MySerializer.Serialize(Portfolio, "Portfolio");
+            MySerializer.Serialize(MySettings, "Settings");
+            MySerializer.Serialize(Trades, "Trades");
             if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(MySerializer.DataDirectory + "/Info.txt", TxtBox.Text));
             return true;
         }
@@ -122,7 +121,7 @@ public partial class MainWindow : Window
     }
     private void SaveData(object sender, PropertyChangedEventArgs e)
     {
-        if (DateTime.Now > TriggerSerialization) Task.Run(() => SaveData());
+        if (e.PropertyName == "InitReqs") Task.Run(() => SaveData());
     }
     private void TakeLoginDetails(object sender, RoutedEventArgs e)
     {
@@ -178,7 +177,7 @@ public partial class MainWindow : Window
     private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
     {
         ToolsView.Items.Refresh();
-        if (DateTime.Now > TriggerSerialization) Task.Run(() => SaveData());
+        Task.Run(() => SaveData());
     }
     private void UpdateOrders(object sender, NotifyCollectionChangedEventArgs e)
     {

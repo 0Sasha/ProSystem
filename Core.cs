@@ -18,7 +18,6 @@ public partial class MainWindow : Window
     private static int CheckingInterval = 1;
     private static bool BackupAddressServer;
     private static DateTime TriggerRequestInfo;
-    private static DateTime TriggerSerialization;
     private static DateTime TriggerRecalculation;
     private static DateTime TriggerUpdatingModels;
     private static DateTime TriggerCheckingPortfolio;
@@ -49,7 +48,7 @@ public partial class MainWindow : Window
 
     #region Properties
     public static MainWindow Window { get; private set; }
-    public static Serializer MySerializer { get; set; } = new BinarySerializer("Data", (info) => AddInfo(info, true, true));
+    public static Serializer MySerializer { get; set; } = new DCSerializer("Data", (info) => AddInfo(info, true, true));
     public static UnitedPortfolio Portfolio { get; set; } = new();
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
@@ -148,10 +147,10 @@ public partial class MainWindow : Window
     {
         try
         {
-            MySettings = (Settings)MySerializer.DeserializeObject("Settings.bin");
-            Tools = new ObservableCollection<Tool>((IEnumerable<Tool>)MySerializer.DeserializeObject("Tools.bin"));
-            Portfolio = (UnitedPortfolio)MySerializer.DeserializeObject("Portfolio.bin");
-            Trades = new ObservableCollection<Trade>((IEnumerable<Trade>)MySerializer.DeserializeObject("Trades.bin"));
+            MySettings = (Settings)MySerializer.Deserialize("Settings", MySettings.GetType());
+            Tools = new ObservableCollection<Tool>((IEnumerable<Tool>)MySerializer.Deserialize("Tools", Tools.GetType()));
+            Portfolio = (UnitedPortfolio)MySerializer.Deserialize("Portfolio", Portfolio.GetType());
+            Trades = new ObservableCollection<Trade>((IEnumerable<Trade>)MySerializer.Deserialize("Trades", Trades.GetType()));
         }
         catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
         if (File.Exists(MySerializer.DataDirectory + "/Info.txt"))
