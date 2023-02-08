@@ -281,12 +281,7 @@ public partial class Tool : INotifyPropertyChanged
     }
     public void UpdateModel()
     {
-        // Обработка баров
-        if (MySecurity.Bars == null || ShowBasicSecurity && BasicSecurity.Bars == null)
-        {
-            AddInfo("MakeModel: нет баров. ShowBasic: " + ShowBasicSecurity);
-            return;
-        }
+        if (MySecurity.Bars == null || ShowBasicSecurity && BasicSecurity.Bars == null) return;
         Bars MyBars = ShowBasicSecurity ? BasicSecurity.Bars.GetCopy() : MySecurity.Bars.GetCopy();
 
         List<double> GridLines = new();
@@ -298,8 +293,6 @@ public partial class Tool : INotifyPropertyChanged
             if (MyBars.DateTime[i].Date != MyBars.DateTime[i - 1].Date) GridLines.Add(i);
         }
 
-        // Формирование новой модели
-        PlotModel NewModel = new();
         DateTimeAxis xAxis = new()
         {
             Position = AxisPosition.Bottom,
@@ -307,7 +300,8 @@ public partial class Tool : INotifyPropertyChanged
             {
                 if (value > 1 && value < MyBars.Close.Length)
                 {
-                    if (MyBars.DateTime[(int)value].Date == MyBars.DateTime[(int)value - 1].Date) return MyBars.DateTime[(int)value].ToString("HH:mm", IC);
+                    if (MyBars.DateTime[(int)value].Date == MyBars.DateTime[(int)value - 1].Date)
+                        return MyBars.DateTime[(int)value].ToString("HH:mm", IC);
                     else return MyBars.DateTime[(int)value].ToString("dd.MM.yy HH:mm", IC);
                 }
                 else return "";
@@ -322,51 +316,11 @@ public partial class Tool : INotifyPropertyChanged
             TrackerFormatString = "High: {3:0.0000}\nLow: {4:0.0000}\nOpen: {5:0.0000}\nClose: {6:0.0000}"
         };
 
-        PlotColors.Color(NewModel);
         PlotColors.Color(xAxis);
         PlotColors.Color(yAxis);
         PlotColors.Color(Candles);
 
-        NewModel.Axes.Add(xAxis);
-        NewModel.Axes.Add(yAxis);
-        NewModel.Series.Add(Candles);
-        NewModel.PlotMargins = new OxyThickness(0, 0, 50, 20);
-
-        // Обработка исходной модели
-        int Range = 100;
-        Series[] MySeries = null;
-        Annotation[] MyArrows = null;
-        if (MainModel != null)
-        {
-            MainModel.Axes[0].AxisChanged -= Handler;
-            if (MiniHandler != null) MainModel.Axes[0].AxisChanged -= MiniHandler;
-
-            if (MainModel.Annotations.Count > 0)
-            {
-                if (!ShowBasicSecurity) MyArrows = MainModel.Annotations.ToArray();
-                MainModel.Annotations.Clear();
-            }
-            if (MainModel.Axes[0].ActualMaximum > 10) Range = (int)(MainModel.Axes[0].ActualMaximum - MainModel.Axes[0].ActualMinimum);
-
-            if (MainModel.Series.Count > 0)
-            {
-                Candles.DecreasingColor = (MainModel.Series[0] as CandleStickSeries).DecreasingColor;
-                if (MainModel.Series.Count > 1)
-                {
-                    MySeries = new Series[MainModel.Series.Count - 1];
-                    for (int i = 0; i < MainModel.Series.Count - 1; i++) MySeries[i] = MainModel.Series[i + 1];
-                }
-                MainModel.Series.Clear();
-            }
-            else AddInfo("MakeModel: У исходной модели нет ни одной серии.");
-        }
-
-        // Обновление модели, её серий и аннотаций
-        MainModel = NewModel;
-        if (MySeries != null) foreach (Series Ser in MySeries) MainModel.Series.Add(Ser);
-        if (MyArrows != null) foreach (Annotation Arrow in MyArrows) MainModel.Annotations.Add(Arrow);
-
-        // Настройка новой модели
+        int Range = MainModel?.Axes[0].ActualMaximum > 10 ? (int)(MainModel.Axes[0].ActualMaximum - MainModel.Axes[0].ActualMinimum) : 100;
         xAxis.Maximum = MyItems[^1].X + 5;
         xAxis.Minimum = xAxis.Maximum - Range > 1 ? xAxis.Maximum - Range : 1;
         if (Range > 0)
@@ -374,43 +328,47 @@ public partial class Tool : INotifyPropertyChanged
             yAxis.Maximum = MyItems.TakeLast(Range).Select(x => x.High).Max();
             yAxis.Minimum = MyItems.TakeLast(Range).Select(x => x.Low).Min();
         }
-        Handler = (sender, e) => AutoScaling(Candles, xAxis, yAxis);
-        xAxis.AxisChanged += Handler;
 
-        int xEnd = MyItems.Length - 1;
         double yMin = double.MaxValue;
         double yMax = double.MinValue;
-        for (int i = Math.Max((int)xAxis.Minimum, 0); i <= xEnd; i++)
+        for (int i = Math.Max((int)xAxis.Minimum, 0); i < MyItems.Length; i++)
         {
             yMin = Math.Min(yMin, MyItems[i].Low);
             yMax = Math.Max(yMax, MyItems[i].High);
         }
-
         double Margin = (yMax - yMin) * 0.05;
         yAxis.Zoom(yMin - Margin, yMax + Margin);
+
+        if (MainModel != null)
+        {
+            MainModel.Axes[0].AxisChanged -= Handler;
+            if (MiniHandler != null) MainModel.Axes[0].AxisChanged -= MiniHandler;
+        }
+        Handler = (sender, e) => AutoScaling(Candles, xAxis, yAxis);
+        xAxis.AxisChanged += Handler;
+
+        if (MainModel == null)
+        {
+            MainModel = new() { PlotMargins = new OxyThickness(0, 0, 50, 20) };
+            PlotColors.Color(MainModel);
+            MainModel.Axes.Add(xAxis);
+            MainModel.Axes.Add(yAxis);
+            MainModel.Series.Add(Candles);
+        }
+        else
+        {
+            MainModel.Axes[0] = xAxis;
+            MainModel.Axes[1] = yAxis;
+            MainModel.Series[0] = Candles;
+        }
         MainModel.InvalidatePlot(true);
     }
     public void UpdateMiniModel(IScript MyScript = null)
     {
-        // Обработка исходных данных
         double[] Gridlines = null;
-        int Range = MainModel.Axes[0].Maximum > 5 ? (int)(MainModel.Axes[0].Maximum - MainModel.Axes[0].Minimum) : 250;
-
         List<DataPoint> Points = new();
         List<Series> ListSeries = new();
-        if (MyScript == null)
-        {
-            if (Model.Series.Count > 0)
-            {
-                foreach (Series MySeries in Model.Series) ListSeries.Add(MySeries);
-                Points = (Model.Series[0] as LineSeries).ItemsSource as List<DataPoint>;
-
-                Model.Series.Clear();
-                Gridlines = Model.Axes[1].ExtraGridlines;
-            }
-            else return;
-        }
-        else
+        if (MyScript != null)
         {
             if (MyScript.Result.Centre != -1)
                 Gridlines = new double[] { MyScript.Result.Centre + MyScript.Result.Level, MyScript.Result.Centre - MyScript.Result.Level };
@@ -428,43 +386,59 @@ public partial class Tool : INotifyPropertyChanged
             }
             if (ListSeries.Count > 1) Points = (ListSeries[0] as LineSeries).ItemsSource as List<DataPoint>;
         }
+        else if (Model.Series.Count > 0)
+        {
+            Points = (Model.Series[0] as LineSeries).ItemsSource as List<DataPoint>;
+            Gridlines = Model.Axes[1].ExtraGridlines;
+        }
+        else return;
 
-        // Формирование новой модели
-        Model = new PlotModel();
-        LinearAxis xAxis = new() { Position = AxisPosition.Bottom, IsZoomEnabled = false, IsPanEnabled = false, IsAxisVisible = false };
-        LinearAxis yAxis = new() { Position = AxisPosition.Right, IsPanEnabled = false };
-
-        xAxis.Maximum = Points.Count + 4;
-        xAxis.Minimum = xAxis.Maximum - Range > 1 ? xAxis.Maximum - Range : 1;
-        yAxis.ExtraGridlines = Gridlines;
-
-        PlotColors.Color(Model);
+        int Range = MainModel.Axes[0].Maximum > 5 ? (int)(MainModel.Axes[0].Maximum - MainModel.Axes[0].Minimum) : 250;
+        LinearAxis xAxis = new()
+        {
+            Position = AxisPosition.Bottom,
+            IsZoomEnabled = false, IsPanEnabled = false, IsAxisVisible = false,
+            Maximum = Points.Count + 4,
+            Minimum = Points.Count + 4 - Range > 1 ? Points.Count + 4 - Range : 1
+        };
+        LinearAxis yAxis = new()
+        {
+            Position = AxisPosition.Right,
+            IsPanEnabled = false,
+            ExtraGridlines = Gridlines
+        };
         PlotColors.Color(xAxis, false);
         PlotColors.Color(yAxis, false);
 
-        Model.Axes.Add(xAxis);
-        Model.Axes.Add(yAxis);
-        foreach (Series MySeries in ListSeries) Model.Series.Add(MySeries);
-        Model.PlotMargins = new OxyThickness(0, 0, 50, 0);
-
-        // Настройка новой модели
-        MainModel.Axes[0].AxisChanged -= MiniHandler;
-        MiniHandler = (sender, e) => AutoScaling(Points.ToArray(), MainModel.Axes[0], xAxis, yAxis);
-        MainModel.Axes[0].AxisChanged += MiniHandler;
-
-        int xStart = (int)xAxis.Minimum;
-        int xEnd = Points.Count - 1;
-
         double yMin = double.MaxValue;
         double yMax = double.MinValue;
-        for (int i = xStart; i <= xEnd; i++)
+        for (int i = (int)xAxis.Minimum; i < Points.Count; i++)
         {
             yMin = Math.Min(yMin, Points[i].Y);
             yMax = Math.Max(yMax, Points[i].Y);
         }
-
         double Margin = (yMax - yMin) * 0.05;
         yAxis.Zoom(yMin - Margin, yMax + Margin);
+
+        MainModel.Axes[0].AxisChanged -= MiniHandler;
+        MiniHandler = (sender, e) => AutoScaling(Points.ToArray(), MainModel.Axes[0], xAxis, yAxis);
+        MainModel.Axes[0].AxisChanged += MiniHandler;
+
+        if (Model == null)
+        {
+            Model = new() { PlotMargins = new OxyThickness(0, 0, 50, 0) };
+            Model.Axes.Add(xAxis);
+            Model.Axes.Add(yAxis);
+            PlotColors.Color(Model);
+        }
+        else
+        {
+            if (ListSeries.Count > 0) Model.Series.Clear();
+            Model.Axes[0] = xAxis;
+            Model.Axes[1] = yAxis;
+        }
+
+        foreach (Series MySeries in ListSeries) Model.Series.Add(MySeries);
         Model.InvalidatePlot(true);
     }
 

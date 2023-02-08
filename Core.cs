@@ -476,7 +476,9 @@ public partial class MainWindow : Window
                         Portfolio.UpdateEquity(DateTime.Today.AddDays(-1));
                         Portfolio.CheckEquity(MySettings.ToleranceEquity);
                         Portfolio.ClearOldPositions();
-                        _ = CompressFilesAndRemove("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"));
+                        _ = ArchiveFiles("Logs/Transaq",
+                            DateTime.Now.AddDays(-1).ToString("yyyyMMdd"), DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
+                        _ = ArchiveFiles("Data", ".xml", "Data", false);
                     });
                     System.Threading.Thread.Sleep(18000);
                 }

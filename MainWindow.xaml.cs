@@ -140,36 +140,39 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
     }
-    private static async Task<bool> CompressFilesAndRemove(string directory, string partName)
+    private static async Task<bool> ArchiveFiles(string directory, string partNameSourceFiles, string archName, bool deleteSourceFiles)
     {
         try
         {
             if (Directory.Exists(directory))
             {
-                var paths = Directory.GetFiles(directory).Where(x => x.Contains(partName)).ToArray();
+                var paths = Directory.GetFiles(directory).Where(x => x.Contains(partNameSourceFiles) && !x.Contains(".zip")).ToArray();
                 if (paths.Length == 0)
                 {
-                    AddInfo("CompressFiles: Файлы не найдены. " + directory + "/" + partName);
+                    AddInfo("ArchiveFiles: Файлы не найдены. " + directory + "/" + partNameSourceFiles);
                     return false;
                 }
 
-                string newDir = directory + "/" + partName + " " + DateTime.Now.TimeOfDay.ToString("hhmmss");
+                string newDir = directory + "/" + archName;
+                if (File.Exists(newDir)) File.Delete(newDir);
                 Directory.CreateDirectory(newDir);
-                foreach (var path in paths) File.Move(path, newDir + "/" + path.Replace(directory, ""));
+                foreach (var path in paths) File.Copy(path, newDir + "/" + path.Replace(directory, ""));
 
+                if (File.Exists(newDir + ".zip")) File.Delete(newDir + ".zip");
                 await Task.Run(() => ZipFile.CreateFromDirectory(newDir, newDir + ".zip", CompressionLevel.SmallestSize, false));
                 Directory.Delete(newDir, true);
+                if (deleteSourceFiles) foreach (var path in paths) File.Delete(path);
                 return true;
             }
             else
             {
-                AddInfo("CompressFiles: Директория " + directory + " не существует");
+                AddInfo("ArchiveFiles: Директория " + directory + " не существует");
                 return false;
             }
         }
         catch (Exception ex)
         {
-            AddInfo("CompressFiles: " + ex.Message);
+            AddInfo("ArchiveFiles: " + ex.Message);
             return false;
         }
     }
