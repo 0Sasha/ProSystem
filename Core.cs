@@ -48,7 +48,8 @@ public partial class MainWindow : Window
 
     #region Properties
     public static MainWindow Window { get; private set; }
-    public static Serializer MySerializer { get; set; } = new DCSerializer("Data", (info) => AddInfo(info, true, true));
+    public static Serializer MySerializer { get; set; }
+    public static Notifier MyNotifier { get; set; }
     public static UnitedPortfolio Portfolio { get; set; } = new();
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
@@ -121,8 +122,10 @@ public partial class MainWindow : Window
         Logger.StartLogging(true);
 
         // Восстановление данных и проверка настроек
+        MySerializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         DeserializeData();
         MySettings.Check(Tools);
+        MyNotifier = new EmailNotifier(587, "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
 
         // Привязка данных и восстановление вкладок инструментов
         BindData();

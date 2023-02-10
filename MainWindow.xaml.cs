@@ -135,7 +135,9 @@ public partial class MainWindow : Window
             string[] details = File.ReadAllLines("Data/mail.txt");
             MySettings.Email = details[0];
             MySettings.EmailPassword = details[1];
-            Notifier.Notify("Test notify");
+            (MyNotifier as EmailNotifier).Email = MySettings.Email;
+            (MyNotifier as EmailNotifier).Password = MySettings.EmailPassword;
+            MyNotifier.Notify("Test notify");
             AddInfo("Тестовое уведомление отправлено.");
         }
         catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
@@ -204,7 +206,7 @@ public partial class MainWindow : Window
                 Window.TxtBox.ScrollToEnd();
             });
         }
-        if (notify) Notifier.Notify(data);
+        if (notify) MyNotifier.Notify(data);
     }
 
     private void ShowUsedMemory(object sender, RoutedEventArgs e) =>

@@ -1,58 +1,101 @@
 ﻿using System;
-using System.Linq;
+using System.Net;
 using System.Net.Mail;
+using System.Net.NetworkInformation;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
-using System.Net.NetworkInformation;
-using static ProSystem.MainWindow;
 namespace ProSystem.Services;
 
-internal static class Notifier
+public abstract class Notifier
 {
-    private static DateTime TriggerNotification;
-    private static readonly ConcurrentQueue<string> DataQueue = new();
+    public abstract Action<string> Inform { get; set; }
+    public abstract void Notify(string data);
+}
 
-    public static void Notify(string data)
+internal class EmailNotifier : Notifier
+{
+    private string host;
+    private string email;
+    private string password;
+    private Action<string> inform;
+
+    private DateTime triggerNotification;
+    private readonly ConcurrentQueue<string> dataQueue = new();
+
+    public int Port { get; set; }
+    public string Host
     {
-        if (!DataQueue.Contains(data)) DataQueue.Enqueue(data);
-        if (DateTime.Now > TriggerNotification && !DataQueue.IsEmpty)
+        get => host;
+        set => host = value == null || value.Length == 0 ? throw new ArgumentException("Null or empty", nameof(value)) : value;
+    }
+    public string Email
+    {
+        get => email;
+        set => email = value == null || value.Length == 0 ? throw new ArgumentException("Null or empty", nameof(value)) : value;
+    }
+    public string Password
+    {
+        get => password;
+        set => password = value == null || value.Length == 0 ? throw new ArgumentException("Null or empty", nameof(value)) : value;
+    }
+    public override Action<string> Inform
+    {
+        get => inform;
+        set => inform = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public EmailNotifier(int port, string host, string email, string password, Action<string> inform)
+    {
+        Port = port;
+        Host = host;
+        Email = email;
+        Password = password;
+        Inform = inform;
+    }
+
+    public override void Notify(string data)
+    {
+        if (!dataQueue.Contains(data)) dataQueue.Enqueue(data);
+        if (DateTime.Now > triggerNotification && !dataQueue.IsEmpty)
         {
-            TriggerNotification = DateTime.Now.AddHours(4);
+            triggerNotification = DateTime.Now.AddHours(4);
             Task.Run(() => SendEmail());
         }
     }
-    private static void SendEmail()
+
+    private void SendEmail()
     {
         while (!NetworkInterface.GetIsNetworkAvailable()) Thread.Sleep(15000);
-        SmtpClient smtp = new("smtp.gmail.com", 587)
+        SmtpClient smtp = new(Host, Port)
         {
             EnableSsl = true,
-            Credentials = new System.Net.NetworkCredential(MySettings.Email, MySettings.EmailPassword)
+            Credentials = new NetworkCredential(Email, Password)
         };
 
         string body = ConstructBody();
-        MailMessage message = new(MySettings.Email, MySettings.Email, "Info", body);
+        MailMessage message = new(Email, Email, "Info", body);
         try
         {
             smtp.Send(message);
-            AddInfo("Оповещение отправлено.");
+            Inform("Оповещение отправлено.");
         }
         catch (Exception e)
         {
-            AddInfo("Повторная попытка отправки оповещения через 10 минут. Исключение: " + e.Message);
+            Inform("Повторная попытка отправки оповещения через 10 минут. Исключение: " + e.Message);
             Thread.Sleep(600000);
             try
             {
                 while (!NetworkInterface.GetIsNetworkAvailable()) Thread.Sleep(15000);
                 smtp.Send(message);
-                AddInfo("Оповещение отправлено.");
+                Inform("Оповещение отправлено.");
             }
             catch (Exception ex)
             {
-                AddInfo("Оповещение не отправлено. Исключение: " + ex.Message);
-                DataQueue.Enqueue(body);
-                TriggerNotification = DateTime.MinValue;
+                Inform("Оповещение не отправлено. Исключение: " + ex.Message);
+                dataQueue.Enqueue(body);
+                triggerNotification = DateTime.MinValue;
             }
         }
         finally
@@ -61,15 +104,16 @@ internal static class Notifier
             message.Dispose();
         }
     }
-    private static string ConstructBody()
+
+    private string ConstructBody()
     {
         string body = "";
-        while (!DataQueue.IsEmpty)
+        while (!dataQueue.IsEmpty)
         {
-            if (DataQueue.TryDequeue(out string part)) body += part + "\n\n";
+            if (dataQueue.TryDequeue(out string part)) body += part + "\n\n";
             else
             {
-                AddInfo("Notifier: не удалось взять объект из очереди.");
+                Inform("Notifier: не удалось взять объект из очереди.");
                 Thread.Sleep(5000);
             }
         }

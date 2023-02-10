@@ -602,7 +602,8 @@ public partial class Tool
             foreach (IScript MyScript in Scripts)
             {
                 Order LastExecuted = MyScript.MyOrders.LastOrDefault(x => x.Status == "matched");
-                if (LastExecuted != null && LastExecuted.DateTime.AddDays(4) > DateTime.Now)
+                if (LastExecuted != null &&
+                    (LastExecuted.DateTime.AddDays(4) > DateTime.Now || Balance > 0 == MySecurity.Bars.Close[^2] < LastExecuted.Price))
                 {
                     int Volume = Balance > 0 ? PosVolumes.Item1 - Balance : PosVolumes.Item2 + Balance;
                     SendOrder(MySecurity, OrderType.Limit,

@@ -1,21 +1,25 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using static ProSystem.MainWindow;
 namespace ProSystem.Services;
 
 public static class Logger
 {
-    private static StreamWriter Writer;
+    private static int busyMethod;
+    private static StreamWriter writer;
+    private static readonly ConcurrentQueue<string> dataQueue = new();
     public static void StartLogging(bool subscribe = false)
     {
         if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
         string Path = "Logs/" + DateTime.Today.ToShortDateString() + ".txt";
 
-        Writer = new StreamWriter(Path, true, System.Text.Encoding.UTF8);
+        writer = new StreamWriter(Path, true, System.Text.Encoding.UTF8);
         WriteLogSystem("Start logging");
-        Writer.Flush();
+        writer.Flush();
 
         if (subscribe)
         {
@@ -24,15 +28,19 @@ public static class Logger
             TaskScheduler.UnobservedTaskException += new(WriteLogTaskException);
         }
     }
-    public static void WriteLogSystem(string Data)
+    public static void WriteLogSystem(string data)
     {
-        Writer.WriteLine(DateTime.Now.ToString("dd.MM.yy HH:mm:ss.ffff", IC) + " " + Data);
-        Writer.Flush();
+        dataQueue.Enqueue(DateTime.Now.ToString("dd.MM.yy HH:mm:ss.ffff", IC) + " " + data);
+        if (Interlocked.Exchange(ref busyMethod, 1) != 0) return;
+
+        while (dataQueue.TryDequeue(out string dt)) writer.WriteLine(dt);
+        writer.Flush();
+        Interlocked.Exchange(ref busyMethod, 0);
     }
     public static void StopLogging()
     {
         WriteLogSystem("Stop logging");
-        Writer.Close();
+        writer.Close();
     }
     public static void WriteLogTaskException(object sender, UnobservedTaskExceptionEventArgs args)
     {

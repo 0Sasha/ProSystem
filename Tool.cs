@@ -293,6 +293,7 @@ public partial class Tool : INotifyPropertyChanged
             if (MyBars.DateTime[i].Date != MyBars.DateTime[i - 1].Date) GridLines.Add(i);
         }
 
+        int Range = MainModel?.Axes[0].ActualMaximum > 10 ? (int)(MainModel.Axes[0].ActualMaximum - MainModel.Axes[0].ActualMinimum) : 100;
         DateTimeAxis xAxis = new()
         {
             Position = AxisPosition.Bottom,
@@ -306,8 +307,9 @@ public partial class Tool : INotifyPropertyChanged
                 }
                 else return "";
             },
-            ExtraGridlines = GridLines.ToArray(),
-            ExtraGridlineColor = OxyColors.LightGray
+            Maximum = MyItems[^1].X + 5,
+            Minimum = MyItems[^1].X + 5 - Range > 1 ? MyItems[^1].X + 5 - Range : 1,
+            ExtraGridlines = GridLines.ToArray()
         };
         LinearAxis yAxis = new() { Position = AxisPosition.Right };
         CandleStickSeries Candles = new()
@@ -319,15 +321,6 @@ public partial class Tool : INotifyPropertyChanged
         PlotColors.Color(xAxis);
         PlotColors.Color(yAxis);
         PlotColors.Color(Candles);
-
-        int Range = MainModel?.Axes[0].ActualMaximum > 10 ? (int)(MainModel.Axes[0].ActualMaximum - MainModel.Axes[0].ActualMinimum) : 100;
-        xAxis.Maximum = MyItems[^1].X + 5;
-        xAxis.Minimum = xAxis.Maximum - Range > 1 ? xAxis.Maximum - Range : 1;
-        if (Range > 0)
-        {
-            yAxis.Maximum = MyItems.TakeLast(Range).Select(x => x.High).Max();
-            yAxis.Minimum = MyItems.TakeLast(Range).Select(x => x.Low).Min();
-        }
 
         double yMin = double.MaxValue;
         double yMax = double.MinValue;
@@ -342,7 +335,7 @@ public partial class Tool : INotifyPropertyChanged
         if (MainModel != null)
         {
             MainModel.Axes[0].AxisChanged -= Handler;
-            if (MiniHandler != null) MainModel.Axes[0].AxisChanged -= MiniHandler;
+            MainModel.Axes[0].AxisChanged -= MiniHandler;
         }
         Handler = (sender, e) => AutoScaling(Candles, xAxis, yAxis);
         xAxis.AxisChanged += Handler;
