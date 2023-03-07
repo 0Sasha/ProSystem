@@ -41,6 +41,7 @@ public static class Logger
     {
         WriteLogSystem("Stop logging");
         writer.Close();
+        writer.Dispose();
     }
     public static void WriteLogTaskException(object sender, UnobservedTaskExceptionEventArgs args)
     {

@@ -535,9 +535,10 @@ public partial class Tool
             return;
         }
 
+        double gap = Math.Abs(Balance) / 14D;
         bool NeedToNormalizeUp =
-            Balance > 0 && Balance + Math.Ceiling(Balance * 0.04) + 0.2 < ClearVolumes.Item1 ||
-            Balance < 0 && -Balance + Math.Ceiling(-Balance * 0.04) + 0.2 < ClearVolumes.Item2;
+            Balance > 0 && Balance + Math.Ceiling(Balance * 0.04) + (gap < 0.5 ? gap : 0.5) < ClearVolumes.Item1 ||
+            Balance < 0 && -Balance + Math.Ceiling(-Balance * 0.04) + (gap < 0.5 ? gap : 0.5) < ClearVolumes.Item2;
 
         Order ActiveOrder = ActiveOrders.SingleOrDefault();
         if (ActiveOrder != null)

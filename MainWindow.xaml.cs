@@ -450,7 +450,7 @@ public partial class MainWindow : Window
             {
                 Tools[k].RequestBars();
                 GetSecurityInfo(Tools[k].MySecurity.Market, Tools[k].MySecurity.Seccode);
-                System.Threading.Thread.Sleep(2000);
+                System.Threading.Thread.Sleep(3500);
 
                 GetClnSecPermissions(Tools[k].MySecurity.Board, Tools[k].MySecurity.Seccode, Tools[k].MySecurity.Market);
             });

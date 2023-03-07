@@ -79,21 +79,21 @@ internal class EmailNotifier : Notifier
         try
         {
             smtp.Send(message);
-            Inform("Оповещение отправлено.");
+            Inform("Notifier: Оповещение отправлено.");
         }
         catch (Exception e)
         {
-            Inform("Повторная попытка отправки оповещения через 10 минут. Исключение: " + e.Message);
+            Inform("Notifier: Повторная попытка отправки оповещения через 10 минут. Исключение: " + e.Message);
             Thread.Sleep(600000);
             try
             {
                 while (!NetworkInterface.GetIsNetworkAvailable()) Thread.Sleep(15000);
                 smtp.Send(message);
-                Inform("Оповещение отправлено.");
+                Inform("Notifier: Оповещение отправлено.");
             }
             catch (Exception ex)
             {
-                Inform("Оповещение не отправлено. Исключение: " + ex.Message);
+                Inform("Notifier: Оповещение не отправлено. Исключение: " + ex.Message);
                 dataQueue.Enqueue(body);
                 triggerNotification = DateTime.MinValue;
             }
@@ -113,7 +113,7 @@ internal class EmailNotifier : Notifier
             if (dataQueue.TryDequeue(out string part)) body += part + "\n\n";
             else
             {
-                Inform("Notifier: не удалось взять объект из очереди.");
+                Inform("Notifier: Не удалось взять объект из очереди.");
                 Thread.Sleep(5000);
             }
         }

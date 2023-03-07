@@ -1190,15 +1190,15 @@ internal static class TXmlConnector
             XR.Read();
             if (XR.GetAttribute("success") == "true")
             {
+                int id = int.Parse(XR.GetAttribute("transactionid"), IC);
                 Window.Dispatcher.Invoke(() =>
                 {
-                    if (Sender != null) Sender.MyOrders.Add(new Order(int.Parse(XR.GetAttribute("transactionid"), IC), Sender.Name, Signal, Note));
-                    else SystemOrders.Add(new Order(int.Parse(XR.GetAttribute("transactionid"), IC), SenderName, Signal, Note));
+                    if (Sender != null) Sender.MyOrders.Add(new Order(id, Sender.Name, Signal, Note));
+                    else SystemOrders.Add(new Order(id, SenderName, Signal, Note));
                 });
 
                 AddInfo("SendOrder: Заявка принята: " + SenderName + "/" + Symbol.Seccode + "/" +
                     BuySell + "/" + Price + "/" + Quantity, MySettings.DisplaySentOrders);
-                //if (Sender != null) Task.Run(() => Sender.UpdateOrdersAndPosition());
 
                 XR.Close();
                 return true;

@@ -16,7 +16,7 @@ public abstract class Serializer
 
 internal class DCSerializer : Serializer
 {
-    private int usingMethod;
+    private int busyMethod;
     private string directory;
     private Action<string> inform;
     private readonly DataContractSerializerSettings settings = new()
@@ -60,7 +60,7 @@ internal class DCSerializer : Serializer
         string dirCopyFile = DataDirectory + "/" + fileName + " copy.xml";
         if (!Directory.Exists(DataDirectory)) Directory.CreateDirectory(DataDirectory);
 
-        while (Interlocked.Exchange(ref usingMethod, 1) != 0) Thread.Sleep(150);
+        while (Interlocked.Exchange(ref busyMethod, 1) != 0) Thread.Sleep(150);
         try
         {
             if (File.Exists(dirCopyFile))
@@ -73,7 +73,7 @@ internal class DCSerializer : Serializer
         }
         catch
         {
-            Interlocked.Exchange(ref usingMethod, 0);
+            Interlocked.Exchange(ref busyMethod, 0);
             throw;
         }
 
@@ -100,7 +100,7 @@ internal class DCSerializer : Serializer
             }
             else Inform("Serialize: Исходный файл не восстановлен, поскольку нет копии файла");
         }
-        finally { Interlocked.Exchange(ref usingMethod, 0); }
+        finally { Interlocked.Exchange(ref busyMethod, 0); }
     }
 
     public override object Deserialize(string fileName, Type type)
