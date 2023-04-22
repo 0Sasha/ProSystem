@@ -584,8 +584,7 @@ public partial class Tool
             foreach (IScript MyScript in Scripts)
                 if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                 {
-                    AddInfo(Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.",
-                        MySettings.DisplaySpecialInfo);
+                    AddInfo(Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.", false);
                     return;
                 }
 

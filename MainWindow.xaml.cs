@@ -450,14 +450,15 @@ public partial class MainWindow : Window
             {
                 Tools[k].RequestBars();
                 GetSecurityInfo(Tools[k].MySecurity.Market, Tools[k].MySecurity.Seccode);
-                System.Threading.Thread.Sleep(3500);
-
                 GetClnSecPermissions(Tools[k].MySecurity.Board, Tools[k].MySecurity.Seccode, Tools[k].MySecurity.Market);
+                _ = Task.Run(() =>
+                {
+                    System.Threading.Thread.Sleep(4000);
+                    Tools[k].UpdateView(true);
+                });
             });
         }
         else AddInfo("SaveTool: отсутствует соединение.");
-
-        if (Tools[k].MySecurity.Bars != null) Tools[k].UpdateView(true);
         AddInfo("Saved tool: " + Tools[k].Name);
     }
     private void ChangeActivityTool(object sender, RoutedEventArgs e)

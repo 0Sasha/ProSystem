@@ -187,7 +187,7 @@ public partial class NewTool : Window
             if (BasicSecurity == null)
             {
                 SelectedTool.BasicSecurity = null;
-                SelectedTool.ShowBasicSecurity = false;
+                if (SelectedTool.ShowBasicSecurity == true) SelectedTool.ShowBasicSecurity = false;
             }
             else if (SelectedTool.BasicSecurity == null || SelectedTool.BasicSecurity.Seccode != BasicSecurity.Seccode)
                 SelectedTool.BasicSecurity = AllSecurities.Single(x => x == BasicSecurity);

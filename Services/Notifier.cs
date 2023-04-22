@@ -57,7 +57,7 @@ internal class EmailNotifier : Notifier
 
     public override void Notify(string data)
     {
-        if (!dataQueue.Contains(data)) dataQueue.Enqueue(data);
+        if (!dataQueue.Contains(data)) dataQueue.Enqueue(DateTime.Now + ": " + data);
         if (DateTime.Now > triggerNotification && !dataQueue.IsEmpty)
         {
             triggerNotification = DateTime.Now.AddHours(4);
@@ -65,9 +65,9 @@ internal class EmailNotifier : Notifier
         }
     }
 
-    private void SendEmail()
+    private async void SendEmail()
     {
-        while (!NetworkInterface.GetIsNetworkAvailable()) Thread.Sleep(15000);
+        while (!NetworkInterface.GetIsNetworkAvailable()) await Task.Delay(15000);
         SmtpClient smtp = new(Host, Port)
         {
             EnableSsl = true,
@@ -83,19 +83,24 @@ internal class EmailNotifier : Notifier
         }
         catch (Exception e)
         {
-            Inform("Notifier: Повторная попытка отправки оповещения через 10 минут. Исключение: " + e.Message);
-            Thread.Sleep(600000);
-            try
+            Inform("Notifier: Повторная попытка через 30 минут. Исключение: " + e.Message);
+            await Task.Delay(TimeSpan.FromMinutes(30));
+            for(int i = 0; i < 60; i++)
             {
-                while (!NetworkInterface.GetIsNetworkAvailable()) Thread.Sleep(15000);
-                smtp.Send(message);
-                Inform("Notifier: Оповещение отправлено.");
-            }
-            catch (Exception ex)
-            {
-                Inform("Notifier: Оповещение не отправлено. Исключение: " + ex.Message);
-                dataQueue.Enqueue(body);
-                triggerNotification = DateTime.MinValue;
+                try
+                {
+                    while (!NetworkInterface.GetIsNetworkAvailable()) await Task.Delay(15000);
+                    smtp.Send(message);
+                    Inform("Notifier: Оповещение отправлено.");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Inform("Notifier: Оповещение не отправлено. Повторная попытка через 6 часов. Исключение: " + ex.Message);
+                    dataQueue.Enqueue(body);
+                    triggerNotification = DateTime.MinValue;
+                }
+                await Task.Delay(TimeSpan.FromHours(6));
             }
         }
         finally
