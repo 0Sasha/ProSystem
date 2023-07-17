@@ -508,7 +508,7 @@ internal static class TXmlConnector
                         Volume = volume.ToArray()
                     };
                 }
-                else if (dateTime.Count == 0) return;
+                else if (dateTime.Count < 2) return;
                 else if (dateTime[^1] >= security.SourceBars.DateTime[^1]) // Полученные данные свежее исходных
                 {
                     // Поиск первого общего бара

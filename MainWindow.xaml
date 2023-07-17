@@ -300,6 +300,7 @@
                                 <MenuItem Header="Add tool" Click="AddToolContext"></MenuItem>
                                 <MenuItem Header="Open tab tool" Click="OpenTabToolContext"></MenuItem>
                                 <MenuItem Header="Change tool" Click="ChangeToolContext"></MenuItem>
+                                <MenuItem Header="Update toolbar" Click="UpdateToolbarContext"></MenuItem>
                                 <MenuItem Header="Write source bars to file" Click="WriteSourceBarsToolContext"></MenuItem>
                                 <MenuItem Header="Reload bars" Click="ReloadBarsToolContext"></MenuItem>
                                 <MenuItem Header="Remove tool" Click="RemoveToolContext"></MenuItem>

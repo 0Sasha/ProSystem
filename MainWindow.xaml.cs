@@ -238,6 +238,7 @@ public partial class MainWindow : Window
             NewTool.Show();
         }
     }
+    private void UpdateToolbarContext(object sender, RoutedEventArgs e) => ToolsView.Items.Refresh();
     private void ReloadBarsToolContext(object sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
