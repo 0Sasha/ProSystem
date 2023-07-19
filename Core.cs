@@ -39,7 +39,7 @@ public partial class MainWindow : Window
     {
         "RSI", "StochRSI", "MFI", "DeMarker", "Stochastic",
         "CMO", "CMF", "RVI", "CCI", "DPO", "FRC", "OBV", "AD", "SumLine",
-        "CHO", "ROC", "MACD", "MA", "Channel", "CrossEMA",
+        "CHO", "ROC", "MACD", "MA", "Channel", "CrossMA",
         "ATRS", "PARS"
     };
     public static readonly StringComparison SC = StringComparison.Ordinal;
@@ -391,7 +391,7 @@ public partial class MainWindow : Window
         SystemReadyToTrading = true;
         AddInfo("PrepareToTrading: SystemReadyToTrading.", false);
     }
-    private static void CheckCondition()
+    private static async void CheckCondition()
     {
         while (true)
         {
@@ -402,7 +402,7 @@ public partial class MainWindow : Window
                 if (Connection == ConnectionState.Connected)
                 {
                     // Проверка требований единого портфеля
-                    if (SystemReadyToTrading && DateTime.Now > TriggerCheckingPortfolio) CheckPortfolio();
+                    if (SystemReadyToTrading && DateTime.Now > TriggerCheckingPortfolio) await CheckPortfolio();
 
                     // Пересчёт скриптов и обновление графиков
                     if (SystemReadyToTrading && DateTime.Now > TriggerRecalculation)
@@ -428,7 +428,7 @@ public partial class MainWindow : Window
                     }
 
                     // Запрос информации
-                    if (DateTime.Now > TriggerRequestInfo) Task.Run(RequestInfo);
+                    if (DateTime.Now > TriggerRequestInfo) await Task.Run(RequestInfo);
 
                     // Переподключение по расписанию
                     if (MySettings.ScheduledConnection && DateTime.Now.Minute == 50)
@@ -472,7 +472,7 @@ public partial class MainWindow : Window
                 else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0 && DateTime.Now.Second < 15)
                 {
                     BackupServer = false;
-                    Task.Run(() =>
+                    await Task.Run(() =>
                     {
                         Logger.StopLogging();
                         Logger.StartLogging();
@@ -490,7 +490,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void CheckPortfolio()
+    private static async Task CheckPortfolio()
     {
         bool CancelActiveOrders(string Seccode)
         {
@@ -645,7 +645,7 @@ public partial class MainWindow : Window
                             }
 
                             // Отключение инструмента
-                            if (MyTool.Active) Window.Dispatcher.Invoke(() => MyTool.ChangeActivity());
+                            if (MyTool.Active) await MyTool.ChangeActivity();
                             AddInfo("CheckPortfolio: Позиция закрыта, заявок нет. Инструмент отключен: " + MyTool.Name);
                             System.Threading.Thread.Sleep(2000);
 
@@ -708,7 +708,7 @@ public partial class MainWindow : Window
                     }
 
                     // Отключение инструмента
-                    if (MyTool.Active) Window.Dispatcher.Invoke(() => MyTool.ChangeActivity());
+                    if (MyTool.Active) await MyTool.ChangeActivity();
                     AddInfo("CheckPortfolio: Позиция закрыта, заявок нет. Наименее приоритетный инструмент отключен: " + MyTool.Name);
                 }
             }

@@ -228,18 +228,17 @@ public partial class MainWindow : Window
             MainTabs.SelectedIndex = 3;
         }
     }
-    private void ChangeToolContext(object sender, RoutedEventArgs e)
+    private async void ChangeToolContext(object sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
             int i = Tools.IndexOf(Tools.Single(x => x == ToolsView.SelectedItem));
-            if (Tools[i].Active) Tools[i].ChangeActivity();
+            if (Tools[i].Active) await Tools[i].ChangeActivity();
             NewTool NewTool = new(Tools[i]);
             NewTool.Show();
         }
     }
-    private void UpdateToolbarContext(object sender, RoutedEventArgs e) =>
-        ToolsView.Items.Refresh();
+    private void UpdateToolbarContext(object sender, RoutedEventArgs e) => ToolsView.Items.Refresh();
     private void ReloadBarsToolContext(object sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
@@ -260,7 +259,7 @@ public partial class MainWindow : Window
             if (Tools[i].BasicSecurity != null) Bars.WriteBars(Tools[i].BasicSecurity.SourceBars, Tools[i].BasicSecurity.ShortName);
         }
     }
-    private void RemoveToolContext(object sender, RoutedEventArgs e)
+    private async void RemoveToolContext(object sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
@@ -272,7 +271,7 @@ public partial class MainWindow : Window
 
             // Деактивация инструмента и удаление его вкладки
             string ToolName = Tools[i].Name;
-            if (Tools[i].Active) Tools[i].ChangeActivity();
+            if (Tools[i].Active) await Tools[i].ChangeActivity();
             TabsTools.Items.Remove(TabsTools.Items[i]);
 
             // Удаление инструмента
@@ -463,12 +462,12 @@ public partial class MainWindow : Window
         else AddInfo("SaveTool: отсутствует соединение.");
         AddInfo("Saved tool: " + Tools[k].Name);
     }
-    private void ChangeActivityTool(object sender, RoutedEventArgs e)
+    private async void ChangeActivityTool(object sender, RoutedEventArgs e)
     {
         Button MyButton = sender as Button;
         MyButton.IsEnabled = false;
-        if (MyButton.Content == null) (MyButton.DataContext as Tool).ChangeActivity();
-        else Tools[TabsTools.SelectedIndex].ChangeActivity();
+        if (MyButton.Content == null) await (MyButton.DataContext as Tool).ChangeActivity();
+        else await Tools[TabsTools.SelectedIndex].ChangeActivity();
         MyButton.IsEnabled = true;
     }
     private void UpdateViewTool(object sender, SelectionChangedEventArgs e)
@@ -505,6 +504,7 @@ public partial class MainWindow : Window
         OxyPlot.SkiaSharp.Wpf.PlotView MainPlotView = new();
         MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("MainModel") });
         MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
+        Grid.SetRowSpan(MainPlotView, 2);
 
         PlotGrid.Children.Add(PlotView);
         PlotGrid.Children.Add(MainPlotView);

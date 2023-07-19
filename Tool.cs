@@ -10,6 +10,8 @@ using OxyPlot.Axes;
 using OxyPlot.Series;
 using OxyPlot.Annotations;
 using static ProSystem.MainWindow;
+using System.Threading.Tasks;
+
 namespace ProSystem;
 
 [Serializable]
@@ -140,14 +142,14 @@ public partial class Tool : INotifyPropertyChanged
             UICollection.Add(Block);
         });
     }
-    public async void ChangeActivity()
+    public async Task ChangeActivity()
     {
         if (Active)
         {
             Active = false;
             if (Connection == ConnectionState.Connected)
             {
-                await System.Threading.Tasks.Task.Run(() =>
+                await Task.Run(() =>
                 {
                     TXmlConnector.SubUnsub(false, MySecurity.Board, MySecurity.Seccode);
                     if (BasicSecurity != null) TXmlConnector.SubUnsub(false, BasicSecurity.Board, BasicSecurity.Seccode);
@@ -163,7 +165,7 @@ public partial class Tool : INotifyPropertyChanged
         {
             if (Connection == ConnectionState.Connected)
             {
-                if (!await System.Threading.Tasks.Task.Run(() =>
+                if (!await Task.Run(() =>
                 {
                     RequestBars();
                     TXmlConnector.GetClnSecPermissions(MySecurity.Board, MySecurity.Seccode, MySecurity.Market);
@@ -233,7 +235,7 @@ public partial class Tool : INotifyPropertyChanged
         if (Active)
         {
             while (Connection == ConnectionState.Connected && !SystemReadyToTrading) await System.Threading.Tasks.Task.Delay(100);
-            ChangeActivity();
+            await ChangeActivity();
             await System.Threading.Tasks.Task.Delay(250);
         }
         MySecurity.SourceBars = null;
@@ -379,7 +381,7 @@ public partial class Tool : INotifyPropertyChanged
             }
             if (ListSeries.Count > 1) Points = (ListSeries[0] as LineSeries).ItemsSource as List<DataPoint>;
         }
-        else if (Model.Series.Count > 0)
+        else if (Model?.Series.Count > 0)
         {
             Points = (Model.Series[0] as LineSeries).ItemsSource as List<DataPoint>;
             Gridlines = Model.Axes[1].ExtraGridlines;

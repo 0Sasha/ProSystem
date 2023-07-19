@@ -25,7 +25,7 @@ internal class DCSerializer : Serializer
         {
             typeof(Position), typeof(Trade), typeof(Settings), typeof(Tool), typeof(Security),
             typeof(AD), typeof(ATRS), typeof(CCI), typeof(Channel), typeof(CHO), typeof(CMF),
-            typeof(CMO), typeof(CrossEMA), typeof(DeMarker), typeof(DPO), typeof(FRC), typeof(MA), typeof(MACD), typeof(MFI), typeof(OBV),
+            typeof(CMO), typeof(CrossMA), typeof(DeMarker), typeof(DPO), typeof(FRC), typeof(MA), typeof(MACD), typeof(MFI), typeof(OBV),
             typeof(PARS), typeof(ROC), typeof(RSI), typeof(RVI), typeof(Stochastic), typeof(StochRSI), typeof(SumLine)
         },
         SerializeReadOnlyTypes = true,

@@ -113,7 +113,7 @@ public partial class NewTool : Window
             {
                 "ATRS" => new Algorithms.ATRS(ScriptName.Text),
                 "PARS" => new Algorithms.PARS(ScriptName.Text),
-                "CrossEMA" => new Algorithms.CrossEMA(ScriptName.Text),
+                "CrossMA" => new Algorithms.CrossMA(ScriptName.Text),
                 "RSI" => new Algorithms.RSI(ScriptName.Text),
                 "Stochastic" => new Algorithms.Stochastic(ScriptName.Text),
                 "MACD" => new Algorithms.MACD(ScriptName.Text),

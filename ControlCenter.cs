@@ -535,6 +535,9 @@ public partial class Tool
             return;
         }
 
+        if (Orders.ToArray().Any(x => x.Sender != "System" && x.Seccode == MySecurity.Seccode &&
+        x.Status is "active" && (x.Quantity - x.Balance > 0.00001 || x.Note == "PartEx"))) return;
+
         double gap = Math.Abs(Balance) / 14D;
         bool NeedToNormalizeUp =
             Balance > 0 && Balance + Math.Ceiling(Balance * 0.04) + (gap < 0.5 ? gap : 0.5) < ClearVolumes.Item1 ||
