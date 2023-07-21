@@ -1,103 +1,70 @@
 ﻿using System;
 using System.Windows.Controls;
 
-namespace ProSystem.Algorithms
+namespace ProSystem.Algorithms;
+
+[Serializable]
+internal class CMO : Script
 {
-    [Serializable]
-    internal class CMO : IScript, System.ComponentModel.INotifyPropertyChanged
+    private int Per = 20;
+    private int Lev = 20;
+    private int TF = 60;
+    private bool IsTr = true;
+    private bool OnlyLim = true;
+
+    public int Period
     {
-        #region Fields
-        private Order LastEx;
-        private PositionType Pos;
+        get => Per;
+        set { Per = value; Notify(); }
+    }
 
-        private int Per = 20;
-        private int Lev = 20;
-        private int TF = 60;
-        private bool IsTr = true;
-        private bool OnlyLim = true;
+    public int Level
+    {
+        get => Lev;
+        set { Lev = value; Notify(); }
+    }
 
-        [field: NonSerialized] private TextBlock BlInfo;
-        [field: NonSerialized] public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
-        #endregion
+    public int IndicatorTF
+    {
+        get => TF;
+        set { TF = value; Notify(); }
+    }
 
-        #region Properties
-        public string Name { get; set; }
-        public Order ActiveOrder { get; set; }
-        public Order LastExecuted
-        {
-            get => LastEx;
-            set
-            {
-                LastEx = value;
-                if (LastEx != null) CurrentPosition = LastEx.BuySell == "B" ? PositionType.Long : PositionType.Short;
-            }
-        }
-        public PositionType CurrentPosition
-        {
-            get => Pos;
-            set { Pos = value; NotifyChanged(); }
-        }
-        public ScriptResult Result { get; set; }
-        public TextBlock BlockInfo
-        {
-            get => BlInfo;
-            set { BlInfo = value; NotifyChanged(); }
-        }
-        public System.Collections.ObjectModel.ObservableCollection<Order> MyOrders { get; set; } = new();
-        public System.Collections.ObjectModel.ObservableCollection<Trade> MyTrades { get; set; } = new();
+    public bool OnlyLimit
+    {
+        get => OnlyLim;
+        set { OnlyLim = value; Notify(); }
+    }
 
-        public int Period
-        {
-            get => Per;
-            set { Per = value; NotifyChanged(); }
-        }
-        public int Level
-        {
-            get => Lev;
-            set { Lev = value; NotifyChanged(); }
-        }
-        public int IndicatorTF
-        {
-            get => TF;
-            set { TF = value; NotifyChanged(); }
-        }
-        public bool OnlyLimit
-        {
-            get => OnlyLim;
-            set { OnlyLim = value; NotifyChanged(); }
-        }
-        public bool IsTrend
-        {
-            get => IsTr;
-            set { IsTr = value; NotifyChanged(); }
-        }
+    public bool IsTrend
+    {
+        get => IsTr;
+        set { IsTr = value; Notify(); }
+    }
 
-        private void NotifyChanged() => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(""));
-        #endregion
+    public CMO(string name) : base(name) { }
 
-        public CMO(string Name) { this.Name = Name; }
-        public override string ToString() => "CMO";
-        public void Initialize(Tool MyTool, TabItem TabTool)
-        {
-            bool IsOSC = true;
-            string[] UpperProperties = new string[] { "Period", "Level", "IndicatorTF" };
-            string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit" };
-            MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties);
-        }
-        public void Calculate(Security Symbol)
-        {
-            Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
-            double[] CMO = Indicators.CMO(iBars.Close, Period);
-            CMO = Indicators.Synchronize(CMO, iBars, Symbol.Bars);
+    public override void Initialize(Tool MyTool, TabItem TabTool)
+    {
+        bool IsOSC = true;
+        string[] UpperProperties = new string[] { "Period", "Level", "IndicatorTF" };
+        string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit" };
+        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties);
+    }
 
-            bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
-            for (int i = 1; i < Symbol.Bars.Close.Length; i++)
-            {
-                if (CMO[i - 1] - Level > 0.00001) IsGrow[i] = IsTrend;
-                else if (CMO[i - 1] - -Level < -0.00001) IsGrow[i] = !IsTrend;
-                else IsGrow[i] = IsGrow[i - 1];
-            }
-            Result = new ScriptResult(ScriptType.OSC, IsGrow, new double[][] { CMO }, iBars.DateTime[^1], 0, Level, OnlyLimit);
+    public override void Calculate(Security Symbol)
+    {
+        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        double[] CMO = Indicators.CMO(iBars.Close, Period);
+        CMO = Indicators.Synchronize(CMO, iBars, Symbol.Bars);
+
+        bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
+        for (int i = 1; i < Symbol.Bars.Close.Length; i++)
+        {
+            if (CMO[i - 1] - Level > 0.00001) IsGrow[i] = IsTrend;
+            else if (CMO[i - 1] - -Level < -0.00001) IsGrow[i] = !IsTrend;
+            else IsGrow[i] = IsGrow[i - 1];
         }
+        Result = new ScriptResult(ScriptType.OSC, IsGrow, new double[][] { CMO }, iBars.DateTime[^1], 0, Level, OnlyLimit);
     }
 }

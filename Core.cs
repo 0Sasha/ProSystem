@@ -125,7 +125,8 @@ public partial class MainWindow : Window
         MySerializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         DeserializeData();
         MySettings.Check(Tools);
-        MyNotifier = new EmailNotifier(587, "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
+        if (MySettings.EmailPassword != null) MyNotifier = new EmailNotifier(587,
+            "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
 
         // Привязка данных и восстановление вкладок инструментов
         BindData();

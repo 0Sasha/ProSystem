@@ -6,23 +6,9 @@ using System.Collections.ObjectModel;
 using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
 using static ProSystem.TXmlConnector;
+
 namespace ProSystem;
 
-public interface IScript
-{
-    string Name { get; set; }
-    Order ActiveOrder { get; set; }
-    Order LastExecuted { get; set; }
-    PositionType CurrentPosition { get; set; }
-    ScriptResult Result { get; set; }
-    TextBlock BlockInfo { get; set; }
-
-    ObservableCollection<Order> MyOrders { get; set; }
-    ObservableCollection<Trade> MyTrades { get; set; }
-
-    void Initialize(Tool MyTool, TabItem TabTool);
-    void Calculate(Security Symbol);
-}
 public partial class Tool
 {
     #region Fields
@@ -210,7 +196,7 @@ public partial class Tool
             if (!CancelUnknownsOrders()) return;
             if (ReadyToTrade)
             {
-                foreach (IScript MyScript in Scripts) MyScript.UpdateOrdersAndPosition();
+                foreach (Script MyScript in Scripts) MyScript.UpdateOrdersAndPosition();
                 if (!CheckPositionMatching(Balance, PosVolumes, NowBidding, NormalPrice)) return;
                 NormalizePosition(Balance, PosVolumes, ClearVolumes, NowBidding);
             }
@@ -218,7 +204,7 @@ public partial class Tool
         else if (!CancelActiveOrders()) return;
 
         // Работа со скриптами
-        foreach (IScript MyScript in Scripts)
+        foreach (Script MyScript in Scripts)
         {
             // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
             if (!MyScript.UpdateOrdersAndPosition()) continue;
@@ -246,7 +232,7 @@ public partial class Tool
         Order[] UnknownsOrders = Orders.ToArray().Where(x => x.Sender == null && x.Seccode == MySecurity.Seccode).ToArray();
         foreach (Order UnknowOrder in UnknownsOrders)
         {
-            foreach (IScript MyScript in Scripts)
+            foreach (Script MyScript in Scripts)
             {
                 int i = Array.FindIndex(MyScript.MyOrders.ToArray(), x => x.TrID == UnknowOrder.TrID);
                 if (i > -1)
@@ -276,7 +262,7 @@ public partial class Tool
         Trade[] UnknownsTrades = Trades.ToArray().Where(x => x.SenderOrder == null && x.Seccode == MySecurity.Seccode).ToArray();
         foreach (Trade UnknowTrade in UnknownsTrades)
         {
-            foreach (IScript MyScript in Scripts)
+            foreach (Script MyScript in Scripts)
             {
                 int i = Array.FindIndex(MyScript.MyOrders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
                 if (i > -1)
@@ -548,7 +534,7 @@ public partial class Tool
         {
             if ((ActiveOrder.BuySell == "B") == Balance < 0 && (Balance > PosVolumes.Item1 || -Balance > PosVolumes.Item2))
             {
-                foreach (IScript MyScript in Scripts)
+                foreach (Script MyScript in Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                     {
                         AddInfo(Name +
@@ -565,7 +551,7 @@ public partial class Tool
             }
             else if ((ActiveOrder.BuySell == "B") == Balance > 0 && NeedToNormalizeUp)
             {
-                foreach (IScript MyScript in Scripts)
+                foreach (Script MyScript in Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                     {
                         AddInfo(Name +
@@ -584,7 +570,7 @@ public partial class Tool
         }
         else if (Balance > PosVolumes.Item1 || -Balance > PosVolumes.Item2)
         {
-            foreach (IScript MyScript in Scripts)
+            foreach (Script MyScript in Scripts)
                 if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)
                 {
                     AddInfo(Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.", false);
@@ -597,12 +583,12 @@ public partial class Tool
         }
         else if (NeedToNormalizeUp)
         {
-            foreach (IScript MyScript in Scripts)
+            foreach (Script MyScript in Scripts)
                 if (MyScript.ActiveOrder != null &&
                     (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 || MyScript.ActiveOrder.Note == "PartEx" ||
                     Math.Abs(MyScript.ActiveOrder.Price - MySecurity.Bars.Close[^2]) < 0.00001)) return;
 
-            foreach (IScript MyScript in Scripts)
+            foreach (Script MyScript in Scripts)
             {
                 Order LastExecuted = MyScript.MyOrders.LastOrDefault(x => x.Status == "matched");
                 if (LastExecuted != null &&
@@ -660,7 +646,7 @@ public partial class Tool
         else if (Scripts.Length == 2)
         {
             // Проверка частичного исполнения заявок
-            foreach (IScript MyScript in Scripts)
+            foreach (Script MyScript in Scripts)
                 if (MyScript.ActiveOrder != null &&
                     (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 ||
                     MyScript.ActiveOrder.Note == "PartEx")) return true;
@@ -850,7 +836,7 @@ public partial class Tool
     #endregion
 
     #region Script methods
-    private void ProcessOrders(IScript MyScript, (int, int) OrderVolumes, bool NormalPrice)
+    private void ProcessOrders(Script MyScript, (int, int) OrderVolumes, bool NormalPrice)
     {
         Security Symbol = MySecurity;
         double PrevClose =
@@ -902,7 +888,7 @@ public partial class Tool
             WriteLogScript(MyScript);
         }
     }
-    private void ProcessOrdersLimitLine(IScript MyScript, (int, int) OrderVolumes)
+    private void ProcessOrdersLimitLine(Script MyScript, (int, int) OrderVolumes)
     {
         Security Symbol = MySecurity;
         double PriceOrder = BasicSecurity?.Bars.DateTime[^1] > MySecurity.Bars.DateTime[^1] ?
@@ -952,7 +938,7 @@ public partial class Tool
             WriteLogScript(MyScript);
         }
     }
-    private void ProcessOrdersStopLine(IScript MyScript, (int, int) OrderVolumes, bool NormalPrice, bool NowBidding, double[] SmallATR)
+    private void ProcessOrdersStopLine(Script MyScript, (int, int) OrderVolumes, bool NormalPrice, bool NowBidding, double[] SmallATR)
     {
         Security Symbol = MySecurity;
         double PrevClose = Symbol.Bars.Close[^2];
@@ -1069,7 +1055,7 @@ public partial class Tool
         }
     }
 
-    private void UpdateScriptView(IScript MyScript)
+    private void UpdateScriptView(Script MyScript)
     {
         string SelectedScript = null;
         Window.Dispatcher.Invoke(() =>
@@ -1105,7 +1091,7 @@ public partial class Tool
             }
         }
     }
-    private bool AlignData(IScript MyScript)
+    private bool AlignData(Script MyScript)
     {
         int InitialLength = MySecurity.Bars.Close.Length;
         int y = MyScript.Result.IsGrow.Length - InitialLength;
@@ -1132,7 +1118,7 @@ public partial class Tool
         }
         return true;
     }
-    private void WriteLogScript(IScript MyScript)
+    private void WriteLogScript(Script MyScript)
     {
         try
         {
@@ -1153,7 +1139,7 @@ public partial class Tool
 }
 public static class Extensions
 {
-    public static bool UpdateOrdersAndPosition(this IScript MyScript)
+    public static bool UpdateOrdersAndPosition(this Script MyScript)
     {
         MyScript.LastExecuted = MyScript.MyOrders.ToArray().LastOrDefault(x => x.Status == "matched" && x.Note != "NM");
         Order[] ActiveOrders =

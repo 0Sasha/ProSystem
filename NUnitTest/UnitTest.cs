@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using ProSystem.Algorithms;
+using ProSystem;
 namespace NUnitTest;
 
 public class Tests

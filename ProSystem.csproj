@@ -2,11 +2,10 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows10.0.17763.0</TargetFramework>
+    <TargetFramework>net7.0-windows10.0.17763.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <Platforms>AnyCPU;x64;x86</Platforms>
     <StartupObject></StartupObject>
-    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
     <Nullable>disable</Nullable>
   </PropertyGroup>
 
@@ -63,13 +62,12 @@
     <Compile Remove="Algorithms\ATRL.cs" />
     <Compile Remove="Algorithms\BBL.cs" />
     <Compile Remove="IndicatorsOLD.cs" />
-    <Compile Remove="IScript.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="NUnit" Version="3.13.3" />
-    <PackageReference Include="OxyPlot.SkiaSharp.Wpf" Version="2.1.0" />
-    <PackageReference Include="OxyPlot.Wpf" Version="2.1.0" />
+    <PackageReference Include="OxyPlot.SkiaSharp.Wpf" Version="2.1.2" />
+    <PackageReference Include="OxyPlot.Wpf" Version="2.1.2" />
   </ItemGroup>
 
   <ItemGroup>

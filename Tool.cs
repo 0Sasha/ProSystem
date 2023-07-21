@@ -4,13 +4,14 @@ using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Controls;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Series;
 using OxyPlot.Annotations;
+using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
-using System.Threading.Tasks;
 
 namespace ProSystem;
 
@@ -45,7 +46,7 @@ public partial class Tool : INotifyPropertyChanged
     public DateTime TimeNextRecalc { get; set; }
     public Security MySecurity { get; set; }
     public Security BasicSecurity { get; set; }
-    public IScript[] Scripts { get; set; }
+    public Script[] Scripts { get; set; }
     public PlotModel MainModel
     {
         get => Plot;
@@ -64,7 +65,7 @@ public partial class Tool : INotifyPropertyChanged
     private void NotifyChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
 
     public Tool() { }
-    public Tool(string Name, Security MySecurity, Security BasicSecurity, IScript[] Scripts)
+    public Tool(string Name, Security MySecurity, Security BasicSecurity, Script[] Scripts)
     {
         this.Name = Name;
         this.MySecurity = MySecurity;
@@ -93,7 +94,7 @@ public partial class Tool : INotifyPropertyChanged
         Controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
 
         UpdateModel();
-        foreach (IScript script in Scripts)
+        foreach (Script script in Scripts)
         {
             script.Initialize(this, MyTabItem);
             script.Calculate(BasicSecurity ?? MySecurity);
@@ -115,7 +116,7 @@ public partial class Tool : INotifyPropertyChanged
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
     }
-    public void InitializeScript(IScript MyScript, TabItem TabTool, bool IsOSC, string[] UpperProperties,
+    public void InitializeScript(Script MyScript, TabItem TabTool, bool IsOSC, string[] UpperProperties,
         string[] MiddleProperties = null, string SpecProperty = null, NameMA[] SpecObjs = null)
     {
         Window.Dispatcher.Invoke(() =>
@@ -358,7 +359,7 @@ public partial class Tool : INotifyPropertyChanged
         }
         MainModel.InvalidatePlot(true);
     }
-    public void UpdateMiniModel(IScript MyScript = null)
+    public void UpdateMiniModel(Script MyScript = null)
     {
         double[] Gridlines = null;
         List<DataPoint> Points = new();
@@ -571,7 +572,7 @@ public partial class Tool : INotifyPropertyChanged
         if (Tools[i].Model != null) Window.Dispatcher.Invoke(() => Tools[i].Model.InvalidatePlot(false));
     }
 
-    public static void AddUpperControls(IScript MyScript, UIElementCollection UICollection, string[] Properties,
+    public static void AddUpperControls(Script MyScript, UIElementCollection UICollection, string[] Properties,
         string SpecProperty = null, NameMA[] SpecObjs = null)
     {
         UICollection.Add(GetTextBlock(Properties[0], 5, 20));
@@ -629,7 +630,7 @@ public partial class Tool : INotifyPropertyChanged
             UICollection.Add(ComboBox2);
         }
     }
-    public static void AddMiddleControls(IScript MyScript, UIElementCollection UICollection, string[] Properties)
+    public static void AddMiddleControls(Script MyScript, UIElementCollection UICollection, string[] Properties)
     {
         UICollection.Add(GetCheckBox(MyScript, Properties[0], Properties[0], 5, 110));
         if (Properties.Length > 1) UICollection.Add(GetCheckBox(MyScript, Properties[1], Properties[1], 5, 130));

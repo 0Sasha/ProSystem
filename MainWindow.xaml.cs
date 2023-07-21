@@ -11,7 +11,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using ProSystem.Services;
+using ProSystem.Algorithms;
 using static ProSystem.TXmlConnector;
+
 namespace ProSystem;
 
 public partial class MainWindow : Window
@@ -344,7 +346,7 @@ public partial class MainWindow : Window
                     if (MyOrder.Sender != null) MyTool.Scripts.Single(x => x.Name == MyOrder.Sender).MyOrders.Remove(MyOrder);
                     else
                     {
-                        foreach (IScript MyScript in MyTool.Scripts)
+                        foreach (Script MyScript in MyTool.Scripts)
                         {
                             if (MyScript.MyOrders.Contains(MyOrder))
                             {
@@ -566,7 +568,7 @@ public partial class MainWindow : Window
             new Binding() { Source = MyTool, Path = new PropertyPath("BaseTF"), Mode = BindingMode.TwoWay });
 
         List<string> MyScripts = new();
-        foreach (IScript Script in MyTool.Scripts) MyScripts.Add(Script.Name);
+        foreach (Script Script in MyTool.Scripts) MyScripts.Add(Script.Name);
         MyScripts.Add("AllScripts");
         MyScripts.Add("Nothing");
         ComboBox ScriptsBox = new()
@@ -688,11 +690,11 @@ public partial class MainWindow : Window
         if (ComboBoxTool.SelectedIndex > -1 && ComboBoxScript.SelectedIndex > -1)
         {
             OrdersInfo.ItemsSource =
-                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (IScript)ComboBoxScript.SelectedItem).MyOrders;
+                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).MyOrders;
             OrdersInfo.Items.Refresh();
 
             TradesInfo.ItemsSource =
-                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (IScript)ComboBoxScript.SelectedItem).MyTrades;
+                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).MyTrades;
             TradesInfo.Items.Refresh();
         }
     }

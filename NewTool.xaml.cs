@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using System.Windows;
+using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
 
 namespace ProSystem;
@@ -9,7 +10,7 @@ public partial class NewTool : Window
     private Security TrSec = null;
     private Security BsSec = null;
     private readonly Tool SelectedTool = null;
-    private readonly System.Collections.Generic.List<IScript> Scripts = new();
+    private readonly System.Collections.Generic.List<Script> Scripts = new();
 
     private Security TradedSecurity
     {
@@ -109,7 +110,7 @@ public partial class NewTool : Window
     {
         if (Scripts.SingleOrDefault(x => x.Name == ScriptName.Text) == null && BoxScripts.SelectedItem != null)
         {
-            IScript newScript = BoxScripts.SelectedItem.ToString() switch
+            Script newScript = BoxScripts.SelectedItem.ToString() switch
             {
                 "ATRS" => new Algorithms.ATRS(ScriptName.Text),
                 "PARS" => new Algorithms.PARS(ScriptName.Text),
@@ -145,7 +146,7 @@ public partial class NewTool : Window
     {
         if (ScriptsView.SelectedIndex > -1)
         {
-            Scripts.Remove((IScript)ScriptsView.SelectedItem);
+            Scripts.Remove((Script)ScriptsView.SelectedItem);
             ScriptsView.Items.Refresh();
         }
     }
@@ -178,7 +179,7 @@ public partial class NewTool : Window
             if (SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode)
             {
                 SelectedTool.MySecurity = AllSecurities.Single(x => x == TradedSecurity);
-                foreach (IScript Script in SelectedTool.Scripts)
+                foreach (Script Script in SelectedTool.Scripts)
                 {
                     Script.MyOrders.Clear();
                     Script.MyTrades.Clear();

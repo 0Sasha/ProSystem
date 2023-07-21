@@ -6,7 +6,9 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
+using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
+
 namespace ProSystem;
 
 internal static class TXmlConnector
@@ -1138,7 +1140,7 @@ internal static class TXmlConnector
     }
 
     public static bool SendOrder(Security Symbol, OrderType OrderType, bool IsBuy, double Price, int Quantity, string Signal,
-        IScript Sender = null, string Note = null, bool UseCredit = false)
+        Script Sender = null, string Note = null, bool UseCredit = false)
     {
         // Подготовка переменных
         string SenderName = Sender != null ? Sender.Name : "System";
@@ -1241,7 +1243,7 @@ internal static class TXmlConnector
         return true;
     }
     public static bool ReplaceOrder(Order ActiveOrder, Security Symbol, OrderType OrderType, double Price, int Quantity, string Signal,
-        IScript Sender = null, string Note = null, bool UseCredit = false)
+        Script Sender = null, string Note = null, bool UseCredit = false)
     {
         string SenderName = Sender != null ? Sender.Name : "System";
         AddInfo("ReplaceOrder: Замена заявки отправителя: " + SenderName, false);

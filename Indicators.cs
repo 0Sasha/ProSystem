@@ -1,5 +1,6 @@
 ﻿using System;
-namespace ProSystem.Algorithms;
+
+namespace ProSystem;
 
 public static class Indicators
 {
