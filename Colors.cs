@@ -12,7 +12,7 @@ static class Colors
     private static readonly SolidColorBrush lightRed = new() { Color = new() { R = 255, G = 80, B = 100, A = 255 } };
     private static readonly SolidColorBrush orange = new() { Color = new() { R = 255, G = 190, B = 0, A = 255 } };
 
-    public static bool DarkTheme { get; set; } = true;
+    private static bool DarkTheme { get; set; } = true;
     public static SolidColorBrush Back { get => Dictionary.txtBack; }
     public static SolidColorBrush Front { get => Dictionary.txtFront; }
     public static SolidColorBrush Border { get => Dictionary.txtBorder; }
@@ -23,6 +23,7 @@ static class Colors
 }
 static class PlotColors
 {
+    private static bool DarkTheme { get; set; } = true;
     private static readonly OxyColorConverter converter = new();
 
     private static readonly OxyColor greenBar =
@@ -46,19 +47,19 @@ static class PlotColors
         OxyColors.DarkGoldenrod, OxyColors.DarkBlue
     };
 
-    public static OxyColor Back { get => Colors.DarkTheme ? OxyColors.Black : OxyColors.White; }
-    public static OxyColor Front { get => Colors.DarkTheme ? OxyColors.White : OxyColors.Black; }
-    public static OxyColor Text { get => Colors.DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
-    public static OxyColor Indicator { get => Colors.DarkTheme ? orange : OxyColors.DarkBlue; }
-    public static OxyColor GreenBar { get => Colors.DarkTheme ? greenBar : OxyColors.Green; }
-    public static OxyColor RedBar { get => Colors.DarkTheme ? redBar : OxyColors.Red; }
-    public static OxyColor FadedBar { get => Colors.DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
-    public static OxyColor Gridline { get => Colors.DarkTheme ? almostBlack : OxyColors.LightGray; }
-    public static OxyColor[] Indicators { get => Colors.DarkTheme ? blackIndicators : whiteIndicators; }
+    public static OxyColor Back { get => DarkTheme ? OxyColors.Black : OxyColors.White; }
+    public static OxyColor Front { get => DarkTheme ? OxyColors.White : OxyColors.Black; }
+    public static OxyColor Text { get => DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
+    public static OxyColor Indicator { get => DarkTheme ? orange : OxyColors.DarkBlue; }
+    public static OxyColor GreenBar { get => DarkTheme ? greenBar : OxyColors.Green; }
+    public static OxyColor RedBar { get => DarkTheme ? redBar : OxyColors.Red; }
+    public static OxyColor FadedBar { get => DarkTheme ? OxyColors.LightGray : OxyColors.Black; }
+    public static OxyColor Gridline { get => DarkTheme ? almostBlack : OxyColors.LightGray; }
+    public static OxyColor[] Indicators { get => DarkTheme ? blackIndicators : whiteIndicators; }
 
-    public static OxyColor LongPosition { get => Colors.DarkTheme ? greenBar : OxyColors.Green; }
-    public static OxyColor ShortPosition { get => Colors.DarkTheme ? orange : OxyColors.DarkGoldenrod; }
-    public static OxyColor MaxVolume { get => Colors.DarkTheme ? darkGray : OxyColors.Black; }
+    public static OxyColor LongPosition { get => DarkTheme ? greenBar : OxyColors.Green; }
+    public static OxyColor ShortPosition { get => DarkTheme ? orange : OxyColors.DarkGoldenrod; }
+    public static OxyColor MaxVolume { get => DarkTheme ? darkGray : OxyColors.Black; }
 
     public static void Color(PlotModel model)
     {

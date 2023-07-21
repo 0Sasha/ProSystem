@@ -16,10 +16,11 @@ internal class DCSerializer : Serializer
     {
         KnownTypes = new Type[]
         {
-        typeof(Position), typeof(Trade), typeof(Settings), typeof(Tool), typeof(Security),
-        typeof(AD), typeof(ATRS), typeof(CCI), typeof(Channel), typeof(CHO), typeof(CMF),
-        typeof(CMO), typeof(CrossMA), typeof(DeMarker), typeof(DPO), typeof(FRC), typeof(MA), typeof(MACD), typeof(MFI), typeof(OBV),
-        typeof(PARS), typeof(ROC), typeof(RSI), typeof(RVI), typeof(Stochastic), typeof(StochRSI), typeof(SumLine)
+            typeof(Script), typeof(Position), typeof(Trade), typeof(Settings), typeof(Tool), typeof(Security),
+            typeof(AD), typeof(ATRS), typeof(CCI), typeof(Channel), typeof(CHO), typeof(CMF), typeof(CMO),
+            typeof(CrossMA), typeof(DeMarker), typeof(DPO), typeof(FRC), typeof(MA), typeof(MACD), typeof(MFI),
+            typeof(OBV), typeof(PARS), typeof(ROC), typeof(RSI), typeof(RVI), typeof(Stochastic),
+            typeof(StochRSI), typeof(SumLine)
         },
         SerializeReadOnlyTypes = true,
         PreserveObjectReferences = true

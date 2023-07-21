@@ -5,6 +5,7 @@ using System.Windows.Controls;
 
 namespace ProSystem.Algorithms;
 
+[Serializable]
 public abstract class Script : INotifyPropertyChanged
 {
     protected Order lastExecuted;
@@ -42,9 +43,9 @@ public abstract class Script : INotifyPropertyChanged
         set { infoBlock = value; Notify(); }
     }
 
-    public virtual ObservableCollection<Order> MyOrders { get; set; }
+    public virtual ObservableCollection<Order> MyOrders { get; set; } = new();
 
-    public virtual ObservableCollection<Trade> MyTrades { get; set; }
+    public virtual ObservableCollection<Trade> MyTrades { get; set; } = new();
 
     public Script(string name) => Name = name;
 

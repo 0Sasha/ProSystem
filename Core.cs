@@ -149,14 +149,18 @@ public partial class MainWindow : Window
     }
     private void DeserializeData()
     {
-        try
-        {
-            MySettings = (Settings)MySerializer.Deserialize("Settings", MySettings.GetType());
-            Tools = new ObservableCollection<Tool>((IEnumerable<Tool>)MySerializer.Deserialize("Tools", Tools.GetType()));
-            Portfolio = (UnitedPortfolio)MySerializer.Deserialize("Portfolio", Portfolio.GetType());
-            Trades = new ObservableCollection<Trade>((IEnumerable<Trade>)MySerializer.Deserialize("Trades", Trades.GetType()));
-        }
+        try { MySettings = (Settings)MySerializer.Deserialize("Settings", MySettings.GetType()); }
         catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+
+        try { Tools = new((IEnumerable<Tool>)MySerializer.Deserialize("Tools", Tools.GetType()));}
+        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+
+        try { Portfolio = (UnitedPortfolio)MySerializer.Deserialize("Portfolio", Portfolio.GetType()); }
+        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+
+        try { Trades = new((IEnumerable<Trade>)MySerializer.Deserialize("Trades", Trades.GetType())); }
+        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+
         if (File.Exists(MySerializer.DataDirectory + "/Info.txt"))
         {
             try
