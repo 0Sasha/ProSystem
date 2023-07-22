@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Controls;
 using System.Collections.ObjectModel;
-using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
 using static ProSystem.TXmlConnector;
 
@@ -68,7 +67,7 @@ public partial class Tool
         set
         {
             StopTr = value;
-            if (Active) BrushState = StopTr ? Colors.Orange : Colors.Green;
+            if (Active) BrushState = StopTr ? Theme.Orange : Theme.Green;
             NotifyChanged();
         }
     }
@@ -787,12 +786,12 @@ public partial class Tool
     {
         (MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor =
             NowBidding && (!ShowBasicSecurity || ShowBasicSecurity && BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
-            PlotColors.RedBar : PlotColors.FadedBar;
+            Theme.RedBar : Theme.FadedBar;
         MainModel.InvalidatePlot(false);
 
         Window.Dispatcher.Invoke(() =>
         {
-            BorderState.Background = ReadyToTrade ? Colors.Green : Colors.Orange;
+            BorderState.Background = ReadyToTrade ? Theme.Green : Theme.Orange;
 
             MainBlockInfo.Text = "\nReq " + Math.Round(RubReqs.Item1) + "/" + Math.Round(RubReqs.Item2) +
             "\nVols " + PosVolumes.Item1 + "/" + PosVolumes.Item2 + "\nOrderVols " + OrderVolumes.Item1 + "/" + OrderVolumes.Item2 +
@@ -1107,10 +1106,16 @@ public partial class Tool
             {
                 AddInfo(Name + ": Количество торговых баров больше базисных: " +
                     InitialLength + "/" + MyScript.Result.IsGrow.Length + " Обрезка.", notify: true);
+
                 y = MySecurity.SourceBars.Close.Length - BasicSecurity.SourceBars.Close.Length + 20;
-                MySecurity.SourceBars.TrimBars(y);
+                if (y > -1 && y < MySecurity.SourceBars.DateTime.Length)
+                    MySecurity.SourceBars = Bars.Trim(MySecurity.SourceBars, y);
+                else AddInfo(Name + ": обрезка баров невозможна.");
+
                 y = InitialLength - MyScript.Result.IsGrow.Length;
-                MySecurity.Bars.TrimBars(y);
+                if (y > -1 && y < MySecurity.Bars.DateTime.Length)
+                    MySecurity.Bars = Bars.Trim(MySecurity.Bars, y);
+                else AddInfo(Name + ": обрезка баров невозможна.");
             }
             else AddInfo(Name + ": Количество торговых баров больше базисных: " +
                 InitialLength + "/" + MyScript.Result.IsGrow.Length, notify: true);

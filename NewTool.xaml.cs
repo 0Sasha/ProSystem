@@ -1,6 +1,5 @@
 ﻿using System.Linq;
 using System.Windows;
-using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
 
 namespace ProSystem;

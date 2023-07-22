@@ -153,7 +153,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
     {
         var Assets = new CategoryAxis { Position = AxisPosition.Left };
         var FactVol = new BarSeries { BarWidth = 4, StrokeThickness = 0 };
-        var MaxVol = new BarSeries { FillColor = PlotColors.MaxVolume, StrokeThickness = 0 };
+        var MaxVol = new BarSeries { FillColor = Theme.MaxVolume, StrokeThickness = 0 };
         var Axis = new LinearAxis
         {
             Position = AxisPosition.Bottom,
@@ -183,7 +183,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
                     FactVol.Items.Add(new BarItem
                     {
                         Value = FactReq,
-                        Color = Pos.Saldo - shift > 0 ? PlotColors.LongPosition : PlotColors.ShortPosition
+                        Color = Pos.Saldo - shift > 0 ? Theme.LongPosition : Theme.ShortPosition
                     });
                 }
                 else if (!onlyWithPositions) FactVol.Items.Add(new BarItem { Value = 0 });
@@ -199,8 +199,8 @@ public class UnitedPortfolio : INotifyPropertyChanged
                 });
             }
         }
-        PlotColors.Color(Assets);
-        PlotColors.Color(Axis);
+        Theme.Color(Assets);
+        Theme.Color(Axis);
 
         var Model = new PlotModel();
         Model.Series.Add(MaxVol);
@@ -209,14 +209,14 @@ public class UnitedPortfolio : INotifyPropertyChanged
         Model.Axes.Add(Axis);
         Model.PlotMargins = new OxyThickness(55, 0, 0, 20);
 
-        PlotColors.Color(Model);
+        Theme.Color(Model);
         return Model;
     }
     public PlotModel GetPortfolioPlot()
     {
         var AssetsPorfolio = new CategoryAxis { Position = AxisPosition.Left };
-        var FactVolPorfolio = new BarSeries { BarWidth = 4, FillColor = PlotColors.ShortPosition, StrokeThickness = 0 };
-        var MaxVolPorfolio = new BarSeries { FillColor = PlotColors.MaxVolume, StrokeThickness = 0 };
+        var FactVolPorfolio = new BarSeries { BarWidth = 4, FillColor = Theme.ShortPosition, StrokeThickness = 0 };
+        var MaxVolPorfolio = new BarSeries { FillColor = Theme.MaxVolume, StrokeThickness = 0 };
         var AxisPorfolio = new LinearAxis
         {
             Position = AxisPosition.Bottom,
@@ -233,8 +233,8 @@ public class UnitedPortfolio : INotifyPropertyChanged
         AssetsPorfolio.Labels.Add("Portfolio");
         FactVolPorfolio.Items.Add(new BarItem { Value = ShareInitReqs });
         MaxVolPorfolio.Items.Add(new BarItem { Value = PotentialShareInitReqs });
-        PlotColors.Color(AssetsPorfolio);
-        PlotColors.Color(AxisPorfolio);
+        Theme.Color(AssetsPorfolio);
+        Theme.Color(AxisPorfolio);
 
         var Model = new PlotModel();
         Model.Series.Add(MaxVolPorfolio);
@@ -242,37 +242,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
         Model.Axes.Add(AssetsPorfolio);
         Model.Axes.Add(AxisPorfolio);
         Model.PlotMargins = new OxyThickness(55, 0, 0, 20);
-        PlotColors.Color(Model);
+        Theme.Color(Model);
         return Model;
-    }
-}
-
-[Serializable]
-public class Position
-{
-    public string Market { get; set; }
-    public string MarketName { get; set; }
-    public string Seccode { get; set; }
-    public string ShortName { get; set; }
-    public double SaldoIn { get; set; }
-    public double Saldo { get; set; }
-    public double PL { get; set; } // Прибыль/убыток
-    public double Amount { get; set; } // Текущая оценка стоимости позиции в валюте инструмента (за исключением FORTS)
-    public double Equity { get; set; } // Текущая оценка стоимости позиции в рублях (за исключением FORTS)
-    public Position() { }
-    public Position(string seccode)
-    {
-        Seccode = seccode;
-        Security sec = AllSecurities.SingleOrDefault(x => x.Seccode == Seccode);
-        if (sec != null)
-        {
-            ShortName = sec.ShortName;
-            Market = sec.Market;
-
-            Market market = Markets.SingleOrDefault(x => x.ID == Market);
-            if (market != null) MarketName = market.Name;
-            else AddInfo("Position constructor: Не найден рынок по Market актива.");
-        }
-        else AddInfo("Position constructor: Не найден актив по Seccode позиции.");
     }
 }

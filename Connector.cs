@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
-using ProSystem.Algorithms;
 using static ProSystem.MainWindow;
 
 namespace ProSystem;
@@ -420,19 +419,20 @@ internal static class TXmlConnector
             }
             else if (Section == "client")
             {
+                string id, market;
                 if (XR.GetAttribute("remove") == "false")
                 {
                     if (Clients.SingleOrDefault(x => x.ID == XR.GetAttribute("id")) == null)
-                        Clients.Add(new ClientAccount(XR.GetAttribute("id")));
+                        id = XR.GetAttribute("id");
                     else { AddInfo("Клиент уже есть в коллекции."); XR.Close(); return Section; }
                 }
                 else { Clients.Remove(Clients.Single(x => x.ID == XR.GetAttribute("id"))); XR.Close(); return Section; }
 
                 if (!XR.ReadToFollowing("market")) { AddInfo("client: no market"); XR.Close(); return Section; };
-                XR.Read(); Clients[^1].Market = XR.Value;
+                XR.Read(); market = XR.Value;
 
                 if (!XR.ReadToFollowing("union")) { AddInfo("client: no union"); XR.Close(); return Section; };
-                XR.Read(); Clients[^1].Union = XR.Value;
+                XR.Read(); Clients.Add(new(id, market, XR.Value));
 
                 XR.Close(); return Section;
             }

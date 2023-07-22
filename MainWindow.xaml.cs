@@ -11,8 +11,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using ProSystem.Services;
-using ProSystem.Algorithms;
 using static ProSystem.TXmlConnector;
+using System.Collections;
 
 namespace ProSystem;
 
@@ -257,8 +257,8 @@ public partial class MainWindow : Window
         if (ToolsView.SelectedItem != null)
         {
             int i = Tools.IndexOf(Tools.Single(x => x == ToolsView.SelectedItem));
-            Bars.WriteBars(Tools[i].MySecurity.SourceBars, Tools[i].MySecurity.ShortName);
-            if (Tools[i].BasicSecurity != null) Bars.WriteBars(Tools[i].BasicSecurity.SourceBars, Tools[i].BasicSecurity.ShortName);
+            Bars.Write(Tools[i].MySecurity.SourceBars, Tools[i].MySecurity.ShortName);
+            if (Tools[i].BasicSecurity != null) Bars.Write(Tools[i].BasicSecurity.SourceBars, Tools[i].BasicSecurity.ShortName);
         }
     }
     private async void RemoveToolContext(object sender, RoutedEventArgs e)
@@ -525,10 +525,10 @@ public partial class MainWindow : Window
         Grid ControlGrid3 = new();
         Grid.SetRow(ControlGrid3, 2);
 
-        Border Border = new() { BorderBrush = Colors.Border, BorderThickness = new Thickness(1) };
-        Border Border1 = new() { BorderBrush = Colors.Border, BorderThickness = new Thickness(1) };
+        Border Border = new() { BorderBrush = MainDictionary.Dictionary.txtBorder, BorderThickness = new Thickness(1) };
+        Border Border1 = new() { BorderBrush = MainDictionary.Dictionary.txtBorder, BorderThickness = new Thickness(1) };
         Grid.SetRow(Border1, 1);
-        Border Border2 = new() { BorderBrush = Colors.Border, BorderThickness = new Thickness(1) };
+        Border Border2 = new() { BorderBrush = MainDictionary.Dictionary.txtBorder, BorderThickness = new Thickness(1) };
         Grid.SetRow(Border2, 2);
 
         ControlGrid.Children.Add(ControlGrid1);
@@ -589,7 +589,7 @@ public partial class MainWindow : Window
             Height = 10,
             BorderThickness = new Thickness(0),
             VerticalAlignment = VerticalAlignment.Top,
-            Background = Colors.Orange
+            Background = Theme.Orange
         };
         MyTool.BorderState = BorderState;
 

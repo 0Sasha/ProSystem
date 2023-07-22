@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 
-namespace ProSystem.Algorithms;
+namespace ProSystem;
 
 [Serializable]
 public abstract class Script : INotifyPropertyChanged
@@ -12,7 +12,7 @@ public abstract class Script : INotifyPropertyChanged
     protected PositionType curPosition;
 
     [field: NonSerialized] protected TextBlock infoBlock;
-    [field: NonSerialized] public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+    [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
 
     public virtual string Name { get; set; }
 
@@ -49,12 +49,12 @@ public abstract class Script : INotifyPropertyChanged
 
     public Script(string name) => Name = name;
 
-    public abstract void Initialize(Tool MyTool, TabItem TabTool);
+    public abstract void Initialize(Tool myTool, TabItem tabTool);
 
-    public abstract void Calculate(Security Symbol);
+    public abstract void Calculate(Security symbol);
 
-    public override string ToString() => this.GetType().Name;
+    public override string ToString() => GetType().Name;
 
-    protected void Notify(string propertyName = "") =>
-        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
+    protected virtual void Notify(string propertyName = "") =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
