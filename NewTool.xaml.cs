@@ -180,8 +180,8 @@ public partial class NewTool : Window
                 SelectedTool.MySecurity = AllSecurities.Single(x => x == TradedSecurity);
                 foreach (Script Script in SelectedTool.Scripts)
                 {
-                    Script.MyOrders.Clear();
-                    Script.MyTrades.Clear();
+                    Script.Orders.Clear();
+                    Script.Trades.Clear();
                 }
             }
             if (BasicSecurity == null)

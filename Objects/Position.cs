@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Linq;
-using static ProSystem.MainWindow;
 
 namespace ProSystem;
 
@@ -17,19 +15,11 @@ public class Position
     public double Amount { get; set; } // Текущая оценка стоимости позиции в валюте инструмента (за исключением FORTS)
     public double Equity { get; set; } // Текущая оценка стоимости позиции в рублях (за исключением FORTS)
     public Position() { }
-    public Position(string seccode)
+    public Position(string seccode, string shortName, string market, string marketName)
     {
         Seccode = seccode;
-        Security sec = AllSecurities.SingleOrDefault(x => x.Seccode == Seccode);
-        if (sec != null)
-        {
-            ShortName = sec.ShortName;
-            Market = sec.Market;
-
-            Market market = Markets.SingleOrDefault(x => x.ID == Market);
-            if (market != null) MarketName = market.Name;
-            else AddInfo("Position constructor: Не найден рынок по Market актива.");
-        }
-        else AddInfo("Position constructor: Не найден актив по Seccode позиции.");
+        ShortName = shortName;
+        Market = market;
+        MarketName = marketName;
     }
 }

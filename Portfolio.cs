@@ -30,7 +30,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
             Task.Run(() =>
             {
                 UpdatePositions();
-                NotifyChanged(nameof(InitReqs));
+                Notify(nameof(InitReqs));
             });
         }
     } // Начальные требования
@@ -41,7 +41,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
         {
             minReqs = value;
             ShareMinReqs = Math.Round(minReqs / Saldo * 100, 2);
-            NotifyChanged(nameof(MinReqs));
+            Notify(nameof(MinReqs));
         }
     } // Минимальные требования
     public double Free { get; set; } // Свободные средства
@@ -74,7 +74,9 @@ public class UnitedPortfolio : INotifyPropertyChanged
     public UnitedPortfolio() { }
 
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
-    private void NotifyChanged(string propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private void Notify(string propertyName = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     public void UpdateSharesAndCheck(Tool[] tools, Settings settings)
     {
@@ -136,7 +138,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
     public void UpdateEquity(DateTime dateTimeOpenPeriod)
     {
         Equity[dateTimeOpenPeriod] = (int)Portfolio.Saldo;
-        NotifyChanged();
+        Notify();
     }
     public bool CheckEquity(int toleranceEquity)
     {

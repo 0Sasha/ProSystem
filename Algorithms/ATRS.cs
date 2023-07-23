@@ -53,7 +53,7 @@ internal class ATRS : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] StopATR = Indicators.ATRLine(iBars.High, iBars.Low, iBars.Close, Period, Mult, PeriodEx, Correction, Symbol.Decimals);
         StopATR = Indicators.Synchronize(StopATR, iBars, Symbol.Bars);
 

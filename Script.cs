@@ -43,13 +43,13 @@ public abstract class Script : INotifyPropertyChanged
         set { infoBlock = value; Notify(); }
     }
 
-    public virtual ObservableCollection<Order> MyOrders { get; set; } = new();
+    public virtual ObservableCollection<Order> Orders { get; set; } = new();
 
-    public virtual ObservableCollection<Trade> MyTrades { get; set; } = new();
+    public virtual ObservableCollection<Trade> Trades { get; set; } = new();
 
     public Script(string name) => Name = name;
 
-    public abstract void Initialize(Tool myTool, TabItem tabTool);
+    public abstract void Initialize(Tool tool, TabItem tabTool);
 
     public abstract void Calculate(Security symbol);
 

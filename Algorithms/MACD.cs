@@ -54,7 +54,7 @@ internal class MACD : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] MACDLine = Indicators.MACD(iBars.Close, Period, Period * Mult);
         double[] SignalLine = Indicators.EMA(MACDLine, (int)(Period * 0.75));
         MACDLine = Indicators.Synchronize(MACDLine, iBars, Symbol.Bars);

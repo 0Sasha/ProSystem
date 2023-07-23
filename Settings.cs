@@ -3,6 +3,7 @@ using System.Linq;
 using System.ComponentModel;
 using System.Collections.Generic;
 using static ProSystem.MainWindow;
+
 namespace ProSystem;
 
 [Serializable]
@@ -35,11 +36,9 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("ModelUpdateInterval должен быть от 1 до 600.");
                 if (UpdInt is < 1 or > 600) UpdInt = 5;
-                NotifyChanged();
-                return;
             }
-            UpdInt = value;
-            NotifyChanged();
+            else UpdInt = value;
+            Notify();
         }
     } // Интервал обновления моделей
     public int RecalcInterval
@@ -51,12 +50,9 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("RecalcInterval должен быть от 5 до 120.");
                 if (RecInt is < 5 or > 120) RecInt = 30;
-                NotifyChanged();
-                return;
             }
-            RecInt = value;
-            if (RecInt > 60) AddInfo("RecalcInterval более 60 секнуд.");
-            NotifyChanged();
+            else RecInt = value;
+            Notify();
         }
     } // Интервал пересчёта скриптов
     public bool ScheduledConnection
@@ -66,7 +62,7 @@ public class Settings : INotifyPropertyChanged
         {
             SchedCon = value;
             if (!SchedCon) AddInfo("Подключение по расписанию отключено.");
-            NotifyChanged();
+            Notify();
         }
     } // Подключение по расписанию
 
@@ -86,11 +82,9 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("RequestTM должен быть от 5 до 30.");
                 if (ReqTM is < 5 or > 30) ReqTM = 15;
-                NotifyChanged();
-                return;
             }
-            ReqTM = value;
-            NotifyChanged();
+            else ReqTM = value;
+            Notify();
         }
     } // Таймаут на выполнение запроса (20 по умолчанию)
     public int SessionTM
@@ -102,11 +96,9 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("SessionTM должен быть от 40 до 300.");
                 if (SesTM is < 40 or > 300) SesTM = 180;
-                NotifyChanged();
-                return;
             }
-            SesTM = value;
-            NotifyChanged();
+            else SesTM = value;
+            Notify();
         }
     } // Таймаут на переподключение к серверу без повторной закачки данных (120 по умолчанию)
 
@@ -122,12 +114,10 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("ToleranceEquity должно быть от 5% до 300%.");
                 if (TolEq is < 5 or > 300) TolEq = 40;
-                NotifyChanged();
-                return;
             }
-            TolEq = value;
+            else TolEq = value;
             if (TolEq > 50) AddInfo("ToleranceEquity более 50% от среднего значения.");
-            NotifyChanged();
+            Notify();
         }
     } // Допустимое отклонение стоимости портфеля в % от среднего значения
     public int TolerancePosition
@@ -139,12 +129,9 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("TolerancePosition должно быть от 1x до 5x.");
                 if (TolPos is < 1 or > 5) TolPos = 3;
-                NotifyChanged();
-                return;
             }
-            TolPos = value;
-            if (TolPos > 3) AddInfo("TolerancePosition более 3x.");
-            NotifyChanged();
+            else TolPos = value;
+            Notify();
         }
     } // Допустимое отклонение объёма текущей позиции в X от рассчитанного объёма
 
@@ -153,9 +140,13 @@ public class Settings : INotifyPropertyChanged
         get => OptShBasAssets;
         set
         {
-            if (value is < 1 or > 150) AddInfo("OptShareBaseBalances должна быть от 1% до 150%.");
+            if (value is < 1 or > 150)
+            {
+                AddInfo("OptShareBaseBalances должна быть от 1% до 150%.");
+                if (OptShBasAssets is < 1 or > 150) OptShBasAssets = 90;
+            }
             else OptShBasAssets = value;
-            NotifyChanged();
+            Notify();
         }
     } // Оптимальная доля базовых активов (балансов) в портфеле
     public int ToleranceBaseAssets
@@ -165,7 +156,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 1 or > 150) AddInfo("ToleranceBaseBalances должно быть от 1% до 150%.");
             else TolBasAssets = value;
-            NotifyChanged();
+            Notify();
         }
     } // Допустимое отклонение доли базовых активов (балансов) от оптимального значения
 
@@ -178,12 +169,10 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("MaxShareInitReqsPosition должна быть от 1% до 50%.");
                 if (MaxShInRePos is < 1 or > 50) MaxShInRePos = 15;
-                NotifyChanged();
-                return;
             }
-            MaxShInRePos = value;
+            else MaxShInRePos = value;
             if (MaxShInRePos > 15) AddInfo("MaxShareInitReqsPosition более 15%.");
-            NotifyChanged();
+            Notify();
         }
     } // Максимальная доля начальных требований позиции (без учёта смещения баланса)
     public int MaxShareInitReqsTool
@@ -195,12 +184,10 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("MaxShareInitReqsTool должна быть от 1% до 150%.");
                 if (MaxShInReTool is < 1 or > 150) MaxShInReTool = 25;
-                NotifyChanged();
-                return;
             }
-            MaxShInReTool = value;
+            else MaxShInReTool = value;
             if (MaxShInReTool > 35) AddInfo("MaxShareInitReqsTool более 35%.");
-            NotifyChanged();
+            Notify();
         }
     } // Максимальная доля начальных требований инструмента (с учётом смещения баланса)
 
@@ -213,12 +200,10 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("MaxShareMinReqsPortfolio должна быть от 10% до 95%.");
                 if (MaxShMinRePort is < 10 or > 95) MaxShMinRePort = 60;
-                NotifyChanged();
-                return;
             }
-            MaxShMinRePort = value;
+            else MaxShMinRePort = value;
             if (MaxShMinRePort > 70) AddInfo("MaxShareMinReqsPortfolio более 70%.");
-            NotifyChanged();
+            Notify();
         }
     } // Максимальная доля минимальных требований портфеля
     public int MaxShareInitReqsPortfolio
@@ -230,12 +215,10 @@ public class Settings : INotifyPropertyChanged
             {
                 AddInfo("MaxShareInitReqsPortfolio должна быть от 10% до 200%.");
                 if (MaxShInRePort is < 10 or > 200) MaxShInRePort = 85;
-                NotifyChanged();
-                return;
             }
-            MaxShInRePort = value;
+            else MaxShInRePort = value;
             if (MaxShInRePort > 90) AddInfo("MaxShareInitReqsPortfolio более 90%.");
-            NotifyChanged();
+            Notify();
         }
     } // Максимальная доля начальных требований портфеля
 
@@ -244,8 +227,12 @@ public class Settings : INotifyPropertyChanged
     public int ShelfLifeTradesScripts { get; set; } = 180; // Срок хранения сделок скриптов (в днях)
 
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
-    private void NotifyChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
+
+    private void Notify(string propertyName = "") =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
     public Settings() { }
+
     public void Check(IEnumerable<Tool> tools)
     {
         ModelUpdateInterval = UpdInt;

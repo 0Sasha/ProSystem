@@ -54,7 +54,7 @@ internal class ROC : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] ROC = Indicators.ROC(iBars.Close, Period);
         ROC = Indicators.Synchronize(ROC, iBars, Symbol.Bars);
 

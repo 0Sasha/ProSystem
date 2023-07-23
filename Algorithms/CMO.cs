@@ -54,7 +54,7 @@ internal class CMO : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] CMO = Indicators.CMO(iBars.Close, Period);
         CMO = Indicators.Synchronize(CMO, iBars, Symbol.Bars);
 

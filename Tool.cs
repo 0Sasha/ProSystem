@@ -222,12 +222,12 @@ public partial class Tool : INotifyPropertyChanged
         if (updateBasicSecurity)
         {
             if (BasicSecurity.SourceBars.TF == BaseTF) BasicSecurity.Bars = BasicSecurity.SourceBars;
-            else BasicSecurity.Bars = Bars.Compress(BasicSecurity.SourceBars, BaseTF);
+            else BasicSecurity.Bars = BasicSecurity.SourceBars.Compress(BaseTF);
         }
         else
         {
             if (MySecurity.SourceBars.TF == BaseTF) MySecurity.Bars = MySecurity.SourceBars;
-            else MySecurity.Bars = Bars.Compress(MySecurity.SourceBars, BaseTF);
+            else MySecurity.Bars = MySecurity.SourceBars.Compress(BaseTF);
         }
     }
     public async void ReloadBars()

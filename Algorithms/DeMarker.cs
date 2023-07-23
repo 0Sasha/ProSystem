@@ -54,7 +54,7 @@ internal class DeMarker : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] DeM = Indicators.DeMarker(iBars.High, iBars.Low, Period);
         DeM = Indicators.Synchronize(DeM, iBars, Symbol.Bars);
 

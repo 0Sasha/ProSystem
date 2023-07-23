@@ -342,31 +342,31 @@ public partial class MainWindow : Window
             if (Connection != ConnectionState.Connected) return;
             for (int j = 0; j < Tools[i].Scripts.Length; j++)
             {
-                for (int k = 0; k < Tools[i].Scripts[j].MyOrders.Count; k++)
+                for (int k = 0; k < Tools[i].Scripts[j].Orders.Count; k++)
                 {
-                    if (Tools[i].Scripts[j].MyOrders[k].DateTime.Date >= DateTime.Now.Date.AddDays(-3) ||
-                        Tools[i].Scripts[j].MyOrders[k].Status == "active" || Tools[i].Scripts[j].MyOrders[k].Status == "watching")
+                    if (Tools[i].Scripts[j].Orders[k].DateTime.Date >= DateTime.Now.Date.AddDays(-3) ||
+                        Tools[i].Scripts[j].Orders[k].Status == "active" || Tools[i].Scripts[j].Orders[k].Status == "watching")
                     {
                         // Поиск заявки скрипта в коллекции всех заявок торговой сессии
-                        if (Tools[i].Scripts[j].MyOrders[k].OrderNo == 0)
-                            x = Array.FindIndex(Orders.ToArray(), x => x.TrID == Tools[i].Scripts[j].MyOrders[k].TrID);
-                        else x = Array.FindIndex(Orders.ToArray(), x => x.OrderNo == Tools[i].Scripts[j].MyOrders[k].OrderNo);
+                        if (Tools[i].Scripts[j].Orders[k].OrderNo == 0)
+                            x = Array.FindIndex(Orders.ToArray(), x => x.TrID == Tools[i].Scripts[j].Orders[k].TrID);
+                        else x = Array.FindIndex(Orders.ToArray(), x => x.OrderNo == Tools[i].Scripts[j].Orders[k].OrderNo);
 
                         // Обновление свойств заявки из коллекции всех заявок и приведение обеих заявок к одному объекту
                         if (x > -1)
                         {
-                            if (Orders[x].Status == Tools[i].Scripts[j].MyOrders[k].Status)
-                                Orders[x].DateTime = Tools[i].Scripts[j].MyOrders[k].DateTime;
-                            Orders[x].Sender = Tools[i].Scripts[j].MyOrders[k].Sender;
-                            Orders[x].Signal = Tools[i].Scripts[j].MyOrders[k].Signal;
-                            Orders[x].Note = Tools[i].Scripts[j].MyOrders[k].Note;
-                            Dispatcher.Invoke(() => Tools[i].Scripts[j].MyOrders[k] = Orders[x]);
+                            if (Orders[x].Status == Tools[i].Scripts[j].Orders[k].Status)
+                                Orders[x].DateTime = Tools[i].Scripts[j].Orders[k].DateTime;
+                            Orders[x].Sender = Tools[i].Scripts[j].Orders[k].Sender;
+                            Orders[x].Signal = Tools[i].Scripts[j].Orders[k].Signal;
+                            Orders[x].Note = Tools[i].Scripts[j].Orders[k].Note;
+                            Dispatcher.Invoke(() => Tools[i].Scripts[j].Orders[k] = Orders[x]);
                         }
-                        else if (Tools[i].Scripts[j].MyOrders[k].Status == "watching" || Tools[i].Scripts[j].MyOrders[k].Status == "active" &&
+                        else if (Tools[i].Scripts[j].Orders[k].Status == "watching" || Tools[i].Scripts[j].Orders[k].Status == "active" &&
                             DateTime.Today.DayOfWeek != DayOfWeek.Saturday && DateTime.Today.DayOfWeek != DayOfWeek.Sunday)
                         {
-                            Tools[i].Scripts[j].MyOrders[k].Status = "lost";
-                            Tools[i].Scripts[j].MyOrders[k].DateTime = DateTime.Now.AddDays(-2);
+                            Tools[i].Scripts[j].Orders[k].Status = "lost";
+                            Tools[i].Scripts[j].Orders[k].DateTime = DateTime.Now.AddDays(-2);
                             AddInfo("PrepareToTrading: " + Tools[i].Scripts[j].Name + ": Активная заявка не актуальна. Статус обновлён.");
                         }
                     }

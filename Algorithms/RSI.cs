@@ -54,7 +54,7 @@ internal class RSI : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] RSI = Indicators.RSI(iBars.Close, Period);
         RSI = Indicators.Synchronize(RSI, iBars, Symbol.Bars);
 

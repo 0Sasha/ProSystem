@@ -848,7 +848,7 @@ internal static class TXmlConnector
                 Position pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
                 if (pos == null)
                 {
-                    pos = new(xr.Value);
+                    pos = CreatePosition(xr.Value);
                     portfolio.Positions.Add(pos);
                 }
 
@@ -991,6 +991,17 @@ internal static class TXmlConnector
             }
         }
     }
+    private static Position CreatePosition(string seccode)
+    {
+        var sec = AllSecurities.SingleOrDefault(x => x.Seccode == seccode);
+        if (sec != null)
+        {
+            var market = Markets.SingleOrDefault(x => x.ID == sec.Market);
+            if (market != null) return new(seccode, sec.ShortName, sec.Market, market.Name);
+            else throw new ArgumentException("Не найден рынок по Market актива.");
+        }
+        else throw new ArgumentException("Не найден актив по Seccode позиции.");
+    }
     private static void ProcessPortfolio(XmlReader xr, UnitedPortfolio portfolio)
     {
         portfolio.Union = xr.GetAttribute("union");
@@ -1050,7 +1061,7 @@ internal static class TXmlConnector
             Position pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
             if (pos == null)
             {
-                pos = new Position(xr.Value);
+                pos = CreatePosition(xr.Value);
                 portfolio.Positions.Add(pos);
             }
 
@@ -1195,7 +1206,7 @@ internal static class TXmlConnector
                 int id = int.Parse(XR.GetAttribute("transactionid"), IC);
                 Window.Dispatcher.Invoke(() =>
                 {
-                    if (Sender != null) Sender.MyOrders.Add(new Order(id, Sender.Name, Signal, Note));
+                    if (Sender != null) Sender.Orders.Add(new Order(id, Sender.Name, Signal, Note));
                     else SystemOrders.Add(new Order(id, SenderName, Signal, Note));
                 });
 

@@ -62,7 +62,7 @@ internal class Channel : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] Line;
         if (NameMA == NameMA.SMA) Line = Indicators.SMA(iBars.Close, Period);
         else if (NameMA == NameMA.WMA) Line = Indicators.WMA(iBars.Close, Period);

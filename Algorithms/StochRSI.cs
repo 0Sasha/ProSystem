@@ -54,7 +54,7 @@ internal class StochRSI : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] StochRSI = Indicators.StochRSI(iBars.Close, Period);
         StochRSI = Indicators.Synchronize(StochRSI, iBars, Symbol.Bars);
 

@@ -195,7 +195,8 @@ public partial class Tool
             if (!CancelUnknownsOrders()) return;
             if (ReadyToTrade)
             {
-                foreach (Script MyScript in Scripts) MyScript.UpdateOrdersAndPosition();
+                foreach (Script MyScript in Scripts)
+                    MyScript.UpdateOrdersAndPosition(CancelOrder, (x) => AddInfo(x));
                 if (!CheckPositionMatching(Balance, PosVolumes, NowBidding, NormalPrice)) return;
                 NormalizePosition(Balance, PosVolumes, ClearVolumes, NowBidding);
             }
@@ -206,7 +207,7 @@ public partial class Tool
         foreach (Script MyScript in Scripts)
         {
             // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
-            if (!MyScript.UpdateOrdersAndPosition()) continue;
+            if (!MyScript.UpdateOrdersAndPosition(CancelOrder, (x) => AddInfo(x))) continue;
             MyScript.Calculate(BasicSymbol);
 
             // Обновление моделей, информационной панели скрипта и логирование
@@ -233,14 +234,14 @@ public partial class Tool
         {
             foreach (Script MyScript in Scripts)
             {
-                int i = Array.FindIndex(MyScript.MyOrders.ToArray(), x => x.TrID == UnknowOrder.TrID);
+                int i = Array.FindIndex(MyScript.Orders.ToArray(), x => x.TrID == UnknowOrder.TrID);
                 if (i > -1)
                 {
-                    if (UnknowOrder.Status == MyScript.MyOrders[i].Status) UnknowOrder.DateTime = MyScript.MyOrders[i].DateTime;
-                    UnknowOrder.Sender = MyScript.MyOrders[i].Sender;
-                    UnknowOrder.Signal = MyScript.MyOrders[i].Signal;
-                    UnknowOrder.Note = MyScript.MyOrders[i].Note;
-                    Window.Dispatcher.Invoke(() => MyScript.MyOrders[i] = UnknowOrder);
+                    if (UnknowOrder.Status == MyScript.Orders[i].Status) UnknowOrder.DateTime = MyScript.Orders[i].DateTime;
+                    UnknowOrder.Sender = MyScript.Orders[i].Sender;
+                    UnknowOrder.Signal = MyScript.Orders[i].Signal;
+                    UnknowOrder.Note = MyScript.Orders[i].Note;
+                    Window.Dispatcher.Invoke(() => MyScript.Orders[i] = UnknowOrder);
                     break;
                 }
             }
@@ -263,13 +264,13 @@ public partial class Tool
         {
             foreach (Script MyScript in Scripts)
             {
-                int i = Array.FindIndex(MyScript.MyOrders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
+                int i = Array.FindIndex(MyScript.Orders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
                 if (i > -1)
                 {
-                    UnknowTrade.SenderOrder = MyScript.MyOrders[i].Sender;
-                    UnknowTrade.SignalOrder = MyScript.MyOrders[i].Signal;
-                    UnknowTrade.NoteOrder = MyScript.MyOrders[i].Note;
-                    Window.Dispatcher.Invoke(() => MyScript.MyTrades.Add(UnknowTrade));
+                    UnknowTrade.SenderOrder = MyScript.Orders[i].Sender;
+                    UnknowTrade.SignalOrder = MyScript.Orders[i].Signal;
+                    UnknowTrade.NoteOrder = MyScript.Orders[i].Note;
+                    Window.Dispatcher.Invoke(() => MyScript.Trades.Add(UnknowTrade));
                     break;
                 }
             }
@@ -589,7 +590,7 @@ public partial class Tool
 
             foreach (Script MyScript in Scripts)
             {
-                Order LastExecuted = MyScript.MyOrders.LastOrDefault(x => x.Status == "matched");
+                Order LastExecuted = MyScript.Orders.LastOrDefault(x => x.Status == "matched");
                 if (LastExecuted != null &&
                     (LastExecuted.DateTime.AddDays(4) > DateTime.Now || Balance > 0 == MySecurity.Bars.Close[^2] < LastExecuted.Price))
                 {
@@ -1082,7 +1083,7 @@ public partial class Tool
 
             if (!ShowBasicSecurity)
             {
-                Trade[] MyTrades = MyScript.MyTrades.ToArray()
+                Trade[] MyTrades = MyScript.Trades.ToArray()
                     .Concat(SystemTrades.ToArray().Where(x => x.Seccode == MySecurity.Seccode)).ToArray();
                 Order[] MyOrders =
                     Orders.ToArray().Where(x => x.Seccode == MySecurity.Seccode && x.Status is "active" or "watching").ToArray();
@@ -1109,12 +1110,12 @@ public partial class Tool
 
                 y = MySecurity.SourceBars.Close.Length - BasicSecurity.SourceBars.Close.Length + 20;
                 if (y > -1 && y < MySecurity.SourceBars.DateTime.Length)
-                    MySecurity.SourceBars = Bars.Trim(MySecurity.SourceBars, y);
+                    MySecurity.SourceBars = MySecurity.SourceBars.Trim(y);
                 else AddInfo(Name + ": обрезка баров невозможна.");
 
                 y = InitialLength - MyScript.Result.IsGrow.Length;
                 if (y > -1 && y < MySecurity.Bars.DateTime.Length)
-                    MySecurity.Bars = Bars.Trim(MySecurity.Bars, y);
+                    MySecurity.Bars = MySecurity.Bars.Trim(y);
                 else AddInfo(Name + ": обрезка баров невозможна.");
             }
             else AddInfo(Name + ": Количество торговых баров больше базисных: " +
@@ -1141,34 +1142,4 @@ public partial class Tool
         catch (Exception e) { AddInfo(Name + ": Исключение логирования скрипта: " + e.Message); }
     }
     #endregion
-}
-public static class Extensions
-{
-    public static bool UpdateOrdersAndPosition(this Script MyScript)
-    {
-        MyScript.LastExecuted = MyScript.MyOrders.ToArray().LastOrDefault(x => x.Status == "matched" && x.Note != "NM");
-        Order[] ActiveOrders =
-            Orders.ToArray().Where(x => x.Sender == MyScript.Name && (x.Status is "active" or "watching")).ToArray();
-
-        if (ActiveOrders.Length <= 1) MyScript.ActiveOrder = ActiveOrders.SingleOrDefault();
-        else
-        {
-            MyScript.ActiveOrder = null;
-            AddInfo(MyScript.Name + ": Отмена активных заявок скрипта: " + ActiveOrders.Length);
-            foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
-
-            Thread.Sleep(500);
-            if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-            Thread.Sleep(1000);
-            if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-            Thread.Sleep(1500);
-            if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-            AddInfo(MyScript.Name + ": Не удалось вовремя отменить активные заявки.");
-            return false;
-        }
-        return true;
-    }
 }

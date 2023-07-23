@@ -55,7 +55,7 @@ internal class MA : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] MA;
         if (NameMA == NameMA.SMA) MA = Indicators.SMA(iBars.Close, Period);
         else if (NameMA == NameMA.EMA) MA = Indicators.EMA(iBars.Close, Period);

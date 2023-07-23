@@ -54,7 +54,7 @@ internal class RVI : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] RVI = Indicators.RVI(iBars.Open, iBars.High, iBars.Low, iBars.Close, Period);
         RVI = Indicators.Synchronize(RVI, iBars, Symbol.Bars);
 

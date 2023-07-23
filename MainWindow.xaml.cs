@@ -75,25 +75,25 @@ public partial class MainWindow : Window
         {
             for (j = 0; j < Tools[i].Scripts.Length; j++)
             {
-                for (k = 0; k < Tools[i].Scripts[j].MyOrders.Count; k++)
+                for (k = 0; k < Tools[i].Scripts[j].Orders.Count; k++)
                 {
-                    if (Tools[i].Scripts[j].MyOrders[k].DateTime.Date < DateTime.Today.AddDays(-MySettings.ShelfLifeOrdersScripts)) continue;
+                    if (Tools[i].Scripts[j].Orders[k].DateTime.Date < DateTime.Today.AddDays(-MySettings.ShelfLifeOrdersScripts)) continue;
                     else break;
                 }
                 if (k > 0)
                 {
-                    Tools[i].Scripts[j].MyOrders = new ObservableCollection<Order>(Tools[i].Scripts[j].MyOrders.ToArray()[k..]);
+                    Tools[i].Scripts[j].Orders = new ObservableCollection<Order>(Tools[i].Scripts[j].Orders.ToArray()[k..]);
                     AddInfo("ClearOutdatedData: удалены устаревшие заявки скрипта: " + Tools[i].Scripts[j].Name);
                 }
 
-                for (k = 0; k < Tools[i].Scripts[j].MyTrades.Count; k++)
+                for (k = 0; k < Tools[i].Scripts[j].Trades.Count; k++)
                 {
-                    if (Tools[i].Scripts[j].MyTrades[k].DateTime.Date < DateTime.Today.AddDays(-MySettings.ShelfLifeTradesScripts)) continue;
+                    if (Tools[i].Scripts[j].Trades[k].DateTime.Date < DateTime.Today.AddDays(-MySettings.ShelfLifeTradesScripts)) continue;
                     else break;
                 }
                 if (k > 0)
                 {
-                    Tools[i].Scripts[j].MyTrades = new ObservableCollection<Trade>(Tools[i].Scripts[j].MyTrades.ToArray()[k..]);
+                    Tools[i].Scripts[j].Trades = new ObservableCollection<Trade>(Tools[i].Scripts[j].Trades.ToArray()[k..]);
                     AddInfo("ClearOutdatedData: удалены устаревшие сделки скрипта: " + Tools[i].Scripts[j].Name);
                 }
             }
@@ -257,8 +257,8 @@ public partial class MainWindow : Window
         if (ToolsView.SelectedItem != null)
         {
             int i = Tools.IndexOf(Tools.Single(x => x == ToolsView.SelectedItem));
-            Bars.Write(Tools[i].MySecurity.SourceBars, Tools[i].MySecurity.ShortName);
-            if (Tools[i].BasicSecurity != null) Bars.Write(Tools[i].BasicSecurity.SourceBars, Tools[i].BasicSecurity.ShortName);
+            Tools[i].MySecurity.SourceBars.Write(Tools[i].MySecurity.ShortName);
+            Tools[i].BasicSecurity?.SourceBars.Write(Tools[i].BasicSecurity.ShortName);
         }
     }
     private async void RemoveToolContext(object sender, RoutedEventArgs e)
@@ -343,14 +343,14 @@ public partial class MainWindow : Window
                 try
                 {
                     Tool MyTool = Tools.Single(x => x.MySecurity.Seccode == MyOrder.Seccode);
-                    if (MyOrder.Sender != null) MyTool.Scripts.Single(x => x.Name == MyOrder.Sender).MyOrders.Remove(MyOrder);
+                    if (MyOrder.Sender != null) MyTool.Scripts.Single(x => x.Name == MyOrder.Sender).Orders.Remove(MyOrder);
                     else
                     {
                         foreach (Script MyScript in MyTool.Scripts)
                         {
-                            if (MyScript.MyOrders.Contains(MyOrder))
+                            if (MyScript.Orders.Contains(MyOrder))
                             {
-                                MyScript.MyOrders.Remove(MyOrder);
+                                MyScript.Orders.Remove(MyOrder);
                                 return;
                             }
                         }
@@ -365,7 +365,7 @@ public partial class MainWindow : Window
                 {
                     if (MyTool.Scripts.SingleOrDefault(x => x.Name == MyOrder.Sender) != null)
                     {
-                        if (MyTool.Scripts.Single(x => x.Name == MyOrder.Sender).MyOrders.Remove(MyOrder)) return;
+                        if (MyTool.Scripts.Single(x => x.Name == MyOrder.Sender).Orders.Remove(MyOrder)) return;
                         else break;
                     }
                 }
@@ -391,7 +391,7 @@ public partial class MainWindow : Window
                 try
                 {
                     Tools.Single(x => x.MySecurity.Seccode == MyTrade.Seccode).Scripts.Single
-                        (x => x.Name == MyTrade.SenderOrder).MyTrades.Remove(MyTrade);
+                        (x => x.Name == MyTrade.SenderOrder).Trades.Remove(MyTrade);
                 }
                 catch (Exception ex) { AddInfo("Исключение во время попытки удаления сделки: " + ex.Message); }
             }
@@ -401,7 +401,7 @@ public partial class MainWindow : Window
                 {
                     if (MyTool.Scripts.SingleOrDefault(x => x.Name == MyTrade.SenderOrder) != null)
                     {
-                        if (MyTool.Scripts.Single(x => x.Name == MyTrade.SenderOrder).MyTrades.Remove(MyTrade)) return;
+                        if (MyTool.Scripts.Single(x => x.Name == MyTrade.SenderOrder).Trades.Remove(MyTrade)) return;
                         else break;
                     }
                 }
@@ -690,11 +690,11 @@ public partial class MainWindow : Window
         if (ComboBoxTool.SelectedIndex > -1 && ComboBoxScript.SelectedIndex > -1)
         {
             OrdersInfo.ItemsSource =
-                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).MyOrders;
+                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).Orders;
             OrdersInfo.Items.Refresh();
 
             TradesInfo.ItemsSource =
-                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).MyTrades;
+                (ComboBoxTool.SelectedItem as Tool).Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).Trades;
             TradesInfo.Items.Refresh();
         }
     }

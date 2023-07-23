@@ -61,7 +61,7 @@ internal class AD : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] Upper = null, Lower = null, MA = null;
         double[] AD = Indicators.AD(iBars.High, iBars.Low, iBars.Close, iBars.Volume);
 

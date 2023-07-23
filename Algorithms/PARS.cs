@@ -39,7 +39,7 @@ internal class PARS : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] PARStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, Symbol.Decimals);
         PARStop = Indicators.Synchronize(PARStop, iBars, Symbol.Bars);
 

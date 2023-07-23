@@ -54,7 +54,7 @@ internal class Stochastic : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] Stoch = Indicators.Stochastic(iBars.High, iBars.Low, iBars.Close, Period);
         Stoch = Indicators.Synchronize(Stoch, iBars, Symbol.Bars);
 

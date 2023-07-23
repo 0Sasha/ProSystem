@@ -54,7 +54,7 @@ internal class MFI : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         double[] MFI = Indicators.MFI(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period);
         MFI = Indicators.Synchronize(MFI, iBars, Symbol.Bars);
 

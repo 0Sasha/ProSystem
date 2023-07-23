@@ -61,7 +61,7 @@ internal class CHO : Script
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Bars.Compress(Symbol.Bars, IndicatorTF);
+        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
         bool OneLevel = PeriodEx < 1;
         double[] Upper = null, Lower = null, SignalLine = null;
         double[] CHO = Indicators.CHO(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period, Period * 3 + 1);
