@@ -11,7 +11,7 @@ internal class DCSerializer : Serializer
 {
     private int busyMethod;
     private string directory;
-    private Action<string> inform;
+    private readonly Action<string> Inform;
     private readonly DataContractSerializerSettings settings = new()
     {
         KnownTypes = new Type[]
@@ -25,12 +25,6 @@ internal class DCSerializer : Serializer
         SerializeReadOnlyTypes = true,
         PreserveObjectReferences = true
     };
-
-    public override Action<string> Inform
-    {
-        get => inform;
-        set => inform = value ?? throw new ArgumentNullException(nameof(value));
-    }
 
     public override string DataDirectory
     {

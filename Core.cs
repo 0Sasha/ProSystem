@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     public static Serializer MySerializer { get; set; }
     public static Notifier MyNotifier { get; set; }
     public static UnitedPortfolio Portfolio { get; set; } = new();
+    public static IPortfolioManager MyPortfolioManager { get; set; }
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
     public static ConnectionState Connection
@@ -124,13 +125,16 @@ public partial class MainWindow : Window
         // Восстановление данных и проверка настроек
         MySerializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         DeserializeData();
+
         MySettings.Check(Tools);
         if (MySettings.EmailPassword != null) MyNotifier = new EmailNotifier(587,
             "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
+        MyPortfolioManager = new PortfolioManager(Portfolio, (info) => AddInfo(info, true, true));
 
         // Привязка данных и восстановление вкладок инструментов
         BindData();
         RestoreToolTabs();
+        Portfolio.PropertyChanged += UpdatePortfolio;
         Portfolio.PropertyChanged += SaveData;
         Tools.CollectionChanged += UpdateTools;
         Orders.CollectionChanged += UpdateOrders;
@@ -481,9 +485,9 @@ public partial class MainWindow : Window
                     {
                         Logger.StopLogging();
                         Logger.StartLogging();
-                        Portfolio.UpdateEquity(DateTime.Today.AddDays(-1));
-                        Portfolio.CheckEquity(MySettings.ToleranceEquity);
-                        Portfolio.ClearOldPositions();
+                        MyPortfolioManager.UpdateEquity();
+                        MyPortfolioManager.CheckEquity(MySettings);
+                        MyPortfolioManager.UpdatePositions();
                         _ = ArchiveFiles("Logs/Transaq",
                             DateTime.Now.AddDays(-1).ToString("yyyyMMdd"), DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
                         _ = ArchiveFiles("Data", ".xml", "Data", false);
@@ -561,7 +565,8 @@ public partial class MainWindow : Window
             double MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
             if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs)
             {
-                Portfolio.UpdateSharesAndCheck(MyTools, MySettings);
+                MyPortfolioManager.UpdateShares(MyTools);
+                MyPortfolioManager.CheckShares(MySettings);
                 return;
             }
 

@@ -386,7 +386,7 @@ public partial class Tool
     private static void CheckPortfolio(ref bool ReadyToTrade)
     {
         if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-        if (!Portfolio.CheckEquity(MySettings.ToleranceEquity)) ReadyToTrade = false;
+        if (!MyPortfolioManager.CheckEquity(MySettings)) ReadyToTrade = false;
     }
 
     private (double, double) GetAndCheckRubReqs(ref bool ReadyToTrade)

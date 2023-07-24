@@ -180,7 +180,17 @@ public partial class MainWindow : Window
             return false;
         }
     }
-
+    public void UpdatePortfolio(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == "Positions")
+        {
+            Window.Dispatcher.Invoke(() =>
+            {
+                Window.PortfolioView.ItemsSource = Portfolio.AllPositions;
+                Window.PortfolioView.ScrollIntoView(this);
+            });
+        }
+    }
     private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
     {
         ToolsView.Items.Refresh();
@@ -413,7 +423,7 @@ public partial class MainWindow : Window
     {
         OrdersView.Items.Refresh();
         TradesView.Items.Refresh();
-        Task.Run(() => Portfolio.UpdatePositions());
+        Task.Run(() => MyPortfolioManager.UpdatePositions());
     }
 
     private void ClearInfo(object sender, RoutedEventArgs e) => TxtBox.Clear();
@@ -710,11 +720,12 @@ public partial class MainWindow : Window
     {
         if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
 
-        DistributionPlot.Model = Portfolio.GetDistributionPlot(Tools,
-            (string)ComboBoxDistrib.SelectedItem, (bool)OnlyPosCheckBox.IsChecked, (bool)ExcludeBaseCheckBox.IsChecked);
+        DistributionPlot.Model = Tools.GetPlot(Portfolio.Positions, Portfolio.Saldo,
+            (string)ComboBoxDistrib.SelectedItem, (bool)OnlyPosCheckBox.IsChecked,
+            (bool)ExcludeBaseCheckBox.IsChecked);
         DistributionPlot.Controller ??= Tool.GetController();
 
-        PortfolioPlot.Model = Portfolio.GetPortfolioPlot();
+        PortfolioPlot.Model = Portfolio.GetPlot();
         PortfolioPlot.Controller ??= Tool.GetController();
     }
 
