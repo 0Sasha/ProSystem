@@ -9,12 +9,12 @@ using System.Linq;
 
 namespace ProSystem.Services;
 
-internal class EmailNotifier : Notifier
+internal class EmailNotifier : INotifier
 {
     private string host;
     private string email;
     private string password;
-    private Action<string> inform;
+    private readonly Action<string> Inform;
 
     private DateTime triggerNotification;
     private readonly ConcurrentQueue<string> dataQueue = new();
@@ -35,11 +35,6 @@ internal class EmailNotifier : Notifier
         get => password;
         set => password = value == null || value.Length == 0 ? throw new ArgumentException("Null or empty", nameof(value)) : value;
     }
-    public override Action<string> Inform
-    {
-        get => inform;
-        set => inform = value ?? throw new ArgumentNullException(nameof(value));
-    }
 
     public EmailNotifier(int port, string host, string email, string password, Action<string> inform)
     {
@@ -50,7 +45,7 @@ internal class EmailNotifier : Notifier
         Inform = inform;
     }
 
-    public override void Notify(string data)
+    public void Notify(string data)
     {
         if (!dataQueue.Contains(data)) dataQueue.Enqueue(DateTime.Now + ": " + data);
         if (DateTime.Now > triggerNotification && !dataQueue.IsEmpty)

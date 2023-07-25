@@ -7,7 +7,7 @@ using ProSystem.Algorithms;
 
 namespace ProSystem.Services;
 
-internal class DCSerializer : Serializer
+internal class DCSerializer : ISerializer
 {
     private int busyMethod;
     private string directory;
@@ -26,7 +26,7 @@ internal class DCSerializer : Serializer
         PreserveObjectReferences = true
     };
 
-    public override string DataDirectory
+    public string DataDirectory
     {
         get => directory;
         set => directory = value ?? throw new ArgumentNullException(nameof(value));
@@ -38,7 +38,7 @@ internal class DCSerializer : Serializer
         Inform = inform;
     }
 
-    public override void Serialize(object obj, string fileName)
+    public void Serialize(object obj, string fileName)
     {
         if (obj == null) throw new ArgumentNullException(nameof(obj));
         if (fileName == null) throw new ArgumentNullException(nameof(fileName));
@@ -91,7 +91,7 @@ internal class DCSerializer : Serializer
         finally { Interlocked.Exchange(ref busyMethod, 0); }
     }
 
-    public override object Deserialize(string fileName, Type type)
+    public object Deserialize(string fileName, Type type)
     {
         if (fileName == null) throw new ArgumentNullException(nameof(fileName));
         if (type == null) throw new ArgumentNullException(nameof(type));

@@ -48,10 +48,11 @@ public partial class MainWindow : Window
 
     #region Properties
     public static MainWindow Window { get; private set; }
-    public static Serializer MySerializer { get; set; }
-    public static Notifier MyNotifier { get; set; }
+    public static ISerializer Serializer { get; set; }
+    public static INotifier Notifier { get; set; }
+    public static IScriptManager ScriptManager { get; set; }
+    public static IPortfolioManager PortfolioManager { get; set; }
     public static UnitedPortfolio Portfolio { get; set; } = new();
-    public static IPortfolioManager MyPortfolioManager { get; set; }
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
     public static ConnectionState Connection
@@ -123,13 +124,14 @@ public partial class MainWindow : Window
         Logger.StartLogging(true);
 
         // Восстановление данных и проверка настроек
-        MySerializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
+        Serializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         DeserializeData();
 
         MySettings.Check(Tools);
-        if (MySettings.EmailPassword != null) MyNotifier = new EmailNotifier(587,
+        if (MySettings.EmailPassword != null) Notifier = new EmailNotifier(587,
             "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
-        MyPortfolioManager = new PortfolioManager(Portfolio, (info) => AddInfo(info, true, true));
+        PortfolioManager = new PortfolioManager(Portfolio, (info) => AddInfo(info, true, true));
+        ScriptManager = new ScriptManager(Window, CancelOrder, (info) => AddInfo(info));
 
         // Привязка данных и восстановление вкладок инструментов
         BindData();
@@ -153,23 +155,23 @@ public partial class MainWindow : Window
     }
     private void DeserializeData()
     {
-        try { MySettings = (Settings)MySerializer.Deserialize("Settings", MySettings.GetType()); }
+        try { MySettings = (Settings)Serializer.Deserialize("Settings", MySettings.GetType()); }
         catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
 
-        try { Tools = new((IEnumerable<Tool>)MySerializer.Deserialize("Tools", Tools.GetType()));}
+        try { Tools = new((IEnumerable<Tool>)Serializer.Deserialize("Tools", Tools.GetType()));}
         catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
 
-        try { Portfolio = (UnitedPortfolio)MySerializer.Deserialize("Portfolio", Portfolio.GetType()); }
+        try { Portfolio = (UnitedPortfolio)Serializer.Deserialize("Portfolio", Portfolio.GetType()); }
         catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
 
-        try { Trades = new((IEnumerable<Trade>)MySerializer.Deserialize("Trades", Trades.GetType())); }
+        try { Trades = new((IEnumerable<Trade>)Serializer.Deserialize("Trades", Trades.GetType())); }
         catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
 
-        if (File.Exists(MySerializer.DataDirectory + "/Info.txt"))
+        if (File.Exists(Serializer.DataDirectory + "/Info.txt"))
         {
             try
             {
-                string Info = File.ReadAllText(MySerializer.DataDirectory + "/Info.txt");
+                string Info = File.ReadAllText(Serializer.DataDirectory + "/Info.txt");
                 if (Info != "") TxtBox.Text = "Начало восстановленного фрагмента.\n" + Info + "\nКонец восстановленного фрагмента.";
             }
             catch (Exception ex) { AddInfo("Исключение чтения Info." + ex.Message); }
@@ -485,9 +487,9 @@ public partial class MainWindow : Window
                     {
                         Logger.StopLogging();
                         Logger.StartLogging();
-                        MyPortfolioManager.UpdateEquity();
-                        MyPortfolioManager.CheckEquity(MySettings);
-                        MyPortfolioManager.UpdatePositions();
+                        PortfolioManager.UpdateEquity();
+                        PortfolioManager.CheckEquity(MySettings);
+                        PortfolioManager.UpdatePositions();
                         _ = ArchiveFiles("Logs/Transaq",
                             DateTime.Now.AddDays(-1).ToString("yyyyMMdd"), DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
                         _ = ArchiveFiles("Data", ".xml", "Data", false);
@@ -565,8 +567,8 @@ public partial class MainWindow : Window
             double MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
             if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs)
             {
-                MyPortfolioManager.UpdateShares(MyTools);
-                MyPortfolioManager.CheckShares(MySettings);
+                PortfolioManager.UpdateShares(MyTools);
+                PortfolioManager.CheckShares(MySettings);
                 return;
             }
 

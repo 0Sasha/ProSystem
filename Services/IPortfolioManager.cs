@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProSystem;
+namespace ProSystem.Services;
 
 public interface IPortfolioManager
 {

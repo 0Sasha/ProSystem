@@ -104,11 +104,11 @@ public partial class MainWindow : Window
         AddInfo("SaveData: Сериализация", false);
         try
         {
-            MySerializer.Serialize(Tools, "Tools");
-            MySerializer.Serialize(Portfolio, "Portfolio");
-            MySerializer.Serialize(MySettings, "Settings");
-            MySerializer.Serialize(Trades, "Trades");
-            if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(MySerializer.DataDirectory + "/Info.txt", TxtBox.Text));
+            Serializer.Serialize(Tools, "Tools");
+            Serializer.Serialize(Portfolio, "Portfolio");
+            Serializer.Serialize(MySettings, "Settings");
+            Serializer.Serialize(Trades, "Trades");
+            if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(Serializer.DataDirectory + "/Info.txt", TxtBox.Text));
             return true;
         }
         catch (Exception ex) { AddInfo("SaveData: " + ex.Message); return false; }
@@ -137,9 +137,9 @@ public partial class MainWindow : Window
             string[] details = File.ReadAllLines("Data/mail.txt");
             MySettings.Email = details[0];
             MySettings.EmailPassword = details[1];
-            (MyNotifier as EmailNotifier).Email = MySettings.Email;
-            (MyNotifier as EmailNotifier).Password = MySettings.EmailPassword;
-            MyNotifier.Notify("Test notify");
+            (Notifier as EmailNotifier).Email = MySettings.Email;
+            (Notifier as EmailNotifier).Password = MySettings.EmailPassword;
+            Notifier.Notify("Test notify");
             AddInfo("Тестовое уведомление отправлено.");
         }
         catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
@@ -218,7 +218,7 @@ public partial class MainWindow : Window
                 Window.TxtBox.ScrollToEnd();
             });
         }
-        if (notify) MyNotifier.Notify(data);
+        if (notify) Notifier.Notify(data);
     }
 
     private void ShowUsedMemory(object sender, RoutedEventArgs e) =>
@@ -423,7 +423,7 @@ public partial class MainWindow : Window
     {
         OrdersView.Items.Refresh();
         TradesView.Items.Refresh();
-        Task.Run(() => MyPortfolioManager.UpdatePositions());
+        Task.Run(() => PortfolioManager.UpdatePositions());
     }
 
     private void ClearInfo(object sender, RoutedEventArgs e) => TxtBox.Clear();

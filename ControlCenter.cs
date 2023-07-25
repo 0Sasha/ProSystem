@@ -189,14 +189,15 @@ public partial class Tool
             NowBidding, ReadyToTrade, RubReqs, ClearVolumes, PosVolumes, OrderVolumes);
 
         // Идентификация заявок, проверка соответствия общей позиции позициям скриптов и нормализация общей позиции
-        IdentifyOrdersAndTrades();
+        ScriptManager.IdentifyOrders(Scripts, Orders, MySecurity.Seccode);
+        ScriptManager.IdentifyTrades(Scripts, Trades, MySecurity.Seccode);
+        IdentifySystemOrdersAndTrades();
         if (!StopTrading)
         {
             if (!CancelUnknownsOrders()) return;
             if (ReadyToTrade)
             {
-                foreach (Script MyScript in Scripts)
-                    MyScript.UpdateOrdersAndPosition(CancelOrder, (x) => AddInfo(x));
+                foreach (Script MyScript in Scripts) ScriptManager.UpdateOrdersAndPosition(MyScript);
                 if (!CheckPositionMatching(Balance, PosVolumes, NowBidding, NormalPrice)) return;
                 NormalizePosition(Balance, PosVolumes, ClearVolumes, NowBidding);
             }
@@ -207,12 +208,11 @@ public partial class Tool
         foreach (Script MyScript in Scripts)
         {
             // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
-            if (!MyScript.UpdateOrdersAndPosition(CancelOrder, (x) => AddInfo(x))) continue;
-            MyScript.Calculate(BasicSymbol);
+            if (!ScriptManager.Calculate(MyScript, BasicSymbol)) continue;
 
             // Обновление моделей, информационной панели скрипта и логирование
             UpdateScriptView(MyScript);
-            if (NowLogging) WriteLogScript(MyScript);
+            if (NowLogging) ScriptManager.WriteLog(MyScript, Name);
 
             // Выравнивание данных и проверка условий для выхода
             if (BasicSymbol != Symbol && !AlignData(MyScript)) continue;
@@ -227,64 +227,31 @@ public partial class Tool
         }
     }
 
-    private void IdentifyOrdersAndTrades()
+    private void IdentifySystemOrdersAndTrades()
     {
-        Order[] UnknownsOrders = Orders.ToArray().Where(x => x.Sender == null && x.Seccode == MySecurity.Seccode).ToArray();
+        var UnknownsOrders = Orders.ToArray().Where(x => x.Sender == null && x.Seccode == MySecurity.Seccode);
         foreach (Order UnknowOrder in UnknownsOrders)
         {
-            foreach (Script MyScript in Scripts)
+            int i = Array.FindIndex(SystemOrders.ToArray(), x => x.TrID == UnknowOrder.TrID);
+            if (i > -1)
             {
-                int i = Array.FindIndex(MyScript.Orders.ToArray(), x => x.TrID == UnknowOrder.TrID);
-                if (i > -1)
-                {
-                    if (UnknowOrder.Status == MyScript.Orders[i].Status) UnknowOrder.DateTime = MyScript.Orders[i].DateTime;
-                    UnknowOrder.Sender = MyScript.Orders[i].Sender;
-                    UnknowOrder.Signal = MyScript.Orders[i].Signal;
-                    UnknowOrder.Note = MyScript.Orders[i].Note;
-                    Window.Dispatcher.Invoke(() => MyScript.Orders[i] = UnknowOrder);
-                    break;
-                }
-            }
-
-            if (UnknowOrder.Sender == null)
-            {
-                int i = Array.FindIndex(SystemOrders.ToArray(), x => x.TrID == UnknowOrder.TrID);
-                if (i > -1)
-                {
-                    UnknowOrder.Sender = SystemOrders[i].Sender;
-                    UnknowOrder.Signal = SystemOrders[i].Signal;
-                    UnknowOrder.Note = SystemOrders[i].Note;
-                    Window.Dispatcher.Invoke(() => SystemOrders[i] = UnknowOrder);
-                }
+                UnknowOrder.Sender = SystemOrders[i].Sender;
+                UnknowOrder.Signal = SystemOrders[i].Signal;
+                UnknowOrder.Note = SystemOrders[i].Note;
+                Window.Dispatcher.Invoke(() => SystemOrders[i] = UnknowOrder);
             }
         }
 
-        Trade[] UnknownsTrades = Trades.ToArray().Where(x => x.SenderOrder == null && x.Seccode == MySecurity.Seccode).ToArray();
+        var UnknownsTrades = Trades.ToArray().Where(x => x.SenderOrder == null && x.Seccode == MySecurity.Seccode);
         foreach (Trade UnknowTrade in UnknownsTrades)
         {
-            foreach (Script MyScript in Scripts)
+            int i = Array.FindIndex(SystemOrders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
+            if (i > -1)
             {
-                int i = Array.FindIndex(MyScript.Orders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
-                if (i > -1)
-                {
-                    UnknowTrade.SenderOrder = MyScript.Orders[i].Sender;
-                    UnknowTrade.SignalOrder = MyScript.Orders[i].Signal;
-                    UnknowTrade.NoteOrder = MyScript.Orders[i].Note;
-                    Window.Dispatcher.Invoke(() => MyScript.Trades.Add(UnknowTrade));
-                    break;
-                }
-            }
-
-            if (UnknowTrade.SenderOrder == null)
-            {
-                int i = Array.FindIndex(SystemOrders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
-                if (i > -1)
-                {
-                    UnknowTrade.SenderOrder = SystemOrders[i].Sender;
-                    UnknowTrade.SignalOrder = SystemOrders[i].Signal;
-                    UnknowTrade.NoteOrder = SystemOrders[i].Note;
-                    Window.Dispatcher.Invoke(() => SystemTrades.Add(UnknowTrade));
-                }
+                UnknowTrade.SenderOrder = SystemOrders[i].Sender;
+                UnknowTrade.SignalOrder = SystemOrders[i].Signal;
+                UnknowTrade.NoteOrder = SystemOrders[i].Note;
+                Window.Dispatcher.Invoke(() => SystemTrades.Add(UnknowTrade));
             }
         }
     }
@@ -386,7 +353,7 @@ public partial class Tool
     private static void CheckPortfolio(ref bool ReadyToTrade)
     {
         if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-        if (!MyPortfolioManager.CheckEquity(MySettings)) ReadyToTrade = false;
+        if (!PortfolioManager.CheckEquity(MySettings)) ReadyToTrade = false;
     }
 
     private (double, double) GetAndCheckRubReqs(ref bool ReadyToTrade)

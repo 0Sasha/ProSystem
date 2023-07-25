@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Collections.Generic;
 
-namespace ProSystem;
+namespace ProSystem.Services;
 
 internal class PortfolioManager : IPortfolioManager
 {
