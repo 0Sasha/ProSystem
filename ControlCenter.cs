@@ -33,32 +33,32 @@ public partial class Tool
     public int WaitingLimit
     {
         get => Wait;
-        set { Wait = value; NotifyChanged(); }
+        set { Wait = value; Notify(); }
     }
     public double ShareOfFunds
     {
         get => Share;
-        set { Share = value > 15 ? 5 : value; NotifyChanged(); }
+        set { Share = value > 15 ? 5 : value; Notify(); }
     }
     public int MinNumberOfLots
     {
         get => MinNumber;
-        set { MinNumber = value; NotifyChanged(); }
+        set { MinNumber = value; Notify(); }
     }
     public int MaxNumberOfLots
     {
         get => MaxNumber;
-        set { MaxNumber = value; NotifyChanged(); }
+        set { MaxNumber = value; Notify(); }
     }
     public int NumberOfLots
     {
         get => Number;
-        set { Number = value; NotifyChanged(); }
+        set { Number = value; Notify(); }
     }
     public int BaseBalance
     {
         get => BaseBal;
-        set { BaseBal = value; NotifyChanged(); }
+        set { BaseBal = value; Notify(); }
     }
 
     public bool StopTrading
@@ -68,7 +68,7 @@ public partial class Tool
         {
             StopTr = value;
             if (Active) BrushState = StopTr ? Theme.Orange : Theme.Green;
-            NotifyChanged();
+            Notify();
         }
     }
     public bool TradeShare
@@ -78,13 +78,13 @@ public partial class Tool
         {
             TradeSh = value;
             Window.UpdateControlGrid(this);
-            NotifyChanged();
+            Notify();
         }
     }
     public bool UseNormalization
     {
         get => UseNM;
-        set { UseNM = value; NotifyChanged(); }
+        set { UseNM = value; Notify(); }
     }
     public bool UseShiftBalance
     {
@@ -93,24 +93,24 @@ public partial class Tool
         {
             UseShift = value;
             Window.UpdateControlGrid(this);
-            NotifyChanged();
+            Notify();
         }
     }
 
     public Border BorderState
     {
         get => BordSt;
-        set { BordSt = value; NotifyChanged(); }
+        set { BordSt = value; Notify(); }
     }
     public TextBlock BlockInfo
     {
         get => BlInfo;
-        set { BlInfo = value; NotifyChanged(); }
+        set { BlInfo = value; Notify(); }
     }
     public TextBlock MainBlockInfo
     {
         get => MainBlInfo;
-        set { MainBlInfo = value; NotifyChanged(); }
+        set { MainBlInfo = value; Notify(); }
     }
     #endregion
 
@@ -1044,7 +1044,7 @@ public partial class Tool
 
         if (SelectedScript == MyScript.Name || SelectedScript == "AllScripts")
         {
-            if (MyScript.Result.Type == ScriptType.OSC) UpdateMiniModel(MyScript);
+            if (MyScript.Result.Type == ScriptType.OSC) ToolManager.UpdateMiniModel(this, MyScript);
             else foreach (double[] Indicator in MyScript.Result.Indicators)
                     MainModel.Series.Add(MakeLineSeries(Indicator, MyScript.Name));
 

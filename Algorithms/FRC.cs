@@ -51,12 +51,12 @@ internal class FRC : Script
 
     public FRC(string name) : base(name) { }
 
-    public override void Initialize(Tool MyTool, TabItem TabTool)
+    public override ScriptProperties GetScriptProperties()
     {
         bool IsOSC = true;
         string[] UpperProperties = new string[] { "Period", "PeriodEx", "IndicatorTF" };
         string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit", "UseChannel" };
-        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties);
+        return new(IsOSC, UpperProperties, MiddleProperties);
     }
 
     public override void Calculate(Security Symbol)

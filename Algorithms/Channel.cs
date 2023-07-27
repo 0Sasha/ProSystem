@@ -51,13 +51,13 @@ internal class Channel : Script
 
     public Channel(string name) : base(name) { }
 
-    public override void Initialize(Tool MyTool, TabItem TabTool)
+    public override ScriptProperties GetScriptProperties()
     {
         bool IsOSC = false;
         string[] UpperProperties = new string[] { "Period", "Mult", "IndicatorTF" };
         string[] MiddleProperties = new string[] { "IsTrend", "UseSD" };
-        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties,
-            "NameMA", new NameMA[] { NameMA.SMA, NameMA.WMA, NameMA.DEMA, NameMA.KAMA, NameMA.LR });
+        NameMA[] MAObjects = new NameMA[] { NameMA.SMA, NameMA.WMA, NameMA.DEMA, NameMA.KAMA, NameMA.LR };
+        return new(IsOSC, UpperProperties, MiddleProperties, "NameMA", MAObjects);
     }
 
     public override void Calculate(Security Symbol)

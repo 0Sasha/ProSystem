@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Windows.Controls;
+using System.Windows.Data;
+using static ProSystem.Controls;
 
 namespace ProSystem.Services;
 
@@ -16,6 +19,38 @@ internal class ScriptManager : IScriptManager
         Window = window;
         CancelOrder = cancelOrder;
         Inform = inform;
+    }
+
+    public void InitializeScripts(IEnumerable<Script> scripts, TabItem tabTool)
+    {
+        int i = 1;
+        foreach (var script in scripts)
+        {
+            var props = script.GetScriptProperties();
+            Window.Dispatcher.Invoke(() =>
+            {
+                if (props.IsOSC)
+                {
+                    var plot = ((tabTool.Content as Grid).Children[0] as Grid).Children[0] as OxyPlot.SkiaSharp.Wpf.PlotView;
+                    if (plot.Visibility == System.Windows.Visibility.Hidden)
+                    {
+                        Grid.SetRow(((tabTool.Content as Grid).Children[0] as Grid).Children[1] as OxyPlot.SkiaSharp.Wpf.PlotView, 1);
+                        plot.Visibility = System.Windows.Visibility.Visible;
+                    }
+                }
+                var uiCollection = (((tabTool.Content as Grid).Children[1] as Grid).Children[i] as Grid).Children;
+
+                uiCollection.Clear();
+                uiCollection.Add(GetTextBlock(script.Name, 5, 0));
+                AddUpperControls(script, uiCollection, props);
+                if (props.MiddleProperties != null) AddMiddleControls(script, uiCollection, props);
+
+                TextBlock textBlock = GetTextBlock("Block Info", 5, 170);
+                script.BlockInfo = textBlock;
+                uiCollection.Add(textBlock);
+            });
+            i++;
+        }
     }
 
     public void IdentifyOrders(IEnumerable<Script> scripts, IEnumerable<Order> allOrders, string seccode)
@@ -121,5 +156,82 @@ internal class ScriptManager : IScriptManager
             System.IO.File.AppendAllText("Logs/LogsTools/" + toolName + ".txt", data + "\n");
         }
         catch (Exception e) { Inform(toolName + ": Исключение логирования скрипта: " + e.Message); }
+    }
+
+    private void AddUpperControls(Script script, UIElementCollection uiCollection, ScriptProperties properties)
+    {
+        var props = properties.UpperProperties;
+
+        uiCollection.Add(GetTextBlock(props[0], 5, 20));
+        uiCollection.Add(GetTextBox(script, props[0], 65, 20));
+
+        uiCollection.Add(GetTextBlock(props[1], 5, 40));
+        uiCollection.Add(GetTextBox(script, props[1], 65, 40));
+
+        if (props.Length > 2)
+        {
+            uiCollection.Add(GetTextBlock(props[2], 5, 60));
+            uiCollection.Add(GetTextBox(script, props[2], 65, 60));
+        }
+        if (props.Length > 3)
+        {
+            uiCollection.Add(GetTextBlock(props[3], 105, 20));
+            uiCollection.Add(GetTextBox(script, props[3], 165, 20));
+        }
+        if (props.Length > 4)
+        {
+            uiCollection.Add(GetTextBlock(props[4], 105, 40));
+            uiCollection.Add(GetTextBox(script, props[4], 165, 40));
+        }
+        if (props.Length > 5)
+        {
+            uiCollection.Add(GetTextBlock(props[5], 105, 60));
+            uiCollection.Add(GetTextBox(script, props[5], 165, 60));
+        }
+        if (props.Length > 6) Inform(script.Name + ": Непредвиденное количество верхних контролов.");
+
+        ComboBox comboBox = new()
+        {
+            Width = 90,
+            Margin = new System.Windows.Thickness(5, 80, 0, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Top,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            ItemsSource = new PositionType[] { PositionType.Long, PositionType.Short, PositionType.Neutral }
+        };
+        Binding binding = new() { Source = script, Path = new System.Windows.PropertyPath("CurrentPosition"), Mode = BindingMode.TwoWay };
+        comboBox.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedItemProperty, binding);
+        uiCollection.Add(comboBox);
+
+        if (properties.MAProperty != null)
+        {
+            ComboBox comboBox2 = new()
+            {
+                Width = 90,
+                Margin = new System.Windows.Thickness(105, 80, 0, 0),
+                VerticalAlignment = System.Windows.VerticalAlignment.Top,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                ItemsSource = properties.MAObjects
+            };
+            Binding binding2 = new()
+            {
+                Source = script,
+                Path = new System.Windows.PropertyPath(properties.MAProperty),
+                Mode = BindingMode.TwoWay
+            };
+            comboBox2.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedItemProperty, binding2);
+            uiCollection.Add(comboBox2);
+        }
+    }
+
+    private void AddMiddleControls(Script script, UIElementCollection uiCollection, ScriptProperties properties)
+    {
+        var props = properties.MiddleProperties;
+        uiCollection.Add(GetCheckBox(script, props[0], props[0], 5, 110));
+        if (props.Length > 1) uiCollection.Add(GetCheckBox(script, props[1], props[1], 5, 130));
+        if (props.Length > 2) uiCollection.Add(GetCheckBox(script, props[2], props[2], 5, 150));
+        if (props.Length > 3) uiCollection.Add(GetCheckBox(script, props[3], props[3], 105, 110));
+        if (props.Length > 4) uiCollection.Add(GetCheckBox(script, props[4], props[4], 105, 130));
+        if (props.Length > 5) uiCollection.Add(GetCheckBox(script, props[5], props[5], 105, 150));
+        if (props.Length > 6) Inform(script.Name + ": Непредвиденное количество средних контролов.");
     }
 }

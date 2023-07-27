@@ -51,13 +51,13 @@ internal class CrossMA : Script
 
     public CrossMA(string name) : base(name) { }
 
-    public override void Initialize(Tool MyTool, TabItem TabTool)
+    public override ScriptProperties GetScriptProperties()
     {
         bool IsOSC = false;
         string[] UpperProperties = new string[] { "Period", "Mult", "IndicatorTF" };
         string[] MiddleProperties = new string[] { "IsCrossMALim", "OnlyLimit" };
-        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties,
-            "NameMA", new NameMA[] { NameMA.SMA, NameMA.EMA, NameMA.SMMA, NameMA.DEMA, NameMA.KAMA });
+        NameMA[] MAObjects = new NameMA[] { NameMA.SMA, NameMA.EMA, NameMA.SMMA, NameMA.DEMA, NameMA.KAMA };
+        return new(IsOSC, UpperProperties, MiddleProperties, "NameMA", MAObjects);
     }
 
     public override void Calculate(Security Symbol)

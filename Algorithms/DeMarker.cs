@@ -44,12 +44,12 @@ internal class DeMarker : Script
 
     public DeMarker(string name) : base(name) { }
 
-    public override void Initialize(Tool MyTool, TabItem TabTool)
+    public override ScriptProperties GetScriptProperties()
     {
         bool IsOSC = true;
         string[] UpperProperties = new string[] { "Period", "Level", "IndicatorTF" };
         string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit" };
-        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties);
+        return new(IsOSC, UpperProperties, MiddleProperties);
     }
 
     public override void Calculate(Security Symbol)

@@ -44,11 +44,11 @@ internal class ATRS : Script
 
     public ATRS(string name) : base(name) { }
 
-    public override void Initialize(Tool MyTool, TabItem TabTool)
+    public override ScriptProperties GetScriptProperties()
     {
         bool IsOSC = false;
         string[] UpperProperties = new string[] { "Period", "Mult", "PeriodEx", "Correction", "IndicatorTF" };
-        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties);
+        return new(IsOSC, UpperProperties);
     }
 
     public override void Calculate(Security Symbol)

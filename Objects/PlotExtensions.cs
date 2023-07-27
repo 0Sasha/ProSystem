@@ -9,6 +9,14 @@ namespace ProSystem;
 
 internal static class PlotExtensions
 {
+    public static PlotController GetController()
+    {
+        var controller = new PlotController();
+        controller.BindMouseDown(OxyMouseButton.Left, PlotCommands.PanAt);
+        controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.SnapTrack);
+        return controller;
+    }
+
     public static PlotModel GetPlot(this UnitedPortfolio portfolio)
     {
         var AssetsPorfolio = new CategoryAxis { Position = AxisPosition.Left };

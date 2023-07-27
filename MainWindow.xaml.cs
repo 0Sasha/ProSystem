@@ -12,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using ProSystem.Services;
 using static ProSystem.TXmlConnector;
+using static ProSystem.Controls;
 using System.Collections;
 
 namespace ProSystem;
@@ -455,7 +456,8 @@ public partial class MainWindow : Window
                 ((TabsTools.Items[k] as TabItem).Content as Grid).Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[2].Children.Clear();
             }
         }
-        for (int i = 0; i < Tools[k].Scripts.Length; i++) Tools[k].Scripts[i].Initialize(Tools[k], TabsTools.Items[k] as TabItem);
+
+        ScriptManager.InitializeScripts(Tools[k].Scripts, TabsTools.Items[k] as TabItem);
 
         if (Connection == ConnectionState.Connected)
         {
@@ -651,43 +653,6 @@ public partial class MainWindow : Window
         MyTool.BlockInfo = BlInfo;
         ControlGrid.Children.Add(BlInfo);
     }
-
-    public static TextBlock GetTextBlock(string Property, double Left, double Top)
-    {
-        return new()
-        {
-            Text = Property.Length > 14 ? Property[0..14] : Property,
-            Margin = new Thickness(Left, Top, 0, 0),
-            VerticalAlignment = VerticalAlignment.Top,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
-    }
-    public static TextBox GetTextBox(object SourceBinding, string Property, double Left, double Top)
-    {
-        TextBox Box = new()
-        {
-            Width = 30,
-            Margin = new Thickness(Left, Top, 0, 0),
-            VerticalAlignment = VerticalAlignment.Top,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
-        Binding Binding = new() { Source = SourceBinding, Path = new PropertyPath(Property), Mode = BindingMode.TwoWay };
-        Box.SetBinding(TextBox.TextProperty, Binding);
-        return Box;
-    }
-    public static CheckBox GetCheckBox(object SourceBinding, string NameBox, string Property, double Left, double Top)
-    {
-        CheckBox CheckBox = new()
-        {
-            Content = NameBox.Length > 14 ? NameBox[0..14] : NameBox,
-            Margin = new Thickness(Left, Top, 0, 0),
-            VerticalAlignment = VerticalAlignment.Top,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
-        Binding Binding = new() { Source = SourceBinding, Path = new PropertyPath(Property), Mode = BindingMode.TwoWay };
-        CheckBox.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, Binding);
-        return CheckBox;
-    }
     #endregion
 
     #region View
@@ -723,10 +688,10 @@ public partial class MainWindow : Window
         DistributionPlot.Model = Tools.GetPlot(Portfolio.Positions, Portfolio.Saldo,
             (string)ComboBoxDistrib.SelectedItem, (bool)OnlyPosCheckBox.IsChecked,
             (bool)ExcludeBaseCheckBox.IsChecked);
-        DistributionPlot.Controller ??= Tool.GetController();
+        DistributionPlot.Controller ??= PlotExtensions.GetController();
 
         PortfolioPlot.Model = Portfolio.GetPlot();
-        PortfolioPlot.Controller ??= Tool.GetController();
+        PortfolioPlot.Controller ??= PlotExtensions.GetController();
     }
 
     private void ResizeInfoPanel(object sender, RoutedEventArgs e)

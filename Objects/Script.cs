@@ -49,7 +49,7 @@ public abstract class Script : INotifyPropertyChanged
 
     public Script(string name) => Name = name;
 
-    public abstract void Initialize(Tool tool, TabItem tabTool);
+    public abstract ScriptProperties GetScriptProperties();
 
     public abstract void Calculate(Security symbol);
 

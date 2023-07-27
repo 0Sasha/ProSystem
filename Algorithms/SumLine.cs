@@ -58,12 +58,12 @@ internal class SumLine : Script
 
     public SumLine(string name) : base(name) { }
 
-    public override void Initialize(Tool MyTool, TabItem TabTool)
+    public override ScriptProperties GetScriptProperties()
     {
         bool IsOSC = true;
         string[] UpperProperties = new string[] { "Period", "PeriodSignal", "IndicatorTF" };
         string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit", "UseChannel", "ChIsBands" };
-        MyTool.InitializeScript(this, TabTool, IsOSC, UpperProperties, MiddleProperties);
+        return new(IsOSC, UpperProperties, MiddleProperties);
     }
 
     public override void Calculate(Security Symbol)

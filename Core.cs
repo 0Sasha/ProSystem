@@ -52,6 +52,7 @@ public partial class MainWindow : Window
     public static INotifier Notifier { get; set; }
     public static IScriptManager ScriptManager { get; set; }
     public static IPortfolioManager PortfolioManager { get; set; }
+    public static IToolManager ToolManager { get; set; }
     public static UnitedPortfolio Portfolio { get; set; } = new();
     public static Settings MySettings { get; set; } = new();
     public static bool ConnectorInitialized { get; set; }
@@ -132,6 +133,7 @@ public partial class MainWindow : Window
             "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
         PortfolioManager = new PortfolioManager(Portfolio, (info) => AddInfo(info, true, true));
         ScriptManager = new ScriptManager(Window, CancelOrder, (info) => AddInfo(info));
+        ToolManager = new ToolManager(this, ScriptManager);
 
         // Привязка данных и восстановление вкладок инструментов
         BindData();
