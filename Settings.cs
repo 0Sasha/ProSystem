@@ -34,7 +34,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 1 or > 600)
             {
-                AddInfo("ModelUpdateInterval должен быть от 1 до 600.");
+                Window.AddInfo("ModelUpdateInterval должен быть от 1 до 600.");
                 if (UpdInt is < 1 or > 600) UpdInt = 5;
             }
             else UpdInt = value;
@@ -48,7 +48,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 5 or > 120)
             {
-                AddInfo("RecalcInterval должен быть от 5 до 120.");
+                Window.AddInfo("RecalcInterval должен быть от 5 до 120.");
                 if (RecInt is < 5 or > 120) RecInt = 30;
             }
             else RecInt = value;
@@ -61,7 +61,7 @@ public class Settings : INotifyPropertyChanged
         set
         {
             SchedCon = value;
-            if (!SchedCon) AddInfo("Подключение по расписанию отключено.");
+            if (!SchedCon) Window.AddInfo("Подключение по расписанию отключено.");
             Notify();
         }
     } // Подключение по расписанию
@@ -80,7 +80,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 5 or > 30)
             {
-                AddInfo("RequestTM должен быть от 5 до 30.");
+                Window.AddInfo("RequestTM должен быть от 5 до 30.");
                 if (ReqTM is < 5 or > 30) ReqTM = 15;
             }
             else ReqTM = value;
@@ -94,7 +94,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 40 or > 300)
             {
-                AddInfo("SessionTM должен быть от 40 до 300.");
+                Window.AddInfo("SessionTM должен быть от 40 до 300.");
                 if (SesTM is < 40 or > 300) SesTM = 180;
             }
             else SesTM = value;
@@ -112,11 +112,11 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 5 or > 300)
             {
-                AddInfo("ToleranceEquity должно быть от 5% до 300%.");
+                Window.AddInfo("ToleranceEquity должно быть от 5% до 300%.");
                 if (TolEq is < 5 or > 300) TolEq = 40;
             }
             else TolEq = value;
-            if (TolEq > 50) AddInfo("ToleranceEquity более 50% от среднего значения.");
+            if (TolEq > 50) Window.AddInfo("ToleranceEquity более 50% от среднего значения.");
             Notify();
         }
     } // Допустимое отклонение стоимости портфеля в % от среднего значения
@@ -127,7 +127,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 1 or > 5)
             {
-                AddInfo("TolerancePosition должно быть от 1x до 5x.");
+                Window.AddInfo("TolerancePosition должно быть от 1x до 5x.");
                 if (TolPos is < 1 or > 5) TolPos = 3;
             }
             else TolPos = value;
@@ -142,7 +142,7 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 1 or > 150)
             {
-                AddInfo("OptShareBaseBalances должна быть от 1% до 150%.");
+                Window.AddInfo("OptShareBaseBalances должна быть от 1% до 150%.");
                 if (OptShBasAssets is < 1 or > 150) OptShBasAssets = 90;
             }
             else OptShBasAssets = value;
@@ -154,7 +154,7 @@ public class Settings : INotifyPropertyChanged
         get => TolBasAssets;
         set
         {
-            if (value is < 1 or > 150) AddInfo("ToleranceBaseBalances должно быть от 1% до 150%.");
+            if (value is < 1 or > 150) Window.AddInfo("ToleranceBaseBalances должно быть от 1% до 150%.");
             else TolBasAssets = value;
             Notify();
         }
@@ -167,11 +167,11 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 1 or > 50)
             {
-                AddInfo("MaxShareInitReqsPosition должна быть от 1% до 50%.");
+                Window.AddInfo("MaxShareInitReqsPosition должна быть от 1% до 50%.");
                 if (MaxShInRePos is < 1 or > 50) MaxShInRePos = 15;
             }
             else MaxShInRePos = value;
-            if (MaxShInRePos > 15) AddInfo("MaxShareInitReqsPosition более 15%.");
+            if (MaxShInRePos > 15) Window.AddInfo("MaxShareInitReqsPosition более 15%.");
             Notify();
         }
     } // Максимальная доля начальных требований позиции (без учёта смещения баланса)
@@ -182,11 +182,11 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 1 or > 150)
             {
-                AddInfo("MaxShareInitReqsTool должна быть от 1% до 150%.");
+                Window.AddInfo("MaxShareInitReqsTool должна быть от 1% до 150%.");
                 if (MaxShInReTool is < 1 or > 150) MaxShInReTool = 25;
             }
             else MaxShInReTool = value;
-            if (MaxShInReTool > 35) AddInfo("MaxShareInitReqsTool более 35%.");
+            if (MaxShInReTool > 35) Window.AddInfo("MaxShareInitReqsTool более 35%.");
             Notify();
         }
     } // Максимальная доля начальных требований инструмента (с учётом смещения баланса)
@@ -198,11 +198,11 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 10 or > 95)
             {
-                AddInfo("MaxShareMinReqsPortfolio должна быть от 10% до 95%.");
+                Window.AddInfo("MaxShareMinReqsPortfolio должна быть от 10% до 95%.");
                 if (MaxShMinRePort is < 10 or > 95) MaxShMinRePort = 60;
             }
             else MaxShMinRePort = value;
-            if (MaxShMinRePort > 70) AddInfo("MaxShareMinReqsPortfolio более 70%.");
+            if (MaxShMinRePort > 70) Window.AddInfo("MaxShareMinReqsPortfolio более 70%.");
             Notify();
         }
     } // Максимальная доля минимальных требований портфеля
@@ -213,11 +213,11 @@ public class Settings : INotifyPropertyChanged
         {
             if (value is < 10 or > 200)
             {
-                AddInfo("MaxShareInitReqsPortfolio должна быть от 10% до 200%.");
+                Window.AddInfo("MaxShareInitReqsPortfolio должна быть от 10% до 200%.");
                 if (MaxShInRePort is < 10 or > 200) MaxShInRePort = 85;
             }
             else MaxShInRePort = value;
-            if (MaxShInRePort > 90) AddInfo("MaxShareInitReqsPortfolio более 90%.");
+            if (MaxShInRePort > 90) Window.AddInfo("MaxShareInitReqsPortfolio более 90%.");
             Notify();
         }
     } // Максимальная доля начальных требований портфеля
@@ -254,7 +254,7 @@ public class Settings : INotifyPropertyChanged
         {
             ToolsByPriority.Clear();
             foreach (Tool tool in tools) ToolsByPriority.Add(tool.Name);
-            AddInfo("ToolsByPriority по умолчанию.");
+            Window.AddInfo("ToolsByPriority по умолчанию.");
         }
     }
 }

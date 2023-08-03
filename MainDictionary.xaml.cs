@@ -44,7 +44,7 @@ public partial class MainDictionary
             {
                 if (sender is TextBox tbx) tbx.GetBindingExpression(TextBox.TextProperty).UpdateSource();
             }
-            catch (Exception ex) { MainWindow.AddInfo("TxtKeyDown: " + ex.Message); }
+            catch (Exception ex) { MainWindow.Window.AddInfo("TxtKeyDown: " + ex.Message); }
         }
     }
 }

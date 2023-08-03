@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using static ProSystem.MainWindow;
+using System.IO.Compression;
+
 namespace ProSystem.Services;
 
 public static class Logger
@@ -48,7 +50,7 @@ public static class Logger
         Exception[] MyExceptions = args.Exception.InnerExceptions.ToArray();
         string Data = "Task Exception:";
         foreach (Exception e in MyExceptions) Data += "\n" + e.Message + "\n" + e.StackTrace;
-        AddInfo(Data, true, true);
+        MainWindow.Window.AddInfo(Data, true, true);
     }
     public static void WriteLogUnhandledException(object sender, UnhandledExceptionEventArgs args)
     {
@@ -71,6 +73,44 @@ public static class Logger
             Smtp.Dispose();
             Message.Dispose();
             WriteLogSystem(Data);
+        }
+    }
+    public static async Task<bool> ArchiveFiles(string directory,
+        string partNameSourceFiles, string archName, bool deleteSourceFiles)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                var paths = Directory.GetFiles(directory).Where(x => x.Contains(partNameSourceFiles) && !x.Contains(".zip")).ToArray();
+                if (paths.Length == 0)
+                {
+                    MainWindow.Window.AddInfo("ArchiveFiles: Файлы не найдены. " +
+                        directory + "/" + partNameSourceFiles);
+                    return false;
+                }
+
+                string newDir = directory + "/" + archName;
+                if (File.Exists(newDir)) File.Delete(newDir);
+                Directory.CreateDirectory(newDir);
+                foreach (var path in paths) File.Copy(path, newDir + "/" + path.Replace(directory, ""));
+
+                if (File.Exists(newDir + ".zip")) File.Delete(newDir + ".zip");
+                await Task.Run(() => ZipFile.CreateFromDirectory(newDir, newDir + ".zip", CompressionLevel.SmallestSize, false));
+                Directory.Delete(newDir, true);
+                if (deleteSourceFiles) foreach (var path in paths) File.Delete(path);
+                return true;
+            }
+            else
+            {
+                MainWindow.Window.AddInfo("ArchiveFiles: Директория " + directory + " не существует");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            MainWindow.Window.AddInfo("ArchiveFiles: " + ex.Message);
+            return false;
         }
     }
 }

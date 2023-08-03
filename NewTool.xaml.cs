@@ -1,5 +1,9 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using static ProSystem.MainWindow;
 
 namespace ProSystem;
@@ -10,6 +14,15 @@ public partial class NewTool : Window
     private Security BsSec = null;
     private readonly Tool SelectedTool = null;
     private readonly System.Collections.Generic.List<Script> Scripts = new();
+    private readonly MainWindow Window;
+
+    private readonly string[] algorithms = new string[]
+    {
+        "RSI", "StochRSI", "MFI", "DeMarker", "Stochastic",
+        "CMO", "CMF", "RVI", "CCI", "DPO", "FRC", "OBV", "AD", "SumLine",
+        "CHO", "ROC", "MACD", "MA", "Channel", "CrossMA",
+        "ATRS", "PARS"
+    };
 
     private Security TradedSecurity
     {
@@ -48,28 +61,34 @@ public partial class NewTool : Window
         }
     }
 
-    public NewTool()
+    private ObservableCollection<Tool> Tools { get => Window.TradingSystem.Tools; }
+    private List<Market> Markets { get => Window.Connector.Markets; }
+    private List<Security> Securities { get => Window.Connector.Securities; }
+
+    public NewTool(MainWindow window)
     {
         InitializeComponent();
+        Window = window;
 
         string[] MyMarkets = new string[Markets.Count];
         for (int i = 0; i < Markets.Count; i++) MyMarkets[i] = Markets[i].Name;
 
-        System.Array.Sort(MyAlgorithms);
+        System.Array.Sort(algorithms);
         BoxMarkets.ItemsSource = MyMarkets;
-        BoxScripts.ItemsSource = MyAlgorithms;
+        BoxScripts.ItemsSource = algorithms;
         ScriptsView.ItemsSource = Scripts;
     }
-    public NewTool(Tool MyTool)
+    public NewTool(MainWindow window, Tool MyTool)
     {
         InitializeComponent();
+        Window = window;
         SelectedTool = MyTool;
 
         string[] MyMarkets = new string[Markets.Count];
         for (int i = 0; i < Markets.Count; i++) MyMarkets[i] = Markets[i].Name;
 
         BoxMarkets.ItemsSource = MyMarkets;
-        BoxScripts.ItemsSource = MyAlgorithms;
+        BoxScripts.ItemsSource = algorithms;
 
         ToolName.Text = SelectedTool.Name;
         Scripts = SelectedTool.Scripts.ToList();
@@ -86,7 +105,7 @@ public partial class NewTool : Window
     {
         try
         {
-            SecuritiesView.ItemsSource = AllSecurities.Where(x => x.Market == Markets.Single(y => y.Name == BoxMarkets.Text).ID &&
+            SecuritiesView.ItemsSource = Securities.Where(x => x.Market == Markets.Single(y => y.Name == BoxMarkets.Text).ID &&
             (x.ShortName.Contains(SearchSec.Text) || x.Seccode.Contains(SearchSec.Text)));
         }
         catch { }
@@ -156,10 +175,10 @@ public partial class NewTool : Window
             if (Tools.SingleOrDefault(x => x.Name == ToolName.Text) == null && TradedSecurity != null &&
                 Tools.SingleOrDefault(x => x.MySecurity.Seccode == TradedSecurity.Seccode) == null)
             {
+                BasicSecurity = BasicSecurity != null ? Securities.Single(x => x == BasicSecurity) : null;
+                SaveTool(new Tool(ToolName.Text,
+                    Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray()));
                 Close();
-                BasicSecurity = BasicSecurity != null ? AllSecurities.Single(x => x == BasicSecurity) : null;
-                MainWindow.Window.SaveTool(new Tool(ToolName.Text,
-                    AllSecurities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray()));
             }
         }
         else
@@ -177,7 +196,7 @@ public partial class NewTool : Window
             }
             if (SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode)
             {
-                SelectedTool.MySecurity = AllSecurities.Single(x => x == TradedSecurity);
+                SelectedTool.MySecurity = Securities.Single(x => x == TradedSecurity);
                 foreach (Script Script in SelectedTool.Scripts)
                 {
                     Script.Orders.Clear();
@@ -190,7 +209,7 @@ public partial class NewTool : Window
                 if (SelectedTool.ShowBasicSecurity == true) SelectedTool.ShowBasicSecurity = false;
             }
             else if (SelectedTool.BasicSecurity == null || SelectedTool.BasicSecurity.Seccode != BasicSecurity.Seccode)
-                SelectedTool.BasicSecurity = AllSecurities.Single(x => x == BasicSecurity);
+                SelectedTool.BasicSecurity = Securities.Single(x => x == BasicSecurity);
 
             if (SelectedTool.Scripts.Length != Scripts.Count) SelectedTool.Scripts = Scripts.ToArray();
             else
@@ -199,8 +218,53 @@ public partial class NewTool : Window
                     if (SelectedTool.Scripts[i].Name != Scripts[i].Name) SelectedTool.Scripts[i] = Scripts[i];
             }
 
+            SaveTool(SelectedTool, false);
             Close();
-            MainWindow.Window.SaveTool(SelectedTool, false);
         }
+    }
+
+    public async void SaveTool(Tool MyTool, bool NewTool = true)
+    {
+        int k;
+        if (NewTool)
+        {
+            Tools.Add(MyTool);
+            ToolManager.CreateTab(MyTool);
+            MySettings.ToolsByPriority.Add(MyTool.Name);
+            Window.ToolsByPriorityView.Items.Refresh();
+            k = Tools.Count - 1;
+        }
+        else
+        {
+            MyTool.MainModel.Series.Clear();
+            MyTool.MainModel.Series.Add(new OxyPlot.Series.CandleStickSeries { });
+            MyTool.MainModel.Annotations.Clear();
+
+            k = Tools.IndexOf(MyTool);
+            ToolManager.UpdateControlGrid(MyTool);
+            if (MyTool.Scripts.Length < 2)
+            {
+                ((Window.TabsTools.Items[k] as TabItem).Content as Grid)
+                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[1].Children.Clear();
+                ((Window.TabsTools.Items[k] as TabItem).Content as Grid)
+                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[2].Children.Clear();
+            }
+        }
+
+        if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)
+        {
+            await Task.Run(() =>
+            {
+                ToolManager.RequestBars(Tools[k]);
+                Window.TradingSystem.Connector.OrderSecurityInfo(Tools[k].MySecurity);
+                Task.Run(() =>
+                {
+                    System.Threading.Thread.Sleep(4000);
+                    ToolManager.UpdateView(Tools[k], true);
+                });
+            });
+        }
+        else Window.AddInfo("SaveTool: отсутствует соединение.");
+        Window.AddInfo("Saved tool: " + Tools[k].Name);
     }
 }

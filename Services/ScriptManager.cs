@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Threading;
 using static ProSystem.Controls;
 
 namespace ProSystem.Services;
@@ -100,6 +102,60 @@ internal class ScriptManager : IScriptManager
                     break;
                 }
             }
+        }
+    }
+
+    public void BringOrdersInLine(Tool tool, IEnumerable<Order> allOrders)
+    {
+        foreach (var script in tool.Scripts)
+        {
+            for (int i = 0; i < script.Orders.Count; i++)
+            {
+                if (script.Orders[i].DateTime.Date >= DateTime.Now.Date.AddDays(-3) ||
+                    script.Orders[i].Status == "active" || script.Orders[i].Status == "watching")
+                {
+                    // Поиск заявки скрипта в коллекции всех заявок торговой сессии
+                    var orders = allOrders.ToArray();
+                    var y = script.Orders[i].OrderNo == 0 ?
+                        Array.FindIndex(orders, x => x.TrID == script.Orders[i].TrID) :
+                        Array.FindIndex(orders, x => x.OrderNo == script.Orders[i].OrderNo);
+
+                    // Обновление свойств заявки из коллекции всех заявок и приведение обеих заявок к одному объекту
+                    if (y > -1)
+                    {
+                        if (orders[y].Status == script.Orders[i].Status)
+                            orders[y].DateTime = script.Orders[i].DateTime;
+                        orders[y].Sender = script.Orders[i].Sender;
+                        orders[y].Signal = script.Orders[i].Signal;
+                        orders[y].Note = script.Orders[i].Note;
+                        Window.Dispatcher.Invoke(() => script.Orders[i] = orders[y]);
+                    }
+                    else if (script.Orders[i].Status == "watching" || script.Orders[i].Status == "active" &&
+                        DateTime.Today.DayOfWeek != DayOfWeek.Saturday && DateTime.Today.DayOfWeek != DayOfWeek.Sunday)
+                    {
+                        script.Orders[i].Status = "lost";
+                        script.Orders[i].DateTime = DateTime.Now.AddDays(-2);
+                        Window.AddInfo("BringOrdersInLine: " +
+                            script.Name + ": Активная заявка не актуальна. Статус обновлён.");
+                    }
+                }
+            }
+        }
+    }
+
+    public void ClearObsoleteData(Tool tool, Settings settings)
+    {
+        foreach (var script in tool.Scripts)
+        {
+            var obsoleteOrders = script.Orders
+                .Where(x => x.DateTime.Date < DateTime.Today.AddDays(-settings.ShelfLifeOrdersScripts));
+            var obsoleteTrades = script.Trades
+                .Where(x => x.DateTime.Date < DateTime.Today.AddDays(-settings.ShelfLifeTradesScripts));
+            Window.Dispatcher.Invoke(() =>
+            {
+                foreach (var order in obsoleteOrders) script.Orders.Remove(order);
+                foreach (var trade in obsoleteTrades) script.Trades.Remove(trade);
+            });
         }
     }
 
