@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -16,189 +15,176 @@ namespace ProSystem;
 
 public partial class MainWindow : Window
 {
-    #region Fields
-    // Индикаторы и единый поток проверки условий
-    private static int CheckingInterval = 1;
-    private static DateTime TriggerRecalculation;
-    private static DateTime TriggerUpdatingModels;
-    private static DateTime TriggerCheckingPortfolio;
-    private static DateTime TriggerCheckingCondition;
-    private readonly System.Threading.Thread ThreadCheckingConditions;
-
-    // Прочие поля
-    public static readonly string[] MyConnectors = new string[] { "TXmlConnector" };
-    public static System.Globalization.CultureInfo IC { get; } = System.Globalization.CultureInfo.InvariantCulture;
-    #endregion
-
-    #region Properties
+    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
+    
     public static MainWindow Window { get; private set; }
+    public ISerializer Serializer { get; set; }
+    public INotifier Notifier { get; set; }
+
     public TradingSystem TradingSystem { get; private set; }
     public Connector Connector { get => TradingSystem.Connector; }
+    public Settings Settings { get => TradingSystem.Settings; }
+    public UnitedPortfolio Portfolio { get => TradingSystem.Portfolio; }
     public ObservableCollection<Tool> Tools { get => TradingSystem.Tools; }
+    public IToolManager ToolManager { get => TradingSystem.ToolManager; }
 
-    public static ISerializer Serializer { get; set; }
-    public static INotifier Notifier { get; set; }
-    public static IScriptManager ScriptManager { get; set; }
-    public static IPortfolioManager PortfolioManager { get; set; }
-    public static IToolManager ToolManager { get; set; }
-    public static UnitedPortfolio Portfolio { get; set; } = new();
-    public static Settings MySettings { get; set; } = new();
-    #endregion
-    
     public MainWindow()
     {
         Window = this;
         InitializeComponent();
         Logger.StartLogging(true);
-        ThreadCheckingConditions = new(CheckCondition) { IsBackground = true, Name = "CheckerCondition" };
 
-        // Восстановление данных и проверка настроек
         Serializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
-        DeserializeData();
+        RestoreInfo();
 
-        MySettings.Check(Tools);
-        if (MySettings.EmailPassword != null) Notifier = new EmailNotifier(587,
-            "smtp.gmail.com", MySettings.Email, MySettings.EmailPassword, (info) => AddInfo(info));
-        PortfolioManager = new PortfolioManager(Portfolio, (info) => AddInfo(info, true, true));
-        ScriptManager = new ScriptManager(Window, CancelOrder, (info) => AddInfo(info));
-        ToolManager = new ToolManager(this, ScriptManager);
+        TradingSystem = new(this, new TXmlConnector(this), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
 
-        // Привязка данных и восстановление вкладок инструментов
+        Settings.Check(Tools);
+        if (Settings.EmailPassword != null) Notifier = new EmailNotifier(587,
+            "smtp.gmail.com", Settings.Email, Settings.EmailPassword, (info) => AddInfo(info));
+
         BindData();
         RestoreToolTabs();
-        Portfolio.PropertyChanged += UpdatePortfolio;
-        Portfolio.PropertyChanged += SaveData;
-        Tools.CollectionChanged += UpdateTools;
-        Orders.CollectionChanged += UpdateOrders;
-        Trades.CollectionChanged += UpdateTrades;
 
-        // Инициализация коннектора и запуск единого потока обработки входящих данных
-        if (File.Exists("txmlconnector64.dll"))
-        {
-            ConnectorSetCallback();
-            if (ConnectorInitialize(MySettings.LogLevelConnector)) ConnectorInitialized = true;
-        }
-        else AddInfo("Не найден коннектор txmlconnector64.dll");
-
-        // Запуск единого потока проверки состояния системы
-        ThreadCheckingConditions.Start();
+        TradingSystem.Start();
     }
 
-    private void DeserializeData()
+    private Settings GetSettings()
     {
-        try { MySettings = (Settings)Serializer.Deserialize("Settings", MySettings.GetType()); }
-        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+        try
+        {
+            return (Settings)Serializer.Deserialize("Settings", typeof(Settings));
+        }
+        catch (Exception ex)
+        {
+            AddInfo("Serializer: " + ex.Message);
+            return new Settings();
+        }
+    }
 
-        try { Tools = new((IEnumerable<Tool>)Serializer.Deserialize("Tools", Tools.GetType())); }
-        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+    private Tool[] GetTools()
+    {
+        try
+        {
+            return (Tool[])Serializer.Deserialize("Tools", typeof(Tool[]));
+        }
+        catch (Exception ex)
+        {
+            AddInfo("Serializer: " + ex.Message);
+            return Array.Empty<Tool>();
+        }
+    }
 
-        try { Portfolio = (UnitedPortfolio)Serializer.Deserialize("Portfolio", Portfolio.GetType()); }
-        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+    private UnitedPortfolio GetPortfolio()
+    {
+        try
+        {
+            return (UnitedPortfolio)Serializer.Deserialize("Portfolio", typeof(UnitedPortfolio));
+        }
+        catch (Exception ex)
+        {
+            AddInfo("Serializer: " + ex.Message);
+            return new();
+        }
+    }
 
-        try { Trades = new((IEnumerable<Trade>)Serializer.Deserialize("Trades", Trades.GetType())); }
-        catch (Exception ex) { AddInfo("Serializer: " + ex.Message); }
+    private Trade[] GetTrades()
+    {
+        try
+        {
+            return (Trade[])Serializer.Deserialize("Trades", typeof(Trade[]));
+        }
+        catch (Exception ex)
+        {
+            AddInfo("Serializer: " + ex.Message);
+            return Array.Empty<Trade>();
+        }
+    }
 
+    private void RestoreInfo()
+    {
         if (File.Exists(Serializer.DataDirectory + "/Info.txt"))
         {
             try
             {
-                string Info = File.ReadAllText(Serializer.DataDirectory + "/Info.txt");
-                if (Info != "") TxtBox.Text = "Начало восстановленного фрагмента.\n" + Info + "\nКонец восстановленного фрагмента.";
+                var info = File.ReadAllText(Serializer.DataDirectory + "/Info.txt");
+                if (info != "") TxtBox.Text = "Начало фрагмента.\n" + info + "\nКонец фрагмента.";
             }
             catch (Exception ex) { AddInfo("Исключение чтения Info." + ex.Message); }
         }
     }
+
     private void BindData()
     {
+        BindData(TradingSystem.Settings);
+        BindData(TradingSystem.Portfolio);
+
+        ToolsView.ItemsSource = TradingSystem.Tools;
+        OrdersView.ItemsSource = TradingSystem.Orders;
+        TradesView.ItemsSource = TradingSystem.Trades;
+        PortfolioView.ItemsSource = TradingSystem.Portfolio.AllPositions;
+        ToolsByPriorityView.ItemsSource = TradingSystem.Settings.ToolsByPriority;
+
+        ComboBoxTool.ItemsSource = TradingSystem.Tools;
+        ComboBoxDistrib.ItemsSource = new string[] { "All tools", "First part", "Second part" };
+        ComboBoxDistrib.SelectedIndex = 1;
+        BoxConnectors.ItemsSource = new string[] { nameof(TXmlConnector) };
+        BoxConnectors.SelectedIndex = 0;
+
+        TradingSystem.Portfolio.PropertyChanged += UpdatePortfolio;
+        TradingSystem.Portfolio.PropertyChanged += SaveData;
+        TradingSystem.Tools.CollectionChanged += UpdateTools;
+        TradingSystem.Orders.CollectionChanged += UpdateOrders;
+        TradingSystem.Trades.CollectionChanged += UpdateTrades;
+    }
+
+    private void BindData(Settings settings)
+    {
         IntervalUpdateTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ModelUpdateInterval"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("ModelUpdateInterval"), Mode = BindingMode.TwoWay });
         IntervalRecalcTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("RecalcInterval"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("RecalcInterval"), Mode = BindingMode.TwoWay });
         ScheduleCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ScheduledConnection"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("ScheduledConnection"), Mode = BindingMode.TwoWay });
 
         DisplaySentOrdersCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("DisplaySentOrders"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("DisplaySentOrders"), Mode = BindingMode.TwoWay });
         DisplayNewTradesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("DisplayNewTrades"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("DisplayNewTrades"), Mode = BindingMode.TwoWay });
         DisplayMessagesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("DisplayMessages"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("DisplayMessages"), Mode = BindingMode.TwoWay });
         DisplaySpecialInfoCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("DisplaySpecialInfo"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("DisplaySpecialInfo"), Mode = BindingMode.TwoWay });
 
         TxtLog.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("LoginConnector"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("LoginConnector"), Mode = BindingMode.TwoWay });
         ConnectorLogLevelTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("LogLevelConnector"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("LogLevelConnector"), Mode = BindingMode.TwoWay });
         RequestTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("RequestTM"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("RequestTM"), Mode = BindingMode.TwoWay });
         SessionTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
-
-        AverageEquityTxt.SetBinding(TextBlock.TextProperty, new Binding()
-        {
-            Source = Portfolio,
-            Path = new PropertyPath("AverageEquity"),
-            Mode = BindingMode.OneWay,
-            StringFormat = "### ### ### УЕ"
-        });
-        CurShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
-        {
-            Source = Portfolio,
-            Path = new PropertyPath("ShareInitReqs"),
-            Mode = BindingMode.OneWay,
-            StringFormat = "#.##'%'"
-        });
-        CurShareInitReqsBaseTxt.SetBinding(TextBlock.TextProperty, new Binding()
-        {
-            Source = Portfolio,
-            Path = new PropertyPath("ShareInitReqsBaseAssets"),
-            Mode = BindingMode.OneWay,
-            StringFormat = "#.##'%'"
-        });
-        PotShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
-        {
-            Source = Portfolio,
-            Path = new PropertyPath("PotentialShareInitReqs"),
-            Mode = BindingMode.OneWay,
-            StringFormat = "#.##'%'"
-        });
-        CurShareMinReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
-        {
-            Source = Portfolio,
-            Path = new PropertyPath("ShareMinReqs"),
-            Mode = BindingMode.OneWay,
-            StringFormat = "#.##'%'"
-        });
-        CurShareBaseAssetsTxt.SetBinding(TextBlock.TextProperty, new Binding()
-        {
-            Source = Portfolio,
-            Path = new PropertyPath("ShareBaseAssets"),
-            Mode = BindingMode.OneWay,
-            StringFormat = "#.##'%'"
-        });
-
+            new Binding() { Source = settings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
 
         ToleranceEquityTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("ToleranceEquity"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         TolerancePositionTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
 
         OptShareBaseAssetsTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("OptShareBaseAssets"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         ToleranceBaseAssetsTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("ToleranceBaseAssets"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
@@ -206,305 +192,102 @@ public partial class MainWindow : Window
 
         MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("MaxShareInitReqsPosition"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("MaxShareInitReqsTool"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         MaxShareInitReqsPortfolioTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("MaxShareInitReqsPortfolio"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         MaxShareMinReqsPortfolioTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
-            Source = MySettings,
+            Source = settings,
             Path = new PropertyPath("MaxShareMinReqsPortfolio"),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
 
         ShelflifeTradesTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTrades"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeTrades"), Mode = BindingMode.TwoWay });
         ShelflifeOrdersScriptsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeOrdersScripts"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeOrdersScripts"), Mode = BindingMode.TwoWay });
         ShelflifeTradesScriptsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = MySettings, Path = new PropertyPath("ShelfLifeTradesScripts"), Mode = BindingMode.TwoWay });
-
-
-        ToolsView.ItemsSource = Tools;
-        OrdersView.ItemsSource = Orders;
-        TradesView.ItemsSource = Trades;
-        PortfolioView.ItemsSource = Portfolio.AllPositions;
-        ComboBoxTool.ItemsSource = Tools;
-        ComboBoxDistrib.ItemsSource = new string[] { "All tools", "First part", "Second part" };
-        ComboBoxDistrib.SelectedIndex = 1;
-        BoxConnectors.ItemsSource = MyConnectors;
-        BoxConnectors.SelectedIndex = 0;
-        ToolsByPriorityView.ItemsSource = MySettings.ToolsByPriority;
+            new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeTradesScripts"), Mode = BindingMode.TwoWay });
     }
+
+    private void BindData(UnitedPortfolio portfolio)
+    {
+        AverageEquityTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = portfolio,
+            Path = new PropertyPath("AverageEquity"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "### ### ### УЕ"
+        });
+        CurShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = portfolio,
+            Path = new PropertyPath("ShareInitReqs"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        CurShareInitReqsBaseTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = portfolio,
+            Path = new PropertyPath("ShareInitReqsBaseAssets"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        PotShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = portfolio,
+            Path = new PropertyPath("PotentialShareInitReqs"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        CurShareMinReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = portfolio,
+            Path = new PropertyPath("ShareMinReqs"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+        CurShareBaseAssetsTxt.SetBinding(TextBlock.TextProperty, new Binding()
+        {
+            Source = portfolio,
+            Path = new PropertyPath("ShareBaseAssets"),
+            Mode = BindingMode.OneWay,
+            StringFormat = "#.##'%'"
+        });
+    }
+
     private void RestoreToolTabs()
     {
         for (int i = 0; i < Tools.Count; i++)
         {
-            if (MySettings.ToolsByPriority[i] != Tools[i].Name)
+            if (Settings.ToolsByPriority[i] != Tools[i].Name)
             {
-                Tool SourceTool = Tools[i];
-                int x = Array.FindIndex(Tools.ToArray(), x => x.Name == MySettings.ToolsByPriority[i]);
+                var initTool = Tools[i];
+                int x = Array.FindIndex(Tools.ToArray(), x => x.Name == Settings.ToolsByPriority[i]);
                 Tools[i] = Tools[x];
-                Tools[x] = SourceTool;
+                Tools[x] = initTool;
             }
             ToolManager.CreateTab(Tools[i]);
         }
     }
 
-    private async Task CheckPortfolio()
-    {
-        bool CancelActiveOrders(string Seccode)
-        {
-            Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == Seccode && x.Status is "active" or "watching").ToArray();
-            if (ActiveOrders.Length == 0) return true;
-            else
-            {
-                foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
-                System.Threading.Thread.Sleep(500);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-                System.Threading.Thread.Sleep(1000);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-                System.Threading.Thread.Sleep(1500);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-                System.Threading.Thread.Sleep(2000);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-                return false;
-            }
-        }
-        bool ClosePositionByMarket(Security Symbol, Position MyPosition)
-        {
-            if (SendOrder(Symbol, OrderType.Market,
-                (int)MyPosition.Saldo < 0, 100, (int)Math.Abs(MyPosition.Saldo), "ClosingPositionByMarket"))
-            {
-                System.Threading.Thread.Sleep(500);
-                if ((int)MyPosition.Saldo != 0)
-                {
-                    System.Threading.Thread.Sleep(1000);
-                    if ((int)MyPosition.Saldo != 0) System.Threading.Thread.Sleep(1500);
-                    if ((int)MyPosition.Saldo != 0) System.Threading.Thread.Sleep(2000);
-                    if ((int)MyPosition.Saldo != 0) System.Threading.Thread.Sleep(5000);
-                }
-                if ((int)MyPosition.Saldo == 0) return true;
-                else AddInfo("CheckPortfolio: Заявка отправлена, но позиция всё ещё не закрыта: " + Symbol.Seccode);
-            }
-            return false;
-        }
-
-        TriggerCheckingPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
-        if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-
-        int UpperBorder = Portfolio.AverageEquity + Portfolio.AverageEquity / 100 * MySettings.ToleranceEquity;
-        int LowerBorder = Portfolio.AverageEquity - Portfolio.AverageEquity / 100 * MySettings.ToleranceEquity;
-        if (Portfolio.Saldo < LowerBorder || Portfolio.Saldo > UpperBorder)
-        {
-            AddInfo("CheckPortfolio: Стоимость портфеля за пределами допустимого отклонения.", notify: true);
-            return;
-        }
-        try
-        {
-            Tool[] MyTools = Tools.ToArray();
-            foreach (Position MyPosition in Portfolio.Positions.ToArray())
-            {
-                if ((int)MyPosition.Saldo != 0 &&
-                    MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
-                    AddInfo("CheckPortfolio: обнаружен независимый актив: " + MyPosition.Seccode, notify: true);
-            }
-
-            double MaxMinReqs = Portfolio.Saldo / 100 * MySettings.MaxShareMinReqsPortfolio;
-            double MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
-            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs)
-            {
-                PortfolioManager.UpdateShares(MyTools);
-                PortfolioManager.CheckShares(MySettings);
-                return;
-            }
-
-            // Запрос информации
-            GetPortfolio(Clients[0].Union);
-            System.Threading.Thread.Sleep(5000);
-
-            // Повторная проверка объёма требований
-            MaxMinReqs = Portfolio.Saldo / 100 * MySettings.MaxShareMinReqsPortfolio;
-            MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
-            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-
-            // Балансировка портфеля
-            AddInfo("CheckPortfolio: Требования портфеля превысили нормы: " +
-                MySettings.MaxShareMinReqsPortfolio.ToString(IC) + "%/" +
-                MySettings.MaxShareInitReqsPortfolio.ToString(IC) + "% MinReqs/InitReqs: " +
-                Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2).ToString(IC) + "%/" +
-                Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2).ToString(IC) + "%", notify: true);
-            if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-
-            // Поиск и закрытие неизвестных позиций, независящих от активных инструментов
-            foreach (Position MyPosition in Portfolio.Positions.ToArray())
-            {
-                if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-                if ((int)MyPosition.Saldo != 0 &&
-                    MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
-                {
-                    // Отмена соответствующих заявок
-                    if (!CancelActiveOrders(MyPosition.Seccode))
-                    {
-                        AddInfo("CheckPortfolio: Не удалось отменить заявки перед закрытием неизвестной позиции: " +
-                            MyPosition.Seccode);
-                        continue;
-                    }
-
-                    // Закрытие неизвестной позиции по рынку
-                    Security Symbol = AllSecurities.Single(x => x.Seccode == MyPosition.Seccode && x.Market == MyPosition.Market);
-                    if (ClosePositionByMarket(Symbol, MyPosition))
-                    {
-                        CancelActiveOrders(MyPosition.Seccode);
-                        AddInfo("CheckPortfolio: Закрыта неизвестная позиция: " + MyPosition.Seccode);
-                        System.Threading.Thread.Sleep(2000);
-
-                        GetPortfolio(Clients[0].Union);
-                        System.Threading.Thread.Sleep(3000);
-                        if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-                    }
-                    else AddInfo("CheckPortfolio: Не удалось закрыть неизвестную позицию: " + MyPosition.Seccode);
-                }
-            }
-
-            // Проверка объёмов открытых позиций активных инструментов
-            double MaxShare = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsTool;
-            foreach (Position MyPosition in Portfolio.Positions.ToArray())
-            {
-                if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-                if ((int)MyPosition.Saldo != 0)
-                {
-                    Tool MyTool = MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode);
-                    if (MyTool == null) continue;
-
-                    bool Long = (int)MyPosition.Saldo > 0;
-                    int Vol = (int)Math.Abs(MyPosition.Saldo);
-                    if (Long && Vol * MyTool.MySecurity.InitReqLong > MaxShare ||
-                        !Long && Vol * MyTool.MySecurity.InitReqShort > MaxShare)
-                    {
-                        AddInfo("CheckPortfolio: Позиция превышает MaxShareInitReqsTool: " + MyPosition.Seccode);
-
-                        // Отмена соответствующих заявок
-                        if (!CancelActiveOrders(MyPosition.Seccode))
-                        {
-                            AddInfo("CheckPortfolio: Не удалось отменить заявки перед закрытием позиции.");
-                            continue;
-                        }
-
-                        // Приостановка торговли, закрытие позиции по рынку и отключение инструмента
-                        bool SourceStopTrading = MyTool.StopTrading;
-                        MyTool.StopTrading = true;
-                        if (ClosePositionByMarket(MyTool.MySecurity, MyPosition))
-                        {
-                            // Проверка отсутствия соответствующих заявок
-                            if (!CancelActiveOrders(MyPosition.Seccode))
-                            {
-                                AddInfo("CheckPortfolio: Позиция закрыта, но не удалось отменить заявки. Инструмент не отключен.");
-                                continue;
-                            }
-
-                            // Отключение инструмента
-                            if (MyTool.Active) await ToolManager.ChangeActivityAsync(MyTool);
-                            AddInfo("CheckPortfolio: Позиция закрыта, заявок нет. Инструмент отключен: " + MyTool.Name);
-                            System.Threading.Thread.Sleep(2000);
-
-                            // Проверка требований портфеля
-                            GetPortfolio(Clients[0].Union);
-                            System.Threading.Thread.Sleep(5000);
-                            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-                        }
-                        else
-                        {
-                            MyTool.StopTrading = SourceStopTrading;
-                            AddInfo("CheckPortfolio: Не удалось закрыть позицию по рынку.");
-                        }
-                    }
-                }
-            }
-
-            // Отключение наименее приоритетных активных инструментов
-            for (int i = MySettings.ToolsByPriority.Count - 1; i > 0; i--)
-            {
-                GetPortfolio(Clients[0].Union);
-                System.Threading.Thread.Sleep(5000);
-                MaxMinReqs = Portfolio.Saldo / 100 * MySettings.MaxShareMinReqsPortfolio;
-                MaxInitReqs = Portfolio.Saldo / 100 * MySettings.MaxShareInitReqsPortfolio;
-                if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-                if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-
-                Tool MyTool = MyTools.SingleOrDefault(x => x.Active && x.Name == MySettings.ToolsByPriority[i]);
-                if (MyTool != null)
-                {
-                    AddInfo("CheckPortfolio: Отключение наименее приоритетного инструмента: " + MyTool.Name);
-
-                    // Отмена соответствующих заявок
-                    if (!CancelActiveOrders(MyTool.MySecurity.Seccode))
-                    {
-                        AddInfo("CheckPortfolio: Не удалось отменить заявки наименее приоритетного активного инструмента.");
-                        continue;
-                    }
-
-                    // Закрытие позиции по рынку, если она существует
-                    bool SourceStopTrading = MyTool.StopTrading;
-                    MyTool.StopTrading = true;
-                    Position MyPosition = Portfolio.Positions.ToArray().SingleOrDefault(x => x.Seccode == MyTool.MySecurity.Seccode);
-                    if (MyPosition != null && (int)MyPosition.Saldo != 0)
-                    {
-                        if (ClosePositionByMarket(MyTool.MySecurity, MyPosition))
-                        {
-                            if (!CancelActiveOrders(MyPosition.Seccode))
-                            {
-                                AddInfo("CheckPortfolio: Позиция закрыта, но не удалось отменить заявки. Инструмент активен.");
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            AddInfo("CheckPortfolio: Не удалось закрыть позицию наименее приоритетного активного инструмента. Инструмент активен.");
-                            MyTool.StopTrading = SourceStopTrading;
-                            continue;
-                        }
-                    }
-
-                    // Отключение инструмента
-                    if (MyTool.Active) await ToolManager.ChangeActivityAsync(MyTool);
-                    AddInfo("CheckPortfolio: Позиция закрыта, заявок нет. Наименее приоритетный инструмент отключен: " + MyTool.Name);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            AddInfo("CheckPortfolio исключение: " + e.Message);
-            AddInfo("Трассировка стека: " + e.StackTrace);
-            if (e.InnerException != null)
-            {
-                AddInfo("Внутреннее исключение: " + e.InnerException.Message);
-                AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
-            }
-        }
-    }
-
-    
-    
     public void AddInfo(string data, bool important = true, bool notify = false)
     {
         Logger.WriteLogSystem(data);
@@ -518,7 +301,6 @@ public partial class MainWindow : Window
         }
         if (notify) Notifier.Notify(data);
     }
-
 
     #region Menu
     private bool SaveData(bool SaveInfoPanel = false)
@@ -560,10 +342,10 @@ public partial class MainWindow : Window
         try
         {
             string[] details = File.ReadAllLines("Data/mail.txt");
-            MySettings.Email = details[0];
-            MySettings.EmailPassword = details[1];
-            (Notifier as EmailNotifier).Email = MySettings.Email;
-            (Notifier as EmailNotifier).Password = MySettings.EmailPassword;
+            Settings.Email = details[0];
+            Settings.EmailPassword = details[1];
+            (Notifier as EmailNotifier).Email = Settings.Email;
+            (Notifier as EmailNotifier).Password = Settings.EmailPassword;
             Notifier.Notify("Test notify");
             AddInfo("Тестовое уведомление отправлено.");
         }
@@ -674,7 +456,7 @@ public partial class MainWindow : Window
             TabsTools.Items.Remove(TabsTools.Items[i]);
 
             // Удаление инструмента
-            MySettings.ToolsByPriority.Remove(Tools[i].Name);
+            Settings.ToolsByPriority.Remove(Tools[i].Name);
             ToolsByPriorityView.Items.Refresh();
             if (Tools.Remove(Tools[i])) AddInfo("Удалён инструмент: " + ToolName);
             else AddInfo("Не получилось удалить инструмент: " + ToolName);
@@ -691,18 +473,18 @@ public partial class MainWindow : Window
         {
             while (n > 0)
             {
-                (MySettings.ToolsByPriority[i], MySettings.ToolsByPriority[i - 1]) =
-                    (MySettings.ToolsByPriority[i - 1], MySettings.ToolsByPriority[i]);
+                (Settings.ToolsByPriority[i], Settings.ToolsByPriority[i - 1]) =
+                    (Settings.ToolsByPriority[i - 1], Settings.ToolsByPriority[i]);
                 n--;
                 i--;
             }
         }
-        else if (header.StartsWith("Downgrade") && i > -1 && i < MySettings.ToolsByPriority.Count - n)
+        else if (header.StartsWith("Downgrade") && i > -1 && i < Settings.ToolsByPriority.Count - n)
         {
             while (n > 0)
             {
-                (MySettings.ToolsByPriority[i], MySettings.ToolsByPriority[i + 1]) =
-                    (MySettings.ToolsByPriority[i + 1], MySettings.ToolsByPriority[i]);
+                (Settings.ToolsByPriority[i], Settings.ToolsByPriority[i + 1]) =
+                    (Settings.ToolsByPriority[i + 1], Settings.ToolsByPriority[i]);
                 n--;
                 i++;
             }
@@ -810,7 +592,7 @@ public partial class MainWindow : Window
     {
         OrdersView.Items.Refresh();
         TradesView.Items.Refresh();
-        Task.Run(() => PortfolioManager.UpdatePositions());
+        Task.Run(() => TradingSystem.PortfolioManager.UpdatePositions());
     }
 
     private void ClearInfo(object sender, RoutedEventArgs e) => TxtBox.Clear();
@@ -823,7 +605,7 @@ public partial class MainWindow : Window
             await Task.Run(() => Connector.Disconnect(false));
         else if (TxtLog.Text.Length > 0 && TxtPas.SecurePassword.Length > 0)
         {
-            Connector.TriggerReconnection = DateTime.Now.AddSeconds(MySettings.SessionTM);
+            Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
             await Task.Run(() => Connector.Connect(false));
         }
         else AddInfo("Введите логин и пароль.");
@@ -838,13 +620,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        CheckingInterval = 1000;
-        System.Threading.Thread.Sleep(50);
-        if (Connector.Connection != ConnectionState.Disconnected)
-            Connector.Disconnect(true);
-
-        if (!Connector.Initialized || Connector.Uninitialize()) Logger.StopLogging();
-        else MessageBox.Show("UnInitialization failed.");
+        TradingSystem.Stop();
+        Logger.StopLogging();
     }
     internal async void ChangeActivityTool(object sender, RoutedEventArgs e)
     {

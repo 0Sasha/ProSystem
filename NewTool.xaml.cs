@@ -190,9 +190,9 @@ public partial class NewTool : Window
 
             if (SelectedTool.Name != ToolName.Text)
             {
-                MySettings.ToolsByPriority.Remove(SelectedTool.Name);
+                Window.Settings.ToolsByPriority.Remove(SelectedTool.Name);
                 SelectedTool.Name = ToolName.Text;
-                MySettings.ToolsByPriority.Add(SelectedTool.Name);
+                Window.Settings.ToolsByPriority.Add(SelectedTool.Name);
             }
             if (SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode)
             {
@@ -229,8 +229,8 @@ public partial class NewTool : Window
         if (NewTool)
         {
             Tools.Add(MyTool);
-            ToolManager.CreateTab(MyTool);
-            MySettings.ToolsByPriority.Add(MyTool.Name);
+            Window.ToolManager.CreateTab(MyTool);
+            Window.Settings.ToolsByPriority.Add(MyTool.Name);
             Window.ToolsByPriorityView.Items.Refresh();
             k = Tools.Count - 1;
         }
@@ -241,7 +241,7 @@ public partial class NewTool : Window
             MyTool.MainModel.Annotations.Clear();
 
             k = Tools.IndexOf(MyTool);
-            ToolManager.UpdateControlGrid(MyTool);
+            Window.ToolManager.UpdateControlGrid(MyTool);
             if (MyTool.Scripts.Length < 2)
             {
                 ((Window.TabsTools.Items[k] as TabItem).Content as Grid)
@@ -255,12 +255,12 @@ public partial class NewTool : Window
         {
             await Task.Run(() =>
             {
-                ToolManager.RequestBars(Tools[k]);
+                Window.ToolManager.RequestBars(Tools[k]);
                 Window.TradingSystem.Connector.OrderSecurityInfo(Tools[k].MySecurity);
                 Task.Run(() =>
                 {
                     System.Threading.Thread.Sleep(4000);
-                    ToolManager.UpdateView(Tools[k], true);
+                    Window.ToolManager.UpdateView(Tools[k], true);
                 });
             });
         }

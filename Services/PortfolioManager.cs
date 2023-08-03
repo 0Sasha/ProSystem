@@ -1,21 +1,23 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ProSystem.Services;
 
 internal class PortfolioManager : IPortfolioManager
 {
-    private readonly Action<string> Inform;
+    private MainWindow Window { get => TradingSystem.Window; }
+    private Settings Settings { get => TradingSystem.Settings; }
+    private UnitedPortfolio Portfolio { get => TradingSystem.Portfolio; }
+    private Connector Connector { get => TradingSystem.Connector; }
+    private IToolManager ToolManager { get => TradingSystem.ToolManager; }
 
-    public UnitedPortfolio Portfolio { get; }
+    public TradingSystem TradingSystem { get; }
 
-    public PortfolioManager(UnitedPortfolio portfolio, Action<string> inform)
-    {
-        Portfolio = portfolio;
-        Inform = inform;
-    }
+    public PortfolioManager(TradingSystem tradingSystem) =>
+        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
 
     public void UpdateEquity()
     {
@@ -31,12 +33,12 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.Notify("Positions");
     }
 
-    public void UpdateShares(IEnumerable<Tool> tools)
+    public void UpdateShares()
     {
         double sumPotInitReqs = 0;
         double sumInitReqsBaseAssets = 0;
         double sumReqsBaseAssets = 0;
-        foreach (var tool in tools)
+        foreach (var tool in TradingSystem.Tools)
         {
             if (tool.Active)
             {
@@ -67,267 +69,255 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.Notify("Shares");
     }
 
-    public bool CheckEquity(Settings settings)
+    public bool CheckEquity()
     {
-        int range = Portfolio.AverageEquity / 100 * settings.ToleranceEquity;
+        int range = Portfolio.AverageEquity / 100 * Settings.ToleranceEquity;
         if (Portfolio.Saldo < Portfolio.AverageEquity - range || Portfolio.Saldo > Portfolio.AverageEquity + range)
         {
-            Inform("Стоимость портфеля за пределами допустимого отклонения.");
+            Window.AddInfo("Стоимость портфеля за пределами допустимого отклонения.");
             return false;
         }
         return true;
     }
 
-    public bool CheckShares(Settings settings)
+    public bool CheckShares()
     {
-        if (Portfolio.PotentialShareInitReqs > settings.MaxShareInitReqsPortfolio)
+        if (Portfolio.PotentialShareInitReqs > Settings.MaxShareInitReqsPortfolio)
         {
-            Inform("Portfolio: Потенциальные начальные требования портфеля превышают норму: " +
-               settings.MaxShareInitReqsPortfolio + "%. PotentialInitReqs: " +
+            Window.AddInfo("Portfolio: Потенциальные начальные требования портфеля превышают норму: " +
+               Settings.MaxShareInitReqsPortfolio + "%. PotentialInitReqs: " +
                Portfolio.PotentialShareInitReqs + "%");
             return false;
         }
 
-        if (Portfolio.ShareBaseAssets > settings.OptShareBaseAssets + settings.ToleranceBaseAssets ||
-            Portfolio.ShareBaseAssets < settings.OptShareBaseAssets - settings.ToleranceBaseAssets)
+        if (Portfolio.ShareBaseAssets > Settings.OptShareBaseAssets + Settings.ToleranceBaseAssets ||
+            Portfolio.ShareBaseAssets < Settings.OptShareBaseAssets - Settings.ToleranceBaseAssets)
         {
-            Inform("Portfolio: Доля базовых активов за пределами допустимого отклонения: " +
+            Window.AddInfo("Portfolio: Доля базовых активов за пределами допустимого отклонения: " +
                 Portfolio.ShareBaseAssets + "%");
             return false;
         }
         return true;
     }
 
-    private async Task CheckPortfolio(IEnumerable<Tool> tools, Settings settings)
+    public async Task NormalizePortfolioAsync()
     {
-        bool CancelActiveOrders(string Seccode)
+        if (!CheckEquity()) return;
+
+        if (CheckRequirements())
         {
-            Order[] ActiveOrders = Orders.ToArray().Where(x => x.Seccode == Seccode && x.Status is "active" or "watching").ToArray();
-            if (ActiveOrders.Length == 0) return true;
-            else
-            {
-                foreach (Order MyOrder in ActiveOrders) CancelOrder(MyOrder);
-                System.Threading.Thread.Sleep(500);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-                System.Threading.Thread.Sleep(1000);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-                System.Threading.Thread.Sleep(1500);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-                System.Threading.Thread.Sleep(2000);
-                if (!ActiveOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-                return false;
-            }
-        }
-        bool ClosePositionByMarket(Security Symbol, Position MyPosition)
-        {
-            if (SendOrder(Symbol, OrderType.Market,
-                (int)MyPosition.Saldo < 0, 100, (int)Math.Abs(MyPosition.Saldo), "ClosingPositionByMarket"))
-            {
-                System.Threading.Thread.Sleep(500);
-                if ((int)MyPosition.Saldo != 0)
-                {
-                    System.Threading.Thread.Sleep(1000);
-                    if ((int)MyPosition.Saldo != 0) System.Threading.Thread.Sleep(1500);
-                    if ((int)MyPosition.Saldo != 0) System.Threading.Thread.Sleep(2000);
-                    if ((int)MyPosition.Saldo != 0) System.Threading.Thread.Sleep(5000);
-                }
-                if ((int)MyPosition.Saldo == 0) return true;
-                else AddInfo("CheckPortfolio: Заявка отправлена, но позиция всё ещё не закрыта: " + Symbol.Seccode);
-            }
-            return false;
-        }
-
-        int UpperBorder = Portfolio.AverageEquity + Portfolio.AverageEquity / 100 * settings.ToleranceEquity;
-        int LowerBorder = Portfolio.AverageEquity - Portfolio.AverageEquity / 100 * settings.ToleranceEquity;
-        if (Portfolio.Saldo < LowerBorder || Portfolio.Saldo > UpperBorder)
-        {
-            AddInfo("CheckPortfolio: Стоимость портфеля за пределами допустимого отклонения.", notify: true);
+            UpdateShares();
+            CheckShares();
+            NotifyIndependentPositions(TradingSystem.Tools.ToArray());
             return;
         }
-        try
+        else
         {
-            Tool[] MyTools = tools.ToArray();
-            foreach (Position MyPosition in Portfolio.Positions.ToArray())
-            {
-                if ((int)MyPosition.Saldo != 0 &&
-                    MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
-                    AddInfo("CheckPortfolio: обнаружен независимый актив: " + MyPosition.Seccode, notify: true);
-            }
+            Window.AddInfo("Требования портфеля выше нормы: " + Settings.MaxShareMinReqsPortfolio + "%/" +
+                Settings.MaxShareInitReqsPortfolio + "% MinReqs/InitReqs: " +
+                Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2) + "%/" +
+                Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2) + "%", notify: true);
 
-            double MaxMinReqs = Portfolio.Saldo / 100 * settings.MaxShareMinReqsPortfolio;
-            double MaxInitReqs = Portfolio.Saldo / 100 * settings.MaxShareInitReqsPortfolio;
-            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs)
+            if (Connector.Connection != ConnectionState.Connected)
             {
-                UpdateShares(MyTools);
-                CheckShares(settings);
+                Window.AddInfo("Соединение отсутствует.");
                 return;
             }
+        }
 
-            // Запрос информации
-            GetPortfolio(Clients[0].Union);
-            System.Threading.Thread.Sleep(5000);
+        Connector.OrderPortfolioInfo(Portfolio);
+        Thread.Sleep(5000);
+        if (CheckRequirements()) return;
 
-            // Повторная проверка объёма требований
-            MaxMinReqs = Portfolio.Saldo / 100 * settings.MaxShareMinReqsPortfolio;
-            MaxInitReqs = Portfolio.Saldo / 100 * settings.MaxShareInitReqsPortfolio;
-            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
+        try
+        {
+            var tools = TradingSystem.Tools.ToArray();
+            CloseIndependentPositions(tools);
+            Connector.OrderPortfolioInfo(Portfolio);
+            Thread.Sleep(5000);
+            if (CheckRequirements()) return;
 
-            // Балансировка портфеля
-            AddInfo("CheckPortfolio: Требования портфеля превысили нормы: " +
-                settings.MaxShareMinReqsPortfolio.ToString(IC) + "%/" +
-                settings.MaxShareInitReqsPortfolio.ToString(IC) + "% MinReqs/InitReqs: " +
-                Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2).ToString(IC) + "%/" +
-                Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2).ToString(IC) + "%", notify: true);
-            if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
+            await DeactivateLargePositionToolsAsync(tools);
+            Connector.OrderPortfolioInfo(Portfolio);
+            Thread.Sleep(5000);
+            if (CheckRequirements()) return;
 
-            // Поиск и закрытие неизвестных позиций, независящих от активных инструментов
-            foreach (Position MyPosition in Portfolio.Positions.ToArray())
-            {
-                if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-                if ((int)MyPosition.Saldo != 0 &&
-                    MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode) == null)
-                {
-                    // Отмена соответствующих заявок
-                    if (!CancelActiveOrders(MyPosition.Seccode))
-                    {
-                        AddInfo("CheckPortfolio: Не удалось отменить заявки перед закрытием неизвестной позиции: " +
-                            MyPosition.Seccode);
-                        continue;
-                    }
-
-                    // Закрытие неизвестной позиции по рынку
-                    Security Symbol = AllSecurities.Single(x => x.Seccode == MyPosition.Seccode && x.Market == MyPosition.Market);
-                    if (ClosePositionByMarket(Symbol, MyPosition))
-                    {
-                        CancelActiveOrders(MyPosition.Seccode);
-                        AddInfo("CheckPortfolio: Закрыта неизвестная позиция: " + MyPosition.Seccode);
-                        System.Threading.Thread.Sleep(2000);
-
-                        GetPortfolio(Clients[0].Union);
-                        System.Threading.Thread.Sleep(3000);
-                        if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-                    }
-                    else AddInfo("CheckPortfolio: Не удалось закрыть неизвестную позицию: " + MyPosition.Seccode);
-                }
-            }
-
-            // Проверка объёмов открытых позиций активных инструментов
-            double MaxShare = Portfolio.Saldo / 100 * settings.MaxShareInitReqsTool;
-            foreach (Position MyPosition in Portfolio.Positions.ToArray())
-            {
-                if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-                if ((int)MyPosition.Saldo != 0)
-                {
-                    Tool MyTool = MyTools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == MyPosition.Seccode);
-                    if (MyTool == null) continue;
-
-                    bool Long = (int)MyPosition.Saldo > 0;
-                    int Vol = (int)Math.Abs(MyPosition.Saldo);
-                    if (Long && Vol * MyTool.MySecurity.InitReqLong > MaxShare ||
-                        !Long && Vol * MyTool.MySecurity.InitReqShort > MaxShare)
-                    {
-                        AddInfo("CheckPortfolio: Позиция превышает MaxShareInitReqsTool: " + MyPosition.Seccode);
-
-                        // Отмена соответствующих заявок
-                        if (!CancelActiveOrders(MyPosition.Seccode))
-                        {
-                            AddInfo("CheckPortfolio: Не удалось отменить заявки перед закрытием позиции.");
-                            continue;
-                        }
-
-                        // Приостановка торговли, закрытие позиции по рынку и отключение инструмента
-                        bool SourceStopTrading = MyTool.StopTrading;
-                        MyTool.StopTrading = true;
-                        if (ClosePositionByMarket(MyTool.MySecurity, MyPosition))
-                        {
-                            // Проверка отсутствия соответствующих заявок
-                            if (!CancelActiveOrders(MyPosition.Seccode))
-                            {
-                                AddInfo("CheckPortfolio: Позиция закрыта, но не удалось отменить заявки. Инструмент не отключен.");
-                                continue;
-                            }
-
-                            // Отключение инструмента
-                            if (MyTool.Active) await ToolManager.ChangeActivityAsync(MyTool);
-                            AddInfo("CheckPortfolio: Позиция закрыта, заявок нет. Инструмент отключен: " + MyTool.Name);
-                            System.Threading.Thread.Sleep(2000);
-
-                            // Проверка требований портфеля
-                            GetPortfolio(Clients[0].Union);
-                            System.Threading.Thread.Sleep(5000);
-                            if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-                        }
-                        else
-                        {
-                            MyTool.StopTrading = SourceStopTrading;
-                            AddInfo("CheckPortfolio: Не удалось закрыть позицию по рынку.");
-                        }
-                    }
-                }
-            }
-
-            // Отключение наименее приоритетных активных инструментов
-            for (int i = settings.ToolsByPriority.Count - 1; i > 0; i--)
-            {
-                GetPortfolio(Clients[0].Union);
-                System.Threading.Thread.Sleep(5000);
-                MaxMinReqs = Portfolio.Saldo / 100 * settings.MaxShareMinReqsPortfolio;
-                MaxInitReqs = Portfolio.Saldo / 100 * settings.MaxShareInitReqsPortfolio;
-                if (Portfolio.MinReqs < MaxMinReqs && Portfolio.InitReqs < MaxInitReqs) return;
-                if (Connection != ConnectionState.Connected) { AddInfo("CheckPortfolio: соединение отсутствует."); return; }
-
-                Tool MyTool = MyTools.SingleOrDefault(x => x.Active && x.Name == settings.ToolsByPriority[i]);
-                if (MyTool != null)
-                {
-                    AddInfo("CheckPortfolio: Отключение наименее приоритетного инструмента: " + MyTool.Name);
-
-                    // Отмена соответствующих заявок
-                    if (!CancelActiveOrders(MyTool.MySecurity.Seccode))
-                    {
-                        AddInfo("CheckPortfolio: Не удалось отменить заявки наименее приоритетного активного инструмента.");
-                        continue;
-                    }
-
-                    // Закрытие позиции по рынку, если она существует
-                    bool SourceStopTrading = MyTool.StopTrading;
-                    MyTool.StopTrading = true;
-                    Position MyPosition = Portfolio.Positions.ToArray().SingleOrDefault(x => x.Seccode == MyTool.MySecurity.Seccode);
-                    if (MyPosition != null && (int)MyPosition.Saldo != 0)
-                    {
-                        if (ClosePositionByMarket(MyTool.MySecurity, MyPosition))
-                        {
-                            if (!CancelActiveOrders(MyPosition.Seccode))
-                            {
-                                AddInfo("CheckPortfolio: Позиция закрыта, но не удалось отменить заявки. Инструмент активен.");
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            AddInfo("CheckPortfolio: Не удалось закрыть позицию наименее приоритетного активного инструмента. Инструмент активен.");
-                            MyTool.StopTrading = SourceStopTrading;
-                            continue;
-                        }
-                    }
-
-                    // Отключение инструмента
-                    if (MyTool.Active) await ToolManager.ChangeActivityAsync(MyTool);
-                    AddInfo("CheckPortfolio: Позиция закрыта, заявок нет. Наименее приоритетный инструмент отключен: " + MyTool.Name);
-                }
-            }
+            await DeactivateLessPriorityToolsAsync(tools);
         }
         catch (Exception e)
         {
-            AddInfo("CheckPortfolio исключение: " + e.Message);
-            AddInfo("Трассировка стека: " + e.StackTrace);
+            Window.AddInfo("CheckPortfolio исключение: " + e.Message);
+            Window.AddInfo("Трассировка стека: " + e.StackTrace);
             if (e.InnerException != null)
             {
-                AddInfo("Внутреннее исключение: " + e.InnerException.Message);
-                AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
+                Window.AddInfo("Внутреннее исключение: " + e.InnerException.Message);
+                Window.AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
             }
         }
+    }
+
+    private bool CheckRequirements()
+    {
+        double maxMinReqs = Portfolio.Saldo / 100 * Settings.MaxShareMinReqsPortfolio;
+        double maxInitReqs = Portfolio.Saldo / 100 * Settings.MaxShareInitReqsPortfolio;
+        return Portfolio.MinReqs < maxMinReqs && Portfolio.InitReqs < maxInitReqs;
+    }
+
+    private void NotifyIndependentPositions(IEnumerable<Tool> tools)
+    {
+        foreach (var position in Portfolio.Positions.ToArray())
+        {
+            if ((int)position.Saldo != 0 &&
+                tools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode) == null)
+                Window.AddInfo("Независимый актив: " + position.Seccode, notify: true);
+        }
+    }
+
+    private void CloseIndependentPositions(IEnumerable<Tool> tools)
+    {
+        foreach (var position in Portfolio.Positions.ToArray())
+        {
+            if ((int)position.Saldo != 0 &&
+                tools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode) == null)
+            {
+                if (!CancelActiveOrders(position.Seccode))
+                {
+                    Window.AddInfo("Не удалось отменить заявки перед закрытием позиции: " + position.Seccode);
+                    continue;
+                }
+
+                if (ClosePositionByMarket(position))
+                {
+                    CancelActiveOrders(position.Seccode);
+                    Window.AddInfo("Закрыта неизвестная позиция: " + position.Seccode);
+                }
+                else Window.AddInfo("Не удалось закрыть неизвестную позицию: " + position.Seccode);
+            }
+        }
+    }
+
+    private async Task DeactivateLargePositionToolsAsync(IEnumerable<Tool> tools)
+    {
+        double maxShare = Portfolio.Saldo / 100 * Settings.MaxShareInitReqsTool;
+        foreach (var position in Portfolio.Positions.ToArray().Where(p => (int)p.Saldo != 0))
+        {
+            var tool = tools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode);
+            if (tool == null) continue;
+
+            var isLong = (int)position.Saldo > 0;
+            var vol = (int)Math.Abs(position.Saldo);
+            if (isLong && vol * tool.MySecurity.InitReqLong > maxShare ||
+                !isLong && vol * tool.MySecurity.InitReqShort > maxShare)
+            {
+                Window.AddInfo("Позиция превышает MaxShareInitReqsTool: " + position.Seccode);
+                if (!CancelActiveOrders(position.Seccode))
+                {
+                    Window.AddInfo("Не удалось отменить заявки перед закрытием позиции.");
+                    continue;
+                }
+
+                bool initStopTrading = tool.StopTrading;
+                tool.StopTrading = true;
+                if (ClosePositionByMarket(position))
+                {
+                    if (!CancelActiveOrders(position.Seccode))
+                    {
+                        Window.AddInfo("Позиция закрыта, но не удалось отменить заявки. Инструмент не отключен.");
+                        continue;
+                    }
+                    if (tool.Active) await ToolManager.ChangeActivityAsync(tool);
+                    Window.AddInfo("Позиция закрыта. Инструмент отключен: " + tool.Name);
+                }
+                else
+                {
+                    tool.StopTrading = initStopTrading;
+                    Window.AddInfo("Не удалось закрыть позицию по рынку.");
+                }
+            }
+        }
+    }
+
+    private async Task DeactivateLessPriorityToolsAsync(IEnumerable<Tool> tools)
+    {
+        for (int i = Settings.ToolsByPriority.Count - 1; i > 0; i--)
+        {
+            Connector.OrderPortfolioInfo(Portfolio);
+            Thread.Sleep(5000);
+            if (CheckRequirements()) return;
+            if (Connector.Connection != ConnectionState.Connected)
+            {
+                Window.AddInfo("Cоединение отсутствует.");
+                return;
+            }
+
+            var tool = tools.SingleOrDefault(x => x.Active && x.Name == Settings.ToolsByPriority[i]);
+            if (tool != null)
+            {
+                Window.AddInfo("Отключение наименее приоритетного инструмента: " + tool.Name);
+                if (!CancelActiveOrders(tool.MySecurity.Seccode))
+                {
+                    Window.AddInfo("Не удалось отменить заявки наименее приоритетного активного инструмента.");
+                    continue;
+                }
+
+                var initStopTrading = tool.StopTrading;
+                tool.StopTrading = true;
+                var position = Portfolio.Positions.ToArray()
+                    .SingleOrDefault(x => x.Seccode == tool.MySecurity.Seccode);
+                if (position != null && (int)position.Saldo != 0)
+                {
+                    if (ClosePositionByMarket(position))
+                    {
+                        if (!CancelActiveOrders(position.Seccode))
+                        {
+                            Window.AddInfo("Позиция закрыта, но не удалось отменить заявки. Инструмент активен.");
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        Window.AddInfo("Не удалось закрыть позицию инструмента. Инструмент активен.");
+                        tool.StopTrading = initStopTrading;
+                        continue;
+                    }
+                }
+
+                if (tool.Active) await ToolManager.ChangeActivityAsync(tool);
+                Window.AddInfo("Позиция закрыта. Наименее приоритетный инструмент отключен: " + tool.Name);
+            }
+        }
+    }
+
+    private bool ClosePositionByMarket(Position position)
+    {
+        var symbol = Connector.Securities.Single(x => x.Seccode == position.Seccode && x.Market == position.Market);
+        if (Connector.SendOrder(symbol, OrderType.Market,
+            (int)position.Saldo < 0, 100, (int)Math.Abs(position.Saldo), "ClosingPositionByMarket"))
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                if ((int)position.Saldo == 0) break;
+                Thread.Sleep(500);
+            }
+
+            if ((int)position.Saldo == 0) return true;
+            else Window.AddInfo("Заявка отправлена, но позиция всё ещё не закрыта: " + symbol.Seccode);
+        }
+        return false;
+    }
+
+    private bool CancelActiveOrders(string seccode)
+    {
+        var active = TradingSystem.Orders.ToArray()
+            .Where(x => x.Seccode == seccode && x.Status is "active" or "watching");
+        if (!active.Any()) return true;
+
+        foreach (var order in active) Connector.CancelOrder(order);
+        for (int i = 0; i < 10; i++)
+        {
+            if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
+            Thread.Sleep(500);
+        }
+        return false;
     }
 }

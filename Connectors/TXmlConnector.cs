@@ -25,8 +25,8 @@ internal class TXmlConnector : Connector
     private bool scheduled;
     private int waitingTime = 18000;
     private ConnectionState connection;
+    private Thread DataProcessor;
 
-    private readonly Thread DataProcessor;
     private readonly ConcurrentQueue<string> DataQueue = new();
 
     private readonly XmlReaderSettings XS = new()
@@ -85,7 +85,6 @@ internal class TXmlConnector : Connector
         Window = window;
         CallbackDel = CallBack;
         AddInfo = Window.AddInfo;
-        //DataProcessor = new(ProcessDataQueue) { IsBackground = true, Name = "DataProcessor" };
     }
 
     #region Methods for processing data
@@ -1520,6 +1519,13 @@ internal class TXmlConnector : Connector
         if (Result.Equals(IntPtr.Zero))
         {
             FreeMemory(Result);
+            Initialized = true;
+            if (SetCallback(CallbackDel))
+            {
+                DataProcessor = new(ProcessDataQueue) { IsBackground = true, Name = "DataProcessor" };
+                DataProcessor.Start();
+            }
+            else throw new Exception("Callback failed.");
             return true;
         }
         else
@@ -1545,6 +1551,7 @@ internal class TXmlConnector : Connector
             else
             {
                 FreeMemory(Result);
+                Initialized = false;
                 AddInfo("UnInitialization successful.");
                 return true;
             }

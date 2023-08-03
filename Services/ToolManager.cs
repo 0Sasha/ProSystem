@@ -368,7 +368,7 @@ internal class ToolManager : IToolManager
         if (tool.Active)
         {
             while (TradingSystem.Connector.Connection == ConnectionState.Connected &&
-                !TradingSystem.Connector.SystemReadyToTrade) await Task.Delay(100);
+                !TradingSystem.ReadyToTrade) await Task.Delay(100);
             await ChangeActivityAsync(tool);
             await Task.Delay(250);
         }
@@ -811,7 +811,7 @@ internal class ToolManager : IToolManager
     private void CheckPortfolio(ref bool ReadyToTrade)
     {
         if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-        if (!TradingSystem.PortfolioManager.CheckEquity(TradingSystem.Settings)) ReadyToTrade = false;
+        if (!TradingSystem.PortfolioManager.CheckEquity()) ReadyToTrade = false;
     }
 
     private (double, double) GetAndCheckRubReqs(Tool tool, ref bool ReadyToTrade)

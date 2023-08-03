@@ -13,7 +13,7 @@ public enum ScriptType
 
 public enum ConnectionState
 {
-    Connected, Connecting, Disconnected, Disconnecting
+    Disconnected, Connecting, Connected, Disconnecting
 }
 
 public enum PositionType

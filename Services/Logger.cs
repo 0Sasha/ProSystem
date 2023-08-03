@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 using static ProSystem.MainWindow;
-using System.IO.Compression;
 
 namespace ProSystem.Services;
 
@@ -14,6 +15,7 @@ public static class Logger
     private static int busyMethod;
     private static StreamWriter writer;
     private static readonly ConcurrentQueue<string> dataQueue = new();
+    private static CultureInfo IC = CultureInfo.InvariantCulture;
     public static void StartLogging(bool subscribe = false)
     {
         if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
@@ -61,11 +63,11 @@ public static class Logger
         catch { }
 
         System.Net.Mail.SmtpClient Smtp = new("smtp.gmail.com", 587);
-        System.Net.Mail.MailMessage Message = new(MySettings.Email, MySettings.Email, "Info", Data);
+        System.Net.Mail.MailMessage Message = new(Window.Settings.Email, Window.Settings.Email, "Info", Data);
         try
         {
             Smtp.EnableSsl = true;
-            Smtp.Credentials = new System.Net.NetworkCredential(MySettings.Email, MySettings.EmailPassword);
+            Smtp.Credentials = new System.Net.NetworkCredential(Window.Settings.Email, Window.Settings.EmailPassword);
             Smtp.Send(Message);
         }
         finally

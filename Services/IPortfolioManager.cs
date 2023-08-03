@@ -1,19 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ProSystem.Services;
 
 public interface IPortfolioManager
 {
-    public UnitedPortfolio Portfolio { get; }
+    public TradingSystem TradingSystem { get; }
+
+    public bool CheckShares();
+
+    public bool CheckEquity();
 
     public void UpdateEquity();
 
     public void UpdatePositions();
 
-    public void UpdateShares(IEnumerable<Tool> tools);
+    public void UpdateShares();
 
-    public bool CheckShares(Settings settings);
-
-    public bool CheckEquity(Settings settings);
+    public Task NormalizePortfolioAsync();
 }
