@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using System.Windows;
 
 namespace ProSystem;
 
@@ -41,5 +43,22 @@ public class Security
     {
         Board = board;
         Seccode = seccode;
+    }
+
+    public void UpdateRequirements()
+    {
+        if (Bars == null) throw new Exception("There is no bars to update requirements");
+
+        LastTrade ??= new Trade()
+        {
+            Price = Bars.Close[^1],
+            DateTime = Bars.DateTime[^1]
+        };
+        MinStepCost = PointCost * MinStep * Math.Pow(10, Decimals) / 100;
+        var lastPrice = LastTrade.DateTime > Bars.DateTime[^1] ? LastTrade.Price : Bars.Close[^1];
+        var value = lastPrice * MinStepCost / MinStep * LotSize / 100;
+
+        InitReqLong = Math.Round((RiskrateLong + ReserateLong) * value, 2);
+        InitReqShort = Math.Round((RiskrateShort + ReserateShort) * value, 2);
     }
 }

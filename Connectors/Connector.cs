@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace ProSystem;
 
@@ -22,25 +23,25 @@ public abstract class Connector
 
     public abstract bool Uninitialize();
 
-    public abstract void Connect(bool scheduled); // async
+    public abstract Task<bool> ConnectAsync(bool scheduled);
 
-    public abstract void Disconnect(bool scheduled); // async
+    public abstract Task<bool> DisconnectAsync(bool scheduled);
 
-    public abstract bool SendOrder(Security security, OrderType type, bool isBuy,
+    public abstract Task<bool> SendOrderAsync(Security security, OrderType type, bool isBuy,
         double price, int quantity, string signal, Script sender = null, string note = null);
 
-    public abstract bool ReplaceOrder(Order activeOrder, Security security, OrderType type,
+    public abstract Task<bool> ReplaceOrderAsync(Order activeOrder, Security security, OrderType type,
         double price, int quantity, string signal, Script sender = null, string note = null);
 
-    public abstract bool CancelOrder(Order activeOrder);
+    public abstract Task<bool> CancelOrderAsync(Order activeOrder);
 
-    public abstract void SubscribeToTrades(Security security);
+    public abstract Task<bool> SubscribeToTradesAsync(Security security);
 
-    public abstract void UnsubscribeFromTrades(Security security);
+    public abstract Task<bool> UnsubscribeFromTradesAsync(Security security);
 
-    public abstract void OrderHistoricalData(Security security, TimeFrame tf, int count);
+    public abstract Task<bool> OrderHistoricalDataAsync(Security security, TimeFrame tf, int count);
 
-    public abstract void OrderSecurityInfo(Security security);
+    public abstract Task<bool> OrderSecurityInfoAsync(Security security);
 
-    public abstract void OrderPortfolioInfo(UnitedPortfolio portfolio);
+    public abstract Task<bool> OrderPortfolioInfoAsync(UnitedPortfolio portfolio);
 }

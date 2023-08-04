@@ -253,11 +253,11 @@ public partial class NewTool : Window
 
         if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
-                Window.ToolManager.RequestBars(Tools[k]);
-                Window.TradingSystem.Connector.OrderSecurityInfo(Tools[k].MySecurity);
-                Task.Run(() =>
+                await Window.ToolManager.RequestBarsAsync(Tools[k]);
+                await Window.TradingSystem.Connector.OrderSecurityInfoAsync(Tools[k].MySecurity);
+                await Task.Run(() =>
                 {
                     System.Threading.Thread.Sleep(4000);
                     Window.ToolManager.UpdateView(Tools[k], true);

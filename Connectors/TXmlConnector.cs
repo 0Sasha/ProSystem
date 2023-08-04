@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
@@ -25,9 +26,10 @@ internal class TXmlConnector : Connector
     private bool scheduled;
     private int waitingTime = 18000;
     private ConnectionState connection;
-    private Thread DataProcessor;
+    private Thread dataProcessor;
 
     private readonly ConcurrentQueue<string> DataQueue = new();
+    private readonly List<ClientAccount> Clients = new();
 
     private readonly XmlReaderSettings XS = new()
     {
@@ -41,7 +43,6 @@ internal class TXmlConnector : Connector
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
     public TradingSystem TradingSystem { get; set; }
-    public List<ClientAccount> Clients { get; set; }
     public override ConnectionState Connection
     {
         get => connection;
@@ -57,9 +58,9 @@ internal class TXmlConnector : Connector
                         Window.ConnectBtn.Content = "Disconnect";
                         Window.StCon.Fill = Theme.Green;
                     });
-                    Task.Run(() =>
+                    Task.Run(async () =>
                     {
-                        TradingSystem.PrepareForTrading();
+                        await TradingSystem.PrepareForTrading();
                         Window.Dispatcher.Invoke(() => Window.ShowDistributionInfo(null, null));
                     });
                 }
@@ -119,7 +120,7 @@ internal class TXmlConnector : Connector
                     AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
                 }
             }
-            System.Threading.Thread.Sleep(5);
+            Thread.Sleep(5);
         }
     }
 
@@ -143,26 +144,20 @@ internal class TXmlConnector : Connector
                     var trade = new Trade(DateTime.ParseExact(xr.Value, DTForm, IC));
 
                     if (!xr.ReadToFollowing("price")) { AddInfo("alltrades: Нет price сделки."); continue; }
-                    xr.Read(); trade.Price = double.Parse(xr.Value, IC);
+                    xr.Read();
+                    trade.Price = double.Parse(xr.Value, IC);
 
                     if (!xr.ReadToFollowing("quantity")) { AddInfo("alltrades: Нет quantity сделки."); continue; }
-                    xr.Read(); trade.Quantity = int.Parse(xr.Value, IC);
+                    xr.Read();
+                    trade.Quantity = int.Parse(xr.Value, IC);
 
                     if (!xr.ReadToFollowing("seccode")) { AddInfo("alltrades: Нет seccode сделки."); continue; }
                     xr.Read();
-                    var tool = tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value);
+                    trade.Seccode = xr.Value;
 
-                    if (tool != null)
-                    {
-                        tool.MySecurity.LastTrade = trade;
-                        UpdateSecurityBars(tool.MySecurity);
-                    }
-                    else
-                    {
-                        tools.Single(x => x.BasicSecurity != null && x.BasicSecurity.Seccode == xr.Value)
-                            .BasicSecurity.LastTrade = trade;
-                        UpdateSecurityBars(tool.BasicSecurity);
-                    }
+                    var tool = tools
+                        .Single(x => x.MySecurity.Seccode == xr.Value || x.BasicSecurity?.Seccode == trade.Seccode);
+                    TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
                 }
             }
             else if (section == "candles")
@@ -372,7 +367,7 @@ internal class TXmlConnector : Connector
                 if (!xr.ReadToFollowing("reserate_short")) { AddInfo("sec_permissions: no reserate_short"); xr.Close(); return section; }
                 xr.Read(); tool.MySecurity.ReserateShort = double.Parse(xr.Value, IC);
 
-                Task.Run(() => UpdateSecurityRequirements(tool.MySecurity));
+                Task.Run(tool.MySecurity.UpdateRequirements);
 
                 /*if (!XR.ReadToFollowing("riskrate_longx")) { AddInfo("sec_permissions: no riskrate_longx"); XR.Close(); return Section; }
                 XR.Read(); MyTool.MySecurity.MinRiskrateLong = double.Parse(XR.Value, IC);
@@ -1164,346 +1159,266 @@ internal class TXmlConnector : Connector
             pos.PL = double.Parse(xr.Value, IC);
         }
     }
-
-    private void UpdateSecurityBars(Security security)
-    {
-        var bars = security.Bars;
-        if (security.LastTrade.DateTime < security.Bars.DateTime[^1].AddMinutes(security.Bars.TF))
-        {
-            bars.Close[^1] = security.LastTrade.Price;
-            if (security.LastTrade.Price > bars.High[^1]) bars.High[^1] = security.LastTrade.Price;
-            else if (security.LastTrade.Price < bars.Low[^1]) bars.Low[^1] = security.LastTrade.Price;
-            bars.Volume[^1] += security.LastTrade.Quantity;
-        }
-        else if (DateTime.Now > security.LastTrDT) // Открытие нового бара
-        {
-            security.LastTrDT = DateTime.Now.AddSeconds(10);
-            Tool MyTool = TradingSystem.Tools.Single(x => x.MySecurity.Seccode == security.Seccode ||
-                x.BasicSecurity != null && x.BasicSecurity.Seccode == security.Seccode);
-            MyTool.TimeNextRecalc = DateTime.Now.AddSeconds(30);
-
-            // Создание нового бара
-            if (DateTime.Now.Date == bars.DateTime[^1].Date) bars.DateTime =
-                    bars.DateTime.Concat(new DateTime[] { bars.DateTime[^1].AddMinutes(bars.TF) }).ToArray();
-            else bars.DateTime =
-                    bars.DateTime.Concat(new DateTime[] { DateTime.Now.Date.AddHours(DateTime.Now.Hour) }).ToArray();
-            bars.Open = bars.Open.Concat(new double[] { security.LastTrade.Price }).ToArray();
-            bars.High = bars.High.Concat(new double[] { security.LastTrade.Price }).ToArray();
-            bars.Low = bars.Low.Concat(new double[] { security.LastTrade.Price }).ToArray();
-            bars.Close = bars.Close.Concat(new double[] { security.LastTrade.Price }).ToArray();
-            bars.Volume = bars.Volume.Concat(new double[] { security.LastTrade.Quantity }).ToArray();
-
-            // Пересчёт скриптов и запрос оригинальных баров
-            Task.Run(async () =>
-            {
-                await Task.Delay(250);
-                Order LastExecuted = TradingSystem.Orders.ToArray()
-                .LastOrDefault(x => x.Seccode == MyTool.MySecurity.Seccode && x.Status == "matched");
-
-                if (LastExecuted != null && LastExecuted.DateTime.AddSeconds(3) > DateTime.Now)
-                {
-                    Window.AddInfo(MyTool.Name + ": Заявка исполнилась одновременно с открытием бара. Ожидание.", false);
-                    await Task.Delay(2000);
-                }
-                else if (MyTool.MySecurity.Seccode == security.Seccode)
-                {
-                    Order[] Active = TradingSystem.Orders.ToArray()
-                    .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
-                    if (Active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.00001))
-                    {
-                        Window.AddInfo(MyTool.Name + ": Цена активной заявки равна цене открытия бара. Ожидание.", false);
-                        await Task.Delay(2000);
-                    }
-                }
-
-                TradingSystem.ToolManager.Calculate(MyTool);
-                MyTool.MainModel.InvalidatePlot(true);
-                TradingSystem.ToolManager.RequestBars(MyTool);
-            });
-        }
-    }
-
-    private void UpdateSecurityRequirements(Security security)
-    {
-        security.MinStepCost = security.PointCost * security.MinStep * Math.Pow(10, security.Decimals) / 100;
-        if (security.Bars == null) Thread.Sleep(5000);
-        if (security.Bars != null)
-        {
-            security.LastTrade ??= new Trade()
-            {
-                Price = security.Bars.Close[^1],
-                DateTime = security.Bars.DateTime[^1]
-            };
-            double LastPrice = security.LastTrade.DateTime > security.Bars.DateTime[^1] ?
-                security.LastTrade.Price : security.Bars.Close[^1];
-            double Value = LastPrice * security.MinStepCost / security.MinStep * security.LotSize / 100;
-
-            security.InitReqLong = Math.Round((security.RiskrateLong + security.ReserateLong) * Value, 2);
-            security.InitReqShort = Math.Round((security.RiskrateShort + security.ReserateShort) * Value, 2);
-        }
-        else Window.AddInfo("Не удалось обновить требования, потому что нет баров.");
-    }
     #endregion
 
     #region Methods for sending commands
-    public override void Connect(bool scheduled = false)
+    public override async Task<bool> ConnectAsync(bool scheduled = false)
     {
         if (!Initialized)
         {
-            AddInfo("Коннектор не инициализирован.");
-            return;
+            AddInfo("Connect: connector is not initialized.");
+            return false;
         }
 
         var settings = TradingSystem.Settings;
-
-        // Очистка данных
         Securities.Clear(); Markets.Clear();
         TimeFrames.Clear(); Clients.Clear();
         Window.Dispatcher.Invoke(() => TradingSystem.Orders.Clear());
 
-        // Подготовка переменных
         waitingTime = settings.RequestTM * 1000 + 3000;
         Connection = ConnectionState.Connecting;
 
-        // Формирование команды
-        string RqDelaq = "20"; // Задает частоту обращений коннектора к серверу Transaq в миллисекундах. Минимум 10.
-        string UnLimits = settings.SessionTM.ToString(IC); // Таймаут информирования о текущих показателях единого портфеля минимум один раз в N секунд.
-        string Equity = "0"; // Таймаут информирования о текущей стоимости позиций один раз в N секунд за исключением позиций FORTS.
+        var delay = "20"; // Задает частоту обращений коннектора к серверу Transaq в миллисекундах. Минимум 10.
+        var limits = settings.SessionTM.ToString(); // Таймаут информирования о текущих показателях единого портфеля минимум один раз в N секунд.
+        var equity = "0"; // Таймаут информирования о текущей стоимости позиций один раз в N секунд за исключением позиций FORTS.
+        var host = !BackupServer ? "tr1.finam.ru" : "tr2.finam.ru";
+        var port = "3900";
 
-        string ServerIP = !BackupServer ? "tr1.finam.ru" : "tr2.finam.ru", ServerPort = "3900";
-        string StartPart = "<command id=\"connect\"><login>" + settings.LoginConnector + "</login><password>";
-        string EndPart = "</password><host>" + ServerIP + "</host><port>" + ServerPort + "</port><rqdelay>" + RqDelaq + "</rqdelay><session_timeout>" +
-            settings.SessionTM.ToString(IC) + "</session_timeout><request_timeout>" + settings.RequestTM.ToString(IC) +
-            "</request_timeout><push_u_limits>" + UnLimits + "</push_u_limits><push_pos_equity>" + Equity + "</push_pos_equity></command>";
+        var firstPart = "<command id=\"connect\"><login>" + settings.LoginConnector + "</login><password>";
+        var lastPart = "</password><host>" + host + "</host><port>" + port + "</port><rqdelay>" + delay +
+            "</rqdelay><session_timeout>" + settings.SessionTM + "</session_timeout><request_timeout>" +
+            settings.RequestTM + "</request_timeout><push_u_limits>" + limits +
+            "</push_u_limits><push_pos_equity>" + equity + "</push_pos_equity></command>";
 
-        // Отправка команды
         this.scheduled = scheduled;
-        string Result = ConnectorSendCommand(StartPart, EndPart, Window.Dispatcher.Invoke(() => Window.TxtPas.SecurePassword));
-        GC.Collect();
+        var res =
+            await SendCommand(firstPart, lastPart, Window.Dispatcher.Invoke(() => Window.TxtPas.SecurePassword));
 
-        if (Result.StartsWith("<result success=\"true\"", SC) || Result.Contains("уже устанавливается")) return; // "уже установлено"
-        else
-        {
-            Connection = ConnectionState.Disconnected;
-            AddInfo(Result);
-        }
+        if (res.StartsWith("<result success=\"true\"", SC) || res.Contains("уже устанавливается")) return true;
+        Connection = ConnectionState.Disconnected;
+        AddInfo(res);
+        return false;
     }
 
-    public override void Disconnect(bool scheduled = false)
+    public override async Task<bool> DisconnectAsync(bool scheduled = false)
     {
+        var result = true;
         TradingSystem.ReadyToTrade = false;
         Connection = ConnectionState.Disconnecting;
 
         this.scheduled = scheduled;
-        string Сommand = "<command id=\"disconnect\"/>";
-        string Result = ConnectorSendCommand(Сommand);
-        if (Result.StartsWith("<result success=\"true\"", SC)) Connection = ConnectionState.Disconnected;
+        var res = await SendCommand("<command id=\"disconnect\"/>");
+        if (res.StartsWith("<result success=\"true\"", SC)) Connection = ConnectionState.Disconnected;
         else
         {
-            if (Result.StartsWith("<result success=\"false\"><message>Соединение не установлено", SC)) Connection = ConnectionState.Disconnected;
-            AddInfo(Result);
+            if (res.StartsWith("<result success=\"false\"><message>Соединение не установлено", SC))
+                Connection = ConnectionState.Disconnected;
+            else result = false;
+            AddInfo(res);
         }
-        System.Threading.Thread.Sleep(1000);
+        Thread.Sleep(1000);
+        return result;
     }
 
-    public override bool SendOrder(Security Symbol, OrderType OrderType, bool IsBuy,
-        double Price, int Quantity, string Signal, Script Sender = null, string Note = null)
+    public override async Task<bool> SendOrderAsync(Security symbol, OrderType type, bool isBuy,
+        double price, int quantity, string signal, Script sender = null, string note = null)
     {
-        // Подготовка переменных
-        string SenderName = Sender != null ? Sender.Name : "System";
-        if (Price < 0.00001 || Quantity < 1)
-        {
-            AddInfo("SendOrder: Цена заявки или количество <= 0. Отправитель: " + SenderName);
-            return false;
-        }
-        Price = Math.Round(Price, Symbol.Decimals);
+        var senderName = sender != null ? sender.Name : "System";
+        if (symbol == null) throw new ArgumentNullException(nameof(symbol));
+        if (price < double.Epsilon)
+            throw new ArgumentOutOfRangeException(nameof(price), "Price <= 0. Sender: " + senderName);
+        if (quantity < 1)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity < 1. Sender: " + senderName);
 
-        string BuySell = IsBuy ? "B" : "S";
-        string Credit = ""; // UseCredit ? "<usecredit/>" : 
-        string ID, Market, Condition;
+        price = Math.Round(price, symbol.Decimals);
+        var buySell = isBuy ? "B" : "S";
+        var credit = ""; // UseCredit ? "<usecredit/>" : 
+        string id, market, condition;
 
-        if (OrderType == OrderType.Limit)
+        if (type == OrderType.Limit)
         {
-            ID = "neworder";
-            Market = "";
-            Condition = "None";
+            id = "neworder";
+            market = "";
+            condition = "None";
         }
-        else if (OrderType == OrderType.Conditional)
+        else if (type == OrderType.Conditional)
         {
-            ID = "newcondorder";
-            Market = "";
-            Condition = IsBuy ? "BidOrLast" : "AskOrLast";
+            id = "newcondorder";
+            market = "";
+            condition = isBuy ? "BidOrLast" : "AskOrLast";
+        }
+        else if (type == OrderType.Market)
+        {
+            id = "neworder";
+            market = "<bymarket/>";
+            condition = "None";
+        }
+        else throw new ArgumentException("Unknown type of the order", nameof(type));
+
+        var command = "<command id=\"" + id + "\">" +
+            "<security><board>" + symbol.Board + "</board><seccode>" + symbol.Seccode + "</seccode></security>" +
+            "<union>" + TradingSystem.Portfolio.Union + "</union><price>" + price.ToString(IC) + "</price>" +
+            "<quantity>" + quantity + "</quantity><buysell>" + buySell + "</buysell>" + market +
+            (type != OrderType.Conditional ? credit + "</command>" :
+            "<cond_type>" + condition + "</cond_type><cond_value>" + price.ToString(IC) + "</cond_value>" +
+            "<validafter>0</validafter><validbefore>till_canceled</validbefore>" + credit + "</command>");
+
+        using XmlReader xr = XmlReader.Create(new StringReader(await SendCommand(command)), XS);
+        xr.Read();
+        if (xr.GetAttribute("success") == "true")
+        {
+            int trId = int.Parse(xr.GetAttribute("transactionid"), IC);
+            Window.Dispatcher.Invoke(() =>
+            {
+                if (sender != null) sender.Orders.Add(new Order(trId, sender.Name, signal, note));
+                else TradingSystem.SystemOrders.Add(new Order(trId, senderName, signal, note));
+            });
+
+            AddInfo("SendOrder: order is sent: " + senderName + "/" + symbol.Seccode + "/" +
+                buySell + "/" + price + "/" + quantity, TradingSystem.Settings.DisplaySentOrders);
+
+            xr.Close();
+            return true;
+        }
+        else if (xr.GetAttribute("success") == "false")
+        {
+            xr.ReadToFollowing("message");
+            xr.Read();
+            AddInfo("SendOrder: order of " + senderName + " is not accepted: " + xr.Value, true,
+                xr.Value.Contains("Недостаток обеспечения"));
         }
         else
         {
-            ID = "neworder";
-            Market = "<bymarket/>";
-            Condition = "None";
+            xr.Read();
+            AddInfo("SendOrder: order of " + senderName + " is not accepted: " + xr.Value);
         }
-
-        // Формирование команды
-        string Сommand = "<command id=\"" + ID + "\"><security><board>" + Symbol.Board + "</board><seccode>" + Symbol.Seccode +
-            "</seccode></security><union>" + TradingSystem.Portfolio.Union + "</union><price>" + Price.ToString(IC) + "</price><quantity>" + Quantity.ToString(IC) +
-            "</quantity><buysell>" + BuySell + "</buysell>" + Market;
-        if (OrderType != OrderType.Conditional) Сommand += Credit + "</command>";
-        else
-        {
-            Сommand += "<cond_type>" + Condition + "</cond_type><cond_value>" + Price.ToString(IC) + "</cond_value>" +
-                "<validafter>0</validafter><validbefore>till_canceled</validbefore>" + Credit + "</command>";
-        }
-
-        // Отправка команды
-        using (XmlReader XR = XmlReader.Create(new StringReader(ConnectorSendCommand(Сommand)), XS))
-        {
-            // Обработка результата
-            XR.Read();
-            if (XR.GetAttribute("success") == "true")
-            {
-                int id = int.Parse(XR.GetAttribute("transactionid"), IC);
-                Window.Dispatcher.Invoke(() =>
-                {
-                    if (Sender != null) Sender.Orders.Add(new Order(id, Sender.Name, Signal, Note));
-                    else TradingSystem.SystemOrders.Add(new Order(id, SenderName, Signal, Note));
-                });
-
-                AddInfo("SendOrder: Заявка принята: " + SenderName + "/" + Symbol.Seccode + "/" +
-                    BuySell + "/" + Price + "/" + Quantity, TradingSystem.Settings.DisplaySentOrders);
-
-                XR.Close();
-                return true;
-            }
-            else if (XR.GetAttribute("success") == "false")
-            {
-                XR.ReadToFollowing("message"); XR.Read();
-                AddInfo("SendOrder: Заявка отправителя " + SenderName + " не принята: " + XR.Value, true, XR.Value.Contains("Недостаток обеспечения"));
-            }
-            else
-            {
-                XR.Read();
-                AddInfo("SendOrder: Заявка отправителя " + SenderName + " не принята с исключением: " + XR.Value);
-            }
-            XR.Close();
-        }
+        xr.Close();
         return false;
     }
 
-    public override bool CancelOrder(Order ActiveOrder)
+    public override async Task<bool> CancelOrderAsync(Order activeOrder)
     {
-        string Reply = ConnectorSendCommand("<command id=\"cancelorder\"><transactionid>" + ActiveOrder.TrID + "</transactionid></command>");
-        using XmlReader XR = XmlReader.Create(new StringReader(Reply), XS);
-        XR.Read();
+        var result = await SendCommand("<command id=\"cancelorder\"><transactionid>" +
+            activeOrder.TrID + "</transactionid></command>");
+        using XmlReader xr = XmlReader.Create(new StringReader(result), XS);
+        xr.Read();
 
-        if (XR.Name == "error" || XR.GetAttribute("success") == "false")
+        if (xr.Name == "error" || xr.GetAttribute("success") == "false")
         {
-            XR.Read(); XR.Read();
-            if (XR.Value.Contains("Неверное значение параметра"))
+            xr.Read(); xr.Read();
+            if (xr.Value.Contains("Неверное значение параметра"))
             {
-                ActiveOrder.Status = ActiveOrder.Status == "active" ? "cancelled" : "disabled";
-                ActiveOrder.DateTime = DateTime.Now.AddDays(-2);
-                AddInfo("CancelOrder: " + ActiveOrder.Sender + ": Активная заявка не актуальна. Статус обновлён.");
+                activeOrder.Status = activeOrder.Status == "active" ? "cancelled" : "disabled";
+                activeOrder.DateTime = DateTime.Now.AddDays(-2);
+                AddInfo("CancelOrder: " + activeOrder.Sender + ": active order is not actual. Status is updated.");
             }
-            else AddInfo("CancelOrder: " + ActiveOrder.Sender + ": Ошибка отмены заявки: " + XR.Value);
-            XR.Close(); return false;
+            else AddInfo("CancelOrder: " + activeOrder.Sender + ": error: " + xr.Value);
+            xr.Close();
+            return false;
         }
-        AddInfo("CancelOrder: Запрос на отмену заявки отправлен " + ActiveOrder.Sender + "/" + ActiveOrder.Seccode, false);
-
-        XR.Close();
+        AddInfo("CancelOrder: request is sent " + activeOrder.Sender + "/" + activeOrder.Seccode, false);
+        xr.Close();
         return true;
     }
 
-    public override bool ReplaceOrder(Order ActiveOrder, Security Symbol, OrderType OrderType,
-        double Price, int Quantity, string Signal, Script Sender = null, string Note = null)
+    public override async Task<bool> ReplaceOrderAsync(Order activeOrder, Security symbol, OrderType type,
+        double price, int quantity, string signal, Script sender = null, string note = null)
     {
-        string SenderName = Sender != null ? Sender.Name : "System";
-        AddInfo("ReplaceOrder: Замена заявки отправителя: " + SenderName, false);
-        if (CancelOrder(ActiveOrder))
+        var senderName = sender != null ? sender.Name : "System";
+        AddInfo("ReplaceOrder: replacement by " + senderName, false);
+        if (await CancelOrderAsync(activeOrder))
         {
-            System.Threading.Thread.Sleep(150);
-            if (ActiveOrder.Status is not "cancelled" and not "disabled")
+            for (int i = 0; i < 15; i++)
             {
-                System.Threading.Thread.Sleep(350);
-                if (ActiveOrder.Status is not "cancelled" and not "disabled")
+                Thread.Sleep(200);
+                if (activeOrder.Status is "cancelled" or "disabled") break;
+                if (activeOrder.Status == "matched")
                 {
-                    System.Threading.Thread.Sleep(2500);
-                    if (ActiveOrder.Status is "matched")
-                    {
-                        AddInfo("ReplaceOrder: Заявка отправителя: " + SenderName + " уже исполнилась.");
-                        return false;
-                    }
-                    else if (ActiveOrder.Status is not "cancelled" and not "disabled")
-                        AddInfo("ReplaceOrder: Не дождались отмены заявки отправителя: " + SenderName);
+                    AddInfo("Order of " + senderName + " is already executed");
+                    return false;
+                }
+                else if (i == 14)
+                {
+                    AddInfo("Didn't wait for the order cancellation: " + senderName);
+                    return false;
                 }
             }
-            if (SendOrder(Symbol, OrderType, ActiveOrder.BuySell == "B", Price, Quantity, Signal, Sender, Note)) return true;
+            return await SendOrderAsync(symbol, type,
+                activeOrder.BuySell == "B", price, quantity, signal, sender, note);
         }
         return false;
     }
 
-    public override void SubscribeToTrades(Security security)
-    {
-        SubUnsub(true, security.Board, security.Seccode);
-    }
+    public override async Task<bool> SubscribeToTradesAsync(Security security) => await SubUnsub(true, security);
 
-    public override void UnsubscribeFromTrades(Security security)
-    {
-        SubUnsub(false, security.Board, security.Seccode);
-    }
+    public override async Task<bool> UnsubscribeFromTradesAsync(Security security) => await SubUnsub(false, security);
 
-    private void SubUnsub(bool Subscribe, string Board, string Seccode, bool Trades = true, bool Quotations = false, bool Quotes = false)
+    private async Task<bool> SubUnsub(bool subscribe, Security symbol, bool quotations = false, bool quotes = false)
     {
-        string Сommand = Subscribe ? "<command id=\"subscribe\">" : "<command id=\"unsubscribe\">";
-        if (Trades) Сommand += "<alltrades><security><board>" + Board + "</board><seccode>" + Seccode + "</seccode></security></alltrades>";
-        if (Quotations) Сommand += "<quotations><security><board>" + Board + "</board><seccode>" + Seccode + "</seccode></security></quotations>";
-        if (Quotes) Сommand += "<quotes><security><board>" + Board + "</board><seccode>" + Seccode + "</seccode></security></quotes>";
-        Сommand += "</command>";
+        var command = (subscribe ? "<command id=\"subscribe\">" : "<command id=\"unsubscribe\">") +
+            "<alltrades><security><board>" + symbol.Board + "</board><seccode>" + symbol.Seccode +
+            "</seccode></security></alltrades>";
+        if (quotations) command += "<quotations><security><board>" +
+                symbol.Board + "</board><seccode>" + symbol.Seccode + "</seccode></security></quotations>";
+        if (quotes) command += "<quotes><security><board>" +
+                symbol.Board + "</board><seccode>" + symbol.Seccode + "</seccode></security></quotes>";
+        command += "</command>";
 
-        string Result = ConnectorSendCommand(Сommand);
-        if (Result != "<result success=\"true\"/>") AddInfo("SubUnsub: " + Result);
+        var result = await SendCommand(command);
+        if (result == "<result success=\"true\"/>") return true;
+        AddInfo("SubUnsub: " + result);
+        return false;
     }
     
-    public override void OrderHistoricalData(Security symbol, TimeFrame tf, int count)
+    public override async Task<bool> OrderHistoricalDataAsync(Security symbol, TimeFrame tf, int count)
     {
-        string Сommand = "<command id=\"gethistorydata\"><security><board>" + symbol.Board + "</board><seccode>" +
-            symbol.Seccode + "</seccode></security><period>" + tf.ID + "</period><count>" + count +
-            "</count><reset>true</reset></command>";
-
-        string Result = ConnectorSendCommand(Сommand);
-        if (Result != "<result success=\"true\"/>") AddInfo("GetHistoryData: " + Result + "\n Command: " + Сommand);
+        var command = "<command id=\"gethistorydata\"><security><board>" + symbol.Board +
+            "</board><seccode>" + symbol.Seccode +"</seccode></security><period>" +
+            tf.ID + "</period><count>" + count + "</count><reset>true</reset></command>";
+        var result = await SendCommand(command);
+        if (result == "<result success=\"true\"/>") return true;
+        AddInfo("OrderHistoricalData: " + result);
+        return false;
     }
 
-    public override void OrderSecurityInfo(Security symbol)
+    public override async Task<bool> OrderSecurityInfoAsync(Security symbol) =>
+        await GetClnSecPermissions(symbol) && await GetSecurityInfo(symbol);
+
+    private async Task<bool> GetSecurityInfo(Security symbol)
     {
-        GetSecurityInfo(symbol.Market, symbol.Seccode);
-        GetClnSecPermissions(symbol.Board, symbol.Seccode, symbol.Market);
+        var command = "<command id=\"get_securities_info\"><security><market>" + symbol.Market +
+            "</market><seccode>" + symbol.Seccode + "</seccode></security></command>";
+        var result = await SendCommand(command);
+        if (result == "<result success=\"true\"/>") return true;
+        AddInfo("GetSecurityInfo: " + result);
+        return false;
     }
 
-    private void GetSecurityInfo(string Market, string Seccode)
+    private async Task<bool> GetClnSecPermissions(Security symbol)
     {
-        string Сommand = "<command id=\"get_securities_info\"><security><market>" + Market +
-            "</market><seccode>" + Seccode + "</seccode></security></command>";
+        var client = Clients.SingleOrDefault(x => x.Market == symbol.Market);
+        if (client == null)
+        {
+            AddInfo("GetClnSecPermissions: client is not found");
+            return false;
+        }
 
-        string Result = ConnectorSendCommand(Сommand);
-        if (Result != "<result success=\"true\"/>") AddInfo("GetSecurityInfo: " + Result);
+        var command = "<command id=\"get_cln_sec_permissions\"><security><board>" + symbol.Board + "</board>" +
+            "<seccode>" + symbol.Seccode + "</seccode></security><client>" + client.ID + "</client></command>";
+        var result = await SendCommand(command);
+        if (result == "<result success=\"true\"/>") return true;
+        AddInfo("GetClnSecPermissions: " + result);
+        return false;
     }
 
-    private void GetClnSecPermissions(string Board, string Seccode, string Market)
+    public override async Task<bool> OrderPortfolioInfoAsync(UnitedPortfolio portfolio)
     {
-        ClientAccount Client = Clients.SingleOrDefault(x => x.Market == Market);
-        if (Client == null) { AddInfo("GetClnSecPermissions: не найден клиент."); return; }
-        string Сommand = "<command id=\"get_cln_sec_permissions\"><security><board>" + Board + "</board>" +
-            "<seccode>" + Seccode + "</seccode></security><client>" + Client.ID + "</client></command>";
-
-        string Result = ConnectorSendCommand(Сommand);
-        if (Result != "<result success=\"true\"/>") AddInfo("GetClnSecPermissions: " + Result);
-    }
-
-    public override void OrderPortfolioInfo(UnitedPortfolio portfolio)
-    {
-        string Сommand = "<command id=\"get_mc_portfolio\" union=\"" + portfolio.Union +
+        var command = "<command id=\"get_mc_portfolio\" union=\"" + portfolio.Union +
             "\" currency=\"false\" asset=\"false\" money=\"false\" depo=\"true\" registers=\"false\"/>";
-
-        string Result = ConnectorSendCommand(Сommand);
-        if (Result != "<result success=\"true\"/>") AddInfo("GetPortfolio: " + Result);
+        var result = await SendCommand(command);
+        if (result == "<result success=\"true\"/>") return true;
+        AddInfo("OrderPortfolioInfo: " + result);
+        return false;
     }
     #endregion
 
@@ -1512,139 +1427,132 @@ internal class TXmlConnector : Connector
     {
         if (!Directory.Exists("Logs/Transaq")) Directory.CreateDirectory("Logs/Transaq");
 
-        IntPtr pPath = Marshal.StringToHGlobalAnsi("Logs/Transaq");
-        IntPtr Result = Initialize(pPath, logLevel);
-        Marshal.FreeHGlobal(pPath);
+        IntPtr path = Marshal.StringToHGlobalAnsi("Logs/Transaq");
+        IntPtr result = Initialize(path, logLevel);
+        Marshal.FreeHGlobal(path);
 
-        if (Result.Equals(IntPtr.Zero))
+        if (result.Equals(IntPtr.Zero))
         {
-            FreeMemory(Result);
-            Initialized = true;
+            FreeMemory(result);
             if (SetCallback(CallbackDel))
             {
-                DataProcessor = new(ProcessDataQueue) { IsBackground = true, Name = "DataProcessor" };
-                DataProcessor.Start();
+                dataProcessor = new(ProcessDataQueue) { IsBackground = true, Name = "DataProcessor" };
+                dataProcessor.Start();
+                Initialized = true;
+                return true;
             }
-            else throw new Exception("Callback failed.");
-            return true;
-        }
-        else
-        {
-            string Res = Marshal.PtrToStringUTF8(Result);
-            FreeMemory(Result);
-            AddInfo("Initialization failed: " + Res);
+
+            AddInfo("Callback failed.");
             return false;
         }
+
+        AddInfo("Initialization failed: " + Marshal.PtrToStringUTF8(result));
+        FreeMemory(result);
+        return false;
     }
 
     public override bool Uninitialize()
     {
         if (Connection == ConnectionState.Disconnected)
         {
-            IntPtr Result = UnInitialize();
-            if (!Result.Equals(IntPtr.Zero))
+            IntPtr result = UnInitialize();
+            if (!result.Equals(IntPtr.Zero))
             {
-                string Res = Marshal.PtrToStringUTF8(Result);
-                FreeMemory(Result);
-                AddInfo("UnInitialization failed: " + Res);
+                AddInfo("Uninitialization failed: " + Marshal.PtrToStringUTF8(result));
+                FreeMemory(result);
+                return false;
             }
-            else
-            {
-                FreeMemory(Result);
-                Initialized = false;
-                AddInfo("UnInitialization successful.");
-                return true;
-            }
+
+            FreeMemory(result);
+            Initialized = false;
+            return true;
         }
-        else AddInfo("UnInitialization failed: не было разрыва соединения с сервером.");
+        
+        AddInfo("Uninitialization failed: server is connected.");
         return false;
     }
 
-    public void ConnectorSetCallback()
+    private async Task<string> SendCommand(string command)
     {
-        if (SetCallback(CallbackDel)) DataProcessor.Start();
-        else throw new Exception("Callback failed.");
+        if (Connection != ConnectionState.Connected) return "There is no connection";
+        IntPtr nintCommand = Marshal.StringToHGlobalAnsi(command);
+        var result = await SendCommand(nintCommand, command);
+        Marshal.FreeHGlobal(nintCommand);
+        return result;
     }
 
-    private string ConnectorSendCommand(string Command)
+    private async Task<string> SendCommand(string firstPart, string lastPart, SecureString middlePart)
     {
-        if (Connection != ConnectionState.Connected) throw new Exception("There is no connection");
-        IntPtr Data = Marshal.StringToHGlobalAnsi(Command);
-        string Result = SendCommandAndGetResult(Data, Command);
-        Marshal.FreeHGlobal(Data);
-        return Result;
-    }
-
-    private string ConnectorSendCommand(string StartPartCMD, string EndPartCMD, System.Security.SecureString MiddlePartCMD)
-    {
-        // Формирование команды
-        EndPartCMD += "\0";
-        IntPtr StartPart = Marshal.StringToHGlobalAnsi(StartPartCMD);
-        IntPtr EndPart = Marshal.StringToHGlobalAnsi(EndPartCMD);
-        IntPtr Data = Marshal.AllocHGlobal(StartPartCMD.Length + MiddlePartCMD.Length + EndPartCMD.Length);
-        IntPtr MiddlePart;
+        lastPart += "\0";
+        IntPtr first = Marshal.StringToHGlobalAnsi(firstPart);
+        IntPtr last = Marshal.StringToHGlobalAnsi(lastPart);
+        IntPtr command = Marshal.AllocHGlobal(firstPart.Length + middlePart.Length + lastPart.Length);
+        IntPtr middle;
         unsafe
         {
-            byte* DataBytes = (byte*)Data.ToPointer();
-            byte* StartPartBytes = (byte*)StartPart.ToPointer();
-            for (int i = 0; i < StartPartCMD.Length; i++) *DataBytes++ = *StartPartBytes++;
+            byte* data = (byte*)command.ToPointer();
+            byte* firstPartBt = (byte*)first.ToPointer();
+            for (int i = 0; i < firstPart.Length; i++) *data++ = *firstPartBt++;
 
-            MiddlePart = Marshal.SecureStringToGlobalAllocAnsi(MiddlePartCMD);
-            byte* MiddlePartBytes = (byte*)MiddlePart.ToPointer();
-            for (int i = 0; i < MiddlePartCMD.Length; i++) *DataBytes++ = *MiddlePartBytes++;
+            middle = Marshal.SecureStringToGlobalAllocAnsi(middlePart);
+            byte* middlePartBt = (byte*)middle.ToPointer();
+            for (int i = 0; i < middlePart.Length; i++) *data++ = *middlePartBt++;
 
-            byte* EndPartBytes = (byte*)EndPart.ToPointer();
-            for (int i = 0; i < EndPartCMD.Length; i++) *DataBytes++ = *EndPartBytes++;
+            byte* lastPartBt = (byte*)last.ToPointer();
+            for (int i = 0; i < lastPart.Length; i++) *data++ = *lastPartBt++;
         }
 
-        // Отправка команды, очистка памяти и возвращение результата
-        string Result = SendCommandAndGetResult(Data, StartPartCMD);
-        Marshal.FreeHGlobal(Data);
-        Marshal.ZeroFreeGlobalAllocAnsi(MiddlePart);
-        Marshal.FreeHGlobal(StartPart);
-        Marshal.FreeHGlobal(EndPart);
-        return Result;
+        var result = await SendCommand(command, firstPart);
+        Marshal.FreeHGlobal(command);
+        Marshal.ZeroFreeGlobalAllocAnsi(middle);
+        Marshal.FreeHGlobal(first);
+        Marshal.FreeHGlobal(last);
+        return result;
     }
     
-    private string SendCommandAndGetResult(IntPtr Data, string Command)
+    private async Task<string> SendCommand(IntPtr command, string strCommand)
     {
-        string Result = "Empty";
-        Task MyTask = Task.Run(() =>
+        var result = "Empty";
+        var sending = Task.Run(() =>
         {
-            IntPtr ResultIntPtr = SendCommand(Data);
-            Result = Marshal.PtrToStringUTF8(ResultIntPtr);
-            FreeMemory(ResultIntPtr);
+            IntPtr res = SendCommand(command);
+            result = Marshal.PtrToStringUTF8(res);
+            FreeMemory(res);
         });
+
         try
         {
-            if (!MyTask.Wait(2000))
+            await Task.Run(() =>
             {
-                Window.TradingSystem.ReadyToTrade = false;
-                AddInfo("SendCommand: Превышено время ожидания ответа сервера. Торговля приостановлена.", false);
-                if (!MyTask.Wait(waitingTime))
+                if (!sending.Wait(2000))
                 {
-                    ServerAvailable = false;
-                    if (Connection == ConnectionState.Connected)
+                    Window.TradingSystem.ReadyToTrade = false;
+                    AddInfo("Server response timed out. Trading is suspended.", false);
+                    if (!sending.Wait(waitingTime))
                     {
-                        Connection = ConnectionState.Connecting;
-                        TriggerReconnection = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
-                    }
-                    AddInfo("SendCommand: Сервер не отвечает. Команда: " + Command, false);
+                        ServerAvailable = false;
+                        if (Connection == ConnectionState.Connected)
+                        {
+                            Connection = ConnectionState.Connecting;
+                            TriggerReconnection = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
+                        }
+                        AddInfo("Server is not responding. Command: " + strCommand, false);
 
-                    if (!MyTask.Wait(waitingTime * 15))
-                    {
-                        AddInfo("SendCommand: Бесконечное ожидание ответа сервера.", notify: true);
-                        MyTask.Wait();
+                        if (!sending.Wait(waitingTime * 15))
+                        {
+                            AddInfo("Infinitely waiting for a server response", notify: true);
+                            sending.Wait();
+                        }
+                        AddInfo("Server is responding", false);
+                        ServerAvailable = true;
                     }
-                    AddInfo("SendCommand: Ответ сервера получен.", false);
-                    ServerAvailable = true;
+                    else if (Connection == ConnectionState.Connected) Window.TradingSystem.ReadyToTrade = true;
                 }
-                else if (Connection == ConnectionState.Connected) Window.TradingSystem.ReadyToTrade = true;
-            }
+            });
         }
-        catch (Exception e) { AddInfo("SendCommand: Исключение отправки команды: " + e.Message); }
-        finally { MyTask.Dispose(); }
-        return Result;
+        catch (Exception e) { AddInfo("Exception during sending command: " + e.Message); }
+        finally { sending.Dispose(); }
+        return result;
     }
     #endregion
 

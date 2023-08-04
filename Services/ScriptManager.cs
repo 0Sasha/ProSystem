@@ -167,7 +167,7 @@ internal class ScriptManager : IScriptManager
         {
             script.ActiveOrder = null;
             Window.AddInfo(script.Name + ": Отмена активных заявок скрипта: " + activeOrders.Length);
-            foreach (Order MyOrder in activeOrders) Connector.CancelOrder(MyOrder);
+            foreach (Order MyOrder in activeOrders) Connector.CancelOrderAsync(MyOrder);
 
             for (int timeout = 500; timeout <= 1500; timeout += 500)
             {

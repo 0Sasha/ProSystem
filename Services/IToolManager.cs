@@ -14,9 +14,9 @@ public interface IToolManager
 
     public Task ChangeActivityAsync(Tool tool);
 
-    public void Calculate(Tool tool, double waitingAfterLastRecalc = 3);
+    public Task CalculateAsync(Tool tool, double waitingAfterLastRecalc = 3);
 
-    public void RequestBars(Tool tool); // async
+    public Task RequestBarsAsync(Tool tool);
 
     public void UpdateBars(Tool tool, bool updateBasicSecurity);  // async
 
@@ -27,4 +27,6 @@ public interface IToolManager
     public void UpdateModel(Tool tool);
 
     public void UpdateMiniModel(Tool tool, Script script = null);
+
+    public void UpdateLastTrade(Tool tool, Trade lastTrade);
 }

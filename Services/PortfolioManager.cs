@@ -125,20 +125,20 @@ internal class PortfolioManager : IPortfolioManager
             }
         }
 
-        Connector.OrderPortfolioInfo(Portfolio);
+        await Connector.OrderPortfolioInfoAsync(Portfolio);
         Thread.Sleep(5000);
         if (CheckRequirements()) return;
 
         try
         {
             var tools = TradingSystem.Tools.ToArray();
-            CloseIndependentPositions(tools);
-            Connector.OrderPortfolioInfo(Portfolio);
+            await CloseIndependentPositions(tools);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
             Thread.Sleep(5000);
             if (CheckRequirements()) return;
 
             await DeactivateLargePositionToolsAsync(tools);
-            Connector.OrderPortfolioInfo(Portfolio);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
             Thread.Sleep(5000);
             if (CheckRequirements()) return;
 
@@ -173,22 +173,22 @@ internal class PortfolioManager : IPortfolioManager
         }
     }
 
-    private void CloseIndependentPositions(IEnumerable<Tool> tools)
+    private async Task CloseIndependentPositions(IEnumerable<Tool> tools)
     {
         foreach (var position in Portfolio.Positions.ToArray())
         {
             if ((int)position.Saldo != 0 &&
                 tools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode) == null)
             {
-                if (!CancelActiveOrders(position.Seccode))
+                if (!await CancelActiveOrders(position.Seccode))
                 {
                     Window.AddInfo("Не удалось отменить заявки перед закрытием позиции: " + position.Seccode);
                     continue;
                 }
 
-                if (ClosePositionByMarket(position))
+                if (await ClosePositionByMarket(position))
                 {
-                    CancelActiveOrders(position.Seccode);
+                    await CancelActiveOrders(position.Seccode);
                     Window.AddInfo("Закрыта неизвестная позиция: " + position.Seccode);
                 }
                 else Window.AddInfo("Не удалось закрыть неизвестную позицию: " + position.Seccode);
@@ -210,7 +210,7 @@ internal class PortfolioManager : IPortfolioManager
                 !isLong && vol * tool.MySecurity.InitReqShort > maxShare)
             {
                 Window.AddInfo("Позиция превышает MaxShareInitReqsTool: " + position.Seccode);
-                if (!CancelActiveOrders(position.Seccode))
+                if (!await CancelActiveOrders(position.Seccode))
                 {
                     Window.AddInfo("Не удалось отменить заявки перед закрытием позиции.");
                     continue;
@@ -218,9 +218,9 @@ internal class PortfolioManager : IPortfolioManager
 
                 bool initStopTrading = tool.StopTrading;
                 tool.StopTrading = true;
-                if (ClosePositionByMarket(position))
+                if (await ClosePositionByMarket(position))
                 {
-                    if (!CancelActiveOrders(position.Seccode))
+                    if (!await CancelActiveOrders(position.Seccode))
                     {
                         Window.AddInfo("Позиция закрыта, но не удалось отменить заявки. Инструмент не отключен.");
                         continue;
@@ -241,7 +241,7 @@ internal class PortfolioManager : IPortfolioManager
     {
         for (int i = Settings.ToolsByPriority.Count - 1; i > 0; i--)
         {
-            Connector.OrderPortfolioInfo(Portfolio);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
             Thread.Sleep(5000);
             if (CheckRequirements()) return;
             if (Connector.Connection != ConnectionState.Connected)
@@ -254,7 +254,7 @@ internal class PortfolioManager : IPortfolioManager
             if (tool != null)
             {
                 Window.AddInfo("Отключение наименее приоритетного инструмента: " + tool.Name);
-                if (!CancelActiveOrders(tool.MySecurity.Seccode))
+                if (!await CancelActiveOrders(tool.MySecurity.Seccode))
                 {
                     Window.AddInfo("Не удалось отменить заявки наименее приоритетного активного инструмента.");
                     continue;
@@ -266,9 +266,9 @@ internal class PortfolioManager : IPortfolioManager
                     .SingleOrDefault(x => x.Seccode == tool.MySecurity.Seccode);
                 if (position != null && (int)position.Saldo != 0)
                 {
-                    if (ClosePositionByMarket(position))
+                    if (await ClosePositionByMarket(position))
                     {
-                        if (!CancelActiveOrders(position.Seccode))
+                        if (!await CancelActiveOrders(position.Seccode))
                         {
                             Window.AddInfo("Позиция закрыта, но не удалось отменить заявки. Инструмент активен.");
                             continue;
@@ -288,10 +288,10 @@ internal class PortfolioManager : IPortfolioManager
         }
     }
 
-    private bool ClosePositionByMarket(Position position)
+    private async Task<bool> ClosePositionByMarket(Position position)
     {
         var symbol = Connector.Securities.Single(x => x.Seccode == position.Seccode && x.Market == position.Market);
-        if (Connector.SendOrder(symbol, OrderType.Market,
+        if (await Connector.SendOrderAsync(symbol, OrderType.Market,
             (int)position.Saldo < 0, 100, (int)Math.Abs(position.Saldo), "ClosingPositionByMarket"))
         {
             for (int i = 0; i < 10; i++)
@@ -306,13 +306,13 @@ internal class PortfolioManager : IPortfolioManager
         return false;
     }
 
-    private bool CancelActiveOrders(string seccode)
+    private async Task<bool> CancelActiveOrders(string seccode)
     {
         var active = TradingSystem.Orders.ToArray()
             .Where(x => x.Seccode == seccode && x.Status is "active" or "watching");
         if (!active.Any()) return true;
 
-        foreach (var order in active) Connector.CancelOrder(order);
+        foreach (var order in active) await Connector.CancelOrderAsync(order);
         for (int i = 0; i < 10; i++)
         {
             if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;

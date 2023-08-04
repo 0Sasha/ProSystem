@@ -17,7 +17,7 @@ public class TradingSystem
     private DateTime triggerRecalc;
     private DateTime triggerUpdateModels;
     private DateTime triggerCheckPortfolio;
-    private Thread MainThread;
+    private Thread stateChecker;
 
     public MainWindow Window { get; init; }
     public Connector Connector { get; init; }
@@ -59,31 +59,31 @@ public class TradingSystem
         else Window.AddInfo("Не найден коннектор txmlconnector64.dll");
 
         isWorking = true;
-        MainThread = new(CheckState) { IsBackground = true, Name = "StateChecker" };
-        MainThread.Start();
+        stateChecker = new(CheckState) { IsBackground = true, Name = "StateChecker" };
+        stateChecker.Start();
     }
 
-    public void Stop()
+    public async Task Stop()
     {
         isWorking = false;
         Thread.Sleep(50);
-        if (Connector.Connection != ConnectionState.Disconnected) Connector.Disconnect(true);
+        if (Connector.Connection != ConnectionState.Disconnected) await Connector.DisconnectAsync(true);
         if (!Connector.Initialized) Connector.Uninitialize();
     }
 
-    public void PrepareForTrading()
+    public async Task PrepareForTrading()
     {
         if (ReadyToTrade)
         {
-            Connector.OrderPortfolioInfo(Portfolio);
-            foreach (var tool in Tools) ToolManager.RequestBars(tool);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
+            foreach (var tool in Tools) await ToolManager.RequestBarsAsync(tool);
             Window.AddInfo("PrepareForTrading: Bars updated.", false);
             return;
         }
 
-        RequestInfo(false);
-        Connector.OrderHistoricalData(new("CETS", "USD000UTSTOM"), new("1"), 1);
-        Connector.OrderHistoricalData(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
+        await RequestInfo(false);
+        await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
+        await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
         foreach (var tool in Tools)
         {
             ScriptManager.BringOrdersInLine(tool, Orders);
@@ -95,12 +95,12 @@ public class TradingSystem
             }
             else if (tool.Active)
             {
-                Connector.SubscribeToTrades(tool.MySecurity);
-                if (tool.BasicSecurity != null) Connector.SubscribeToTrades(tool.BasicSecurity);
+                await Connector.SubscribeToTradesAsync(tool.MySecurity);
+                if (tool.BasicSecurity != null) await Connector.SubscribeToTradesAsync(tool.BasicSecurity);
             }
 
-            ToolManager.RequestBars(tool);
-            Connector.OrderSecurityInfo(tool.MySecurity);
+            await ToolManager.RequestBarsAsync(tool);
+            await Connector.OrderSecurityInfoAsync(tool.MySecurity);
         }
 
         if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
@@ -117,12 +117,12 @@ public class TradingSystem
             {
                 triggerCheckState = DateTime.Now.AddSeconds(1);
                 if (Connector.Connection == ConnectionState.Connected) await UpdateState();
-                else if (Connector.Connection == ConnectionState.Connecting) Reconnect();
-                else if (DateTime.Now > DateTime.Today.AddMinutes(400)) Connect();
+                else if (Connector.Connection == ConnectionState.Connecting) await Reconnect();
+                else if (DateTime.Now > DateTime.Today.AddMinutes(400)) await Connect();
                 else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0)
                 {
                     Connector.BackupServer = false;
-                    await RelogAsync();
+                    await Window.RelogAsync();
                     PortfolioManager.UpdateEquity();
                     PortfolioManager.CheckEquity();
                     PortfolioManager.UpdatePositions();
@@ -148,7 +148,7 @@ public class TradingSystem
             {
                 if (MyTool.Active)
                 {
-                    if (DateTime.Now > MyTool.TimeNextRecalc) ToolManager.Calculate(MyTool);
+                    if (DateTime.Now > MyTool.TimeNextRecalc) await ToolManager.CalculateAsync(MyTool);
                     ToolManager.UpdateView(MyTool, false);
                 }
             }
@@ -159,20 +159,16 @@ public class TradingSystem
             foreach (Tool MyTool in Tools) if (MyTool.Active) ToolManager.UpdateView(MyTool, false);
         }
 
-        if (DateTime.Now > triggerRequestInfo) await Task.Run(() => RequestInfo());
+        if (DateTime.Now > triggerRequestInfo) await RequestInfo();
 
         if (Settings.ScheduledConnection && DateTime.Now.Minute == 50)
         {
             if (DateTime.Now < DateTime.Today.AddMinutes(400)) //DateTime.Now.Hour == 18 && DateTime.Now.Second < 3
-            {
-                Task disconnection = Task.Run(() => Connector.Disconnect(true));
-                if (!disconnection.Wait(300000))
-                    Window.AddInfo("Превышено время ожидания disconnection task.", notify: true);
-            }
+                await Connector.DisconnectAsync(true);
         }
     }
 
-    private void Connect()
+    private async Task Connect()
     {
         if (Settings.ScheduledConnection &&
             (Connector.ServerAvailable || DateTime.Now > Connector.TriggerReconnection) &&
@@ -180,49 +176,34 @@ public class TradingSystem
         {
             Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
             bool scheduled = DateTime.Now.Minute == 40 && DateTime.Now.Hour == 6;
-            Task connection = Task.Run(() => Connector.Connect(scheduled));
-            if (!connection.Wait(300000))
-                Window.AddInfo("CheckState: Превышено время ожидания connection task.", notify: true);
+            await Connector.ConnectAsync(scheduled);
         }
         else if (!Settings.ScheduledConnection && DateTime.Now.Minute is 0 or 30)
             Settings.ScheduledConnection = true;
     }
 
-    private void Reconnect()
+    private async Task Reconnect()
     {
         if (DateTime.Now > Connector.TriggerReconnection)
         {
             Window.AddInfo("Переподключение.");
-            Task disconnection = Task.Run(() => Connector.Disconnect(false));
-            if (!disconnection.Wait(300000))
-                Window.AddInfo("CheckState: Превышено время ожидания disconnection task.", notify: true);
-            else if (!Settings.ScheduledConnection)
+            await Connector.DisconnectAsync(false);
+            if (!Settings.ScheduledConnection)
             {
                 Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
-                Task connection = Task.Run(() => Connector.Connect(false));
-                if (!connection.Wait(300000))
-                    Window.AddInfo("CheckState: Превышено время ожидания connection task.", notify: true);
+                await Connector.ConnectAsync(false);
             }
         }
     }
 
-    private async Task RelogAsync()
-    {
-        Logger.StopLogging();
-        Logger.StartLogging();
-        await Logger.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
-            DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
-        await Logger.ArchiveFiles("Data", ".xml", "Data", false);
-    }
-
-    private void RequestInfo(bool orderBars = true)
+    private async Task RequestInfo(bool orderBars = true)
     {
         triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute).AddSeconds(-DateTime.Now.Second);
-        Connector.OrderPortfolioInfo(Portfolio);
+        await Connector.OrderPortfolioInfoAsync(Portfolio);
         foreach (Tool tool in Tools)
         {
-            Connector.OrderSecurityInfo(tool.MySecurity);
-            if (orderBars && !tool.Active) ToolManager.RequestBars(tool);
+            await Connector.OrderSecurityInfoAsync(tool.MySecurity);
+            if (orderBars && !tool.Active) await ToolManager.RequestBarsAsync(tool);
         }
     }
 

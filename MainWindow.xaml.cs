@@ -49,6 +49,15 @@ public partial class MainWindow : Window
         TradingSystem.Start();
     }
 
+    public async Task RelogAsync()
+    {
+        Logger.StopLogging();
+        Logger.StartLogging();
+        await Logger.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
+            DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
+        await Logger.ArchiveFiles("Data", ".xml", "Data", false);
+    }
+
     private Settings GetSettings()
     {
         try
@@ -497,9 +506,9 @@ public partial class MainWindow : Window
         if (TradingSystem.Connector.Connection == ConnectionState.Connected && OrdersView.SelectedItem != null)
         {
             Order SelectedOrder = (Order)OrdersView.SelectedItem;
-            if (SelectedOrder.Status is "active" or "watching") await Task.Run(() =>
+            if (SelectedOrder.Status is "active" or "watching") await Task.Run(async () =>
             {
-                if (!TradingSystem.Connector.CancelOrder(SelectedOrder)) AddInfo("Ошибка отмены заявки.");
+                if (!await TradingSystem.Connector.CancelOrderAsync(SelectedOrder)) AddInfo("Ошибка отмены заявки.");
             });
             else AddInfo("Заявка не активна.");
         }
@@ -602,15 +611,15 @@ public partial class MainWindow : Window
     private async void ChangeСonnection(object sender, RoutedEventArgs e)
     {
         if (Connector.Connection is ConnectionState.Connected or ConnectionState.Connecting)
-            await Task.Run(() => Connector.Disconnect(false));
+            await Connector.DisconnectAsync(false);
         else if (TxtLog.Text.Length > 0 && TxtPas.SecurePassword.Length > 0)
         {
             Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
-            await Task.Run(() => Connector.Connect(false));
+            await Connector.ConnectAsync(false);
         }
         else AddInfo("Введите логин и пароль.");
     }
-    private void ClosingMainWindow(object sender, CancelEventArgs e)
+    private async void ClosingMainWindow(object sender, CancelEventArgs e)
     {
         var Res = MessageBox.Show("Are you sure you want to exit?",
             "Closing", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -620,7 +629,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        TradingSystem.Stop();
+        await TradingSystem.Stop();
         Logger.StopLogging();
     }
     internal async void ChangeActivityTool(object sender, RoutedEventArgs e)
