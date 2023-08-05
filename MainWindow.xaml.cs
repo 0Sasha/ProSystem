@@ -37,7 +37,7 @@ public partial class MainWindow : Window
         Serializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         RestoreInfo();
 
-        TradingSystem = new(this, new TXmlConnector(this), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
+        TradingSystem = new(this, typeof(TXmlConnector), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
 
         Settings.Check(Tools);
         if (Settings.EmailPassword != null) Notifier = new EmailNotifier(587,
@@ -145,6 +145,7 @@ public partial class MainWindow : Window
         TradingSystem.Tools.CollectionChanged += UpdateTools;
         TradingSystem.Orders.CollectionChanged += UpdateOrders;
         TradingSystem.Trades.CollectionChanged += UpdateTrades;
+        Connector.PropertyChanged += UpdateConnection;
     }
 
     private void BindData(Settings settings)
@@ -375,35 +376,6 @@ public partial class MainWindow : Window
     }
     #endregion
 
-    #region ListViewies
-    private void UpdatePortfolio(object sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == "Positions")
-        {
-            Window.Dispatcher.Invoke(() =>
-            {
-                Window.PortfolioView.ItemsSource = Portfolio.AllPositions;
-                Window.PortfolioView.ScrollIntoView(this);
-            });
-        }
-    }
-    private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
-    {
-        ToolsView.Items.Refresh();
-        Task.Run(() => SaveData());
-    }
-    private void UpdateOrders(object sender, NotifyCollectionChangedEventArgs e)
-    {
-        OrdersView.Items.Refresh();
-        if (OrdersView.Items.Count > 0) OrdersView.ScrollIntoView(OrdersView.Items[^1]);
-    }
-    private void UpdateTrades(object sender, NotifyCollectionChangedEventArgs e)
-    {
-        TradesView.Items.Refresh();
-        if (TradesView.Items.Count > 0) TradesView.ScrollIntoView(TradesView.Items[^1]);
-    }
-    #endregion
-
     #region Context menu
     private void AddToolContext(object sender, RoutedEventArgs e)
     {
@@ -608,16 +580,72 @@ public partial class MainWindow : Window
     #endregion
 
     #region View
+    private void UpdateConnection(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Connector.Connection))
+        {
+            if (Connector.Connection == ConnectionState.Connected)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    ConnectBtn.Content = "Disconnect";
+                    StCon.Fill = Theme.Green;
+                });
+                Task.Run(async () =>
+                {
+                    await TradingSystem.PrepareForTrading();
+                    Dispatcher.Invoke(() => ShowDistributionInfo(null, null));
+                });
+            }
+            else Dispatcher.Invoke(() =>
+            {
+                if (Connector.Connection == ConnectionState.Connecting)
+                {
+                    ConnectBtn.Content = "Disconnect";
+                    StCon.Fill = Theme.Orange;
+                }
+                else
+                {
+                    ConnectBtn.Content = "Connect";
+                    StCon.Fill = Connector.Connection == ConnectionState.Disconnected ? Theme.Gray : Theme.Red;
+                }
+            });
+        }
+    }
+    private void UpdatePortfolio(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == "Positions")
+        {
+            Window.Dispatcher.Invoke(() =>
+            {
+                Window.PortfolioView.ItemsSource = Portfolio.AllPositions;
+                Window.PortfolioView.ScrollIntoView(this);
+            });
+        }
+    }
+    private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        ToolsView.Items.Refresh();
+        Task.Run(() => SaveData());
+    }
+    private void UpdateOrders(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        OrdersView.Items.Refresh();
+        if (OrdersView.Items.Count > 0) OrdersView.ScrollIntoView(OrdersView.Items[^1]);
+    }
+    private void UpdateTrades(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        TradesView.Items.Refresh();
+        if (TradesView.Items.Count > 0) TradesView.ScrollIntoView(TradesView.Items[^1]);
+    }
+
     private async void ChangeСonnection(object sender, RoutedEventArgs e)
     {
         if (Connector.Connection is ConnectionState.Connected or ConnectionState.Connecting)
             await Connector.DisconnectAsync(false);
         else if (TxtLog.Text.Length > 0 && TxtPas.SecurePassword.Length > 0)
-        {
-            Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
-            await Connector.ConnectAsync(false);
-        }
-        else AddInfo("Введите логин и пароль.");
+            await Connector.ConnectAsync(TxtLog.Text, TxtPas.SecurePassword, false);
+        else AddInfo("Type login and password");
     }
     private async void ClosingMainWindow(object sender, CancelEventArgs e)
     {
@@ -666,7 +694,7 @@ public partial class MainWindow : Window
         TradesInfo.ItemsSource = TradingSystem.SystemTrades;
         TradesInfo.Items.Refresh();
     }
-    internal void ShowDistributionInfo(object sender, RoutedEventArgs e)
+    private void ShowDistributionInfo(object sender, RoutedEventArgs e)
     {
         if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
 

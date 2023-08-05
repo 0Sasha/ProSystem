@@ -36,10 +36,13 @@ internal class ToolManager : IToolManager
 
         UpdateModel(tool);
         ScriptManager.InitializeScripts(tool.Scripts, tabTool);
-        foreach (Script script in tool.Scripts)
+        if (tool.BasicSecurity == null && tool.MySecurity.Bars != null || tool.BasicSecurity?.Bars != null)
         {
-            script.Calculate(tool.BasicSecurity ?? tool.MySecurity);
-            UpdateScriptView(tool, script);
+            foreach (var script in tool.Scripts)
+            {
+                script.Calculate(tool.BasicSecurity ?? tool.MySecurity);
+                UpdateScriptView(tool, script);
+            }
         }
         UpdateModel(tool);
         UpdateMiniModel(tool);

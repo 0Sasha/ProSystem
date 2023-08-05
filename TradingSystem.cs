@@ -35,19 +35,20 @@ public class TradingSystem
     public ObservableCollection<Order> SystemOrders { get; init; } = new();
     public ObservableCollection<Trade> SystemTrades { get; init; } = new();
 
-    public TradingSystem(MainWindow window, Connector connector, UnitedPortfolio portfolio, Settings settings)
+    public TradingSystem(MainWindow window, Type connectorType, UnitedPortfolio portfolio, Settings settings)
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
-        Connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(Window, this, Window.AddInfo);
+        else throw new ArgumentException("Unknow connector", nameof(connectorType));
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        ScriptManager = new ScriptManager(window, Connector);
-        ToolManager = new ToolManager(window, this, ScriptManager);
+        ScriptManager = new ScriptManager(Window, Connector);
+        ToolManager = new ToolManager(Window, this, ScriptManager);
         PortfolioManager = new PortfolioManager(this);
     }
 
-    public TradingSystem(MainWindow window, Connector connector, UnitedPortfolio portfolio, Settings settings,
-        IEnumerable<Tool> tools, IEnumerable<Trade> trades) : this(window, connector, portfolio, settings)
+    public TradingSystem(MainWindow window, Type connectorType, UnitedPortfolio portfolio, Settings settings,
+        IEnumerable<Tool> tools, IEnumerable<Trade> trades) : this(window, connectorType, portfolio, settings)
     {
         Tools = new(tools);
         Trades = new(trades);
@@ -174,9 +175,9 @@ public class TradingSystem
             (Connector.ServerAvailable || DateTime.Now > Connector.TriggerReconnection) &&
             Window.Dispatcher.Invoke(() => Window.TxtLog.Text.Length > 0 && Window.TxtPas.SecurePassword.Length > 0))
         {
-            Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
             bool scheduled = DateTime.Now.Minute == 40 && DateTime.Now.Hour == 6;
-            await Connector.ConnectAsync(scheduled);
+            await Window.Dispatcher.Invoke(async () =>
+                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword, scheduled));
         }
         else if (!Settings.ScheduledConnection && DateTime.Now.Minute is 0 or 30)
             Settings.ScheduledConnection = true;
@@ -186,13 +187,10 @@ public class TradingSystem
     {
         if (DateTime.Now > Connector.TriggerReconnection)
         {
-            Window.AddInfo("Переподключение.");
+            Window.AddInfo("Reconnection on timeout");
             await Connector.DisconnectAsync(false);
-            if (!Settings.ScheduledConnection)
-            {
-                Connector.TriggerReconnection = DateTime.Now.AddSeconds(Settings.SessionTM);
-                await Connector.ConnectAsync(false);
-            }
+            if (!Settings.ScheduledConnection) await Window.Dispatcher.Invoke(async () =>
+                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword, false));
         }
     }
 

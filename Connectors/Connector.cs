@@ -1,29 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Security;
 using System.Threading.Tasks;
 
 namespace ProSystem;
 
-public abstract class Connector
+public abstract class Connector : INotifyPropertyChanged
 {
-    public virtual bool Initialized { get; set; }
+    public virtual bool Initialized { get; protected set; }
     public virtual bool BackupServer { get; set; }
     public virtual bool ServerAvailable { get; set; }
     public virtual ConnectionState Connection { get; set; }
     public virtual DateTime TriggerReconnection { get; set; }
 
-    public virtual List<Security> Securities { get; set; }
-    public virtual List<Market> Markets { get; set; }
-    public virtual List<TimeFrame> TimeFrames { get; set; }
+    public virtual List<Security> Securities { get; protected set; } = new();
+    public virtual List<Market> Markets { get; protected set; } = new();
+    public virtual List<TimeFrame> TimeFrames { get; protected set; } = new();
 
     public virtual double USDRUB { get; set; }
     public virtual double EURRUB { get; set; }
+
+
+    public abstract event PropertyChangedEventHandler PropertyChanged;
 
     public abstract bool Initialize(int logLevel);
 
     public abstract bool Uninitialize();
 
-    public abstract Task<bool> ConnectAsync(bool scheduled);
+    public abstract Task<bool> ConnectAsync(string login, SecureString password, bool scheduled);
 
     public abstract Task<bool> DisconnectAsync(bool scheduled);
 
