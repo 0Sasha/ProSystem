@@ -9,16 +9,12 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Xml;
 
 namespace ProSystem;
 
-internal delegate void AddInformation(string data, bool important = true, bool notify = false);
-
 internal class TXmlConnector : Connector
 {
-    private readonly Window Window;
     private readonly AddInformation AddInfo;
     private readonly TradingSystem TradingSystem;
     private readonly TXmlDataProcessor DataProcessor;
@@ -42,7 +38,9 @@ internal class TXmlConnector : Connector
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
     public bool Scheduled { get; set; }
+
     public List<ClientAccount> Clients { get; } = new();
+
     public override ConnectionState Connection
     {
         get => connection;
@@ -56,19 +54,26 @@ internal class TXmlConnector : Connector
         }
     }
 
-    public TXmlConnector(Window window, TradingSystem tradingSystem, AddInformation addInfo)
+    public TXmlConnector(TradingSystem tradingSystem, AddInformation addInfo)
     {
-        Window = window ?? throw new ArgumentNullException(nameof(window));
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-        DataProcessor = new(this, tradingSystem, Window, addInfo);
+        DataProcessor = new(this, tradingSystem, addInfo);
         CallbackDel = CallBack;
     }
+
 
     public override event PropertyChangedEventHandler PropertyChanged;
 
     private void Notify(string propertyName = "") =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private bool CallBack(IntPtr data)
+    {
+        DataQueue.Enqueue(Marshal.PtrToStringUTF8(data));
+        FreeMemory(data);
+        return true;
+    }
 
     private void ProcessDataQueue()
     {
@@ -105,7 +110,7 @@ internal class TXmlConnector : Connector
 
         Securities.Clear(); Markets.Clear();
         TimeFrames.Clear(); Clients.Clear();
-        Window.Dispatcher.Invoke(() => TradingSystem.Orders.Clear());
+        TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Orders.Clear());
 
         var settings = TradingSystem.Settings;
         waitingTime = settings.RequestTM * 1000 + 3000;
@@ -203,7 +208,7 @@ internal class TXmlConnector : Connector
         if (xr.GetAttribute("success") == "true")
         {
             int trId = int.Parse(xr.GetAttribute("transactionid"), IC);
-            Window.Dispatcher.Invoke(() =>
+            TradingSystem.Window.Dispatcher.Invoke(() =>
             {
                 if (sender != null) sender.Orders.Add(new Order(trId, sender.Name, signal, note));
                 else TradingSystem.SystemOrders.Add(new Order(trId, senderName, signal, note));
@@ -407,13 +412,6 @@ internal class TXmlConnector : Connector
         
         AddInfo("Uninitialization failed: server is connected.");
         return false;
-    }
-
-    private bool CallBack(IntPtr data)
-    {
-        DataQueue.Enqueue(Marshal.PtrToStringUTF8(data));
-        FreeMemory(data);
-        return true;
     }
 
     private async Task<string> SendCommand(string command)

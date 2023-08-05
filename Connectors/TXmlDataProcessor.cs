@@ -1,18 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Xml;
 
 namespace ProSystem;
 
 internal class TXmlDataProcessor
 {
-    private readonly Window Window;
     private readonly TXmlConnector Connector;
     private readonly TradingSystem TradingSystem;
     private readonly AddInformation AddInfo;
@@ -27,426 +24,123 @@ internal class TXmlDataProcessor
     private readonly StringComparison SC = StringComparison.Ordinal;
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    public TXmlDataProcessor(TXmlConnector connector,
-        TradingSystem tradingSystem, Window window, AddInformation addInfo)
+    public TXmlDataProcessor(TXmlConnector connector, TradingSystem tradingSystem, AddInformation addInfo)
     {
         Connector = connector ?? throw new ArgumentNullException(nameof(connector));
-        Window = window ?? throw new ArgumentNullException(nameof(window));
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
     }
 
-    public string ProcessData(string data)
+    public void ProcessData(string data)
     {
-        string section = null;
         using XmlReader xr = XmlReader.Create(new StringReader(data), XS);
-        var tools = TradingSystem.Tools;
 
-        while (xr.Read())
+        xr.Read();
+        var section = xr.Name;
+
+        // Высокочастотные секции
+        if (section == "alltrades")
         {
-            section = xr.Name;
-
-            // Высокочастотные секции
-            if (section == "alltrades")
+            while (xr.Read())
             {
-                while (xr.Read())
-                {
-                    if (!xr.ReadToFollowing("time")) { xr.Close(); return section; }
-                    xr.Read();
-                    var trade = new Trade(DateTime.ParseExact(xr.Value, DTForm, IC));
-
-                    if (!xr.ReadToFollowing("price")) { AddInfo("alltrades: Нет price сделки."); continue; }
-                    xr.Read();
-                    trade.Price = double.Parse(xr.Value, IC);
-
-                    if (!xr.ReadToFollowing("quantity")) { AddInfo("alltrades: Нет quantity сделки."); continue; }
-                    xr.Read();
-                    trade.Quantity = int.Parse(xr.Value, IC);
-
-                    if (!xr.ReadToFollowing("seccode")) { AddInfo("alltrades: Нет seccode сделки."); continue; }
-                    xr.Read();
-                    trade.Seccode = xr.Value;
-
-                    var tool = tools
-                        .Single(x => x.MySecurity.Seccode == xr.Value || x.BasicSecurity?.Seccode == trade.Seccode);
-                    TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
-                }
-            }
-            else if (section == "candles")
-            {
-                if (xr.GetAttribute("status") == "3")
-                {
-                    AddInfo("candles: Запрошенные данные недоступны. Запросите позже.");
-                    xr.Close(); return section;
-                }
-
-                Security security;
-                int i = Array.FindIndex(tools.ToArray(), x => x.MySecurity.Seccode == xr.GetAttribute("seccode"));
-                if (i > -1) security = tools[i].MySecurity;
-                else
-                {
-                    i = Array.FindIndex(tools.ToArray(), x => x.BasicSecurity != null && x.BasicSecurity.Seccode == xr.GetAttribute("seccode"));
-                    if (i > -1) security = tools[i].BasicSecurity;
-                    else
-                    {
-                        string sec = xr.GetAttribute("seccode"); xr.Read();
-                        if (sec.Contains("USD")) Connector.USDRUB = double.Parse(xr.GetAttribute("close"), IC);
-                        else if (sec.Contains("EUR")) Connector.EURRUB = double.Parse(xr.GetAttribute("close"), IC);
-                        else AddInfo("candles: Неактуальный инструмент: " + sec);
-                        xr.Close(); return section;
-                    }
-                }
-
-                ProcessBars(xr, tools[i], security);
-                xr.Close();
-                return section;
-            }
-            // Базовые секции
-            else if (section == "orders")
-            {
-                ProcessOrders(xr, TradingSystem.Orders);
-                xr.Close();
-                return section;
-            }
-            else if (section == "positions")
-            {
+                if (!xr.ReadToFollowing("time")) break;
                 xr.Read();
-                ProcessPositions(xr, xr.Name, TradingSystem.Portfolio);
-                xr.Close();
-                return section;
-            }
-            else if (section == "trades")
-            {
-                ProcessTrades(xr, TradingSystem.Trades);
-                xr.Close();
-                return section;
-            }
-            else if (section == "server_status")
-            {
-                if (xr.GetAttribute("connected") == "true")
-                {
-                    Connector.ServerAvailable = true;
-                    if (xr.GetAttribute("recover") != "true")
-                    {
-                        Connector.Connection = ConnectionState.Connected;
-                        AddInfo("Connected", !Connector.Scheduled);
-                        Connector.Scheduled = false;
-                    }
-                    else
-                    {
-                        Connector.TriggerReconnection = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
-                        Connector.Connection = ConnectionState.Connecting;
-                        AddInfo("Recover connection");
-                    }
-                }
-                else if (xr.GetAttribute("connected") == "false")
-                {
-                    TradingSystem.ReadyToTrade = false;
-                    Connector.ServerAvailable = true;
+                var trade = new Trade(DateTime.ParseExact(xr.Value, DTForm, IC));
 
-                    if (xr.GetAttribute("recover") != "true")
-                    {
-                        Connector.Connection = ConnectionState.Disconnected;
-                        AddInfo("Disconnected", !Connector.Scheduled);
-                        Connector.Scheduled = false;
-                    }
-                    else
-                    {
-                        Connector.Connection = ConnectionState.Connecting;
-                        AddInfo("Recover");
-                    }
-                }
-                else if (xr.GetAttribute("connected") == "error")
+                if (!xr.ReadToFollowing("price"))
                 {
-                    TradingSystem.ReadyToTrade = false;
-                    Connector.ServerAvailable = false;
-                    Connector.BackupServer = !Connector.BackupServer;
-
-                    Connector.Connection = ConnectionState.Disconnected;
-                    xr.Read(); AddInfo("Server error: " + xr.Value + " BackupServer: " + !Connector.BackupServer, notify: true);
+                    AddInfo("alltrades: no price");
+                    continue;
                 }
-            }
-            else if (section == "mc_portfolio")
-            {
-                ProcessPortfolio(xr, TradingSystem.Portfolio);
-                xr.Close();
-                return section;
-            }
-            // Второстепенные секции
-            else if (section == "sec_info_upd")
-            {
+                xr.Read();
+                trade.Price = double.Parse(xr.Value, IC);
+
+                if (!xr.ReadToFollowing("quantity"))
+                {
+                    AddInfo("alltrades: no quantity");
+                    continue;
+                }
+                xr.Read();
+                trade.Quantity = int.Parse(xr.Value, IC);
+
                 if (!xr.ReadToFollowing("seccode"))
                 {
-                    AddInfo("sec_info_upd: Нет seccode.");
-                    xr.Close();
-                    return section;
+                    AddInfo("alltrades: no seccode");
+                    continue;
                 }
                 xr.Read();
+                trade.Seccode = xr.Value;
 
-                Tool MyTool;
-                if (tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value) == null) { xr.Close(); return section; }
-                else MyTool = tools.Single(x => x.MySecurity.Seccode == xr.Value);
-
-                string Name = "";
-                while (xr.Read())
-                {
-                    if (xr.Name.Length > 0) Name = xr.Name;
-                    else if (xr.HasValue)
-                    {
-                        if (Name == "buy_deposit") MyTool.MySecurity.BuyDeposit = double.Parse(xr.Value, IC);
-                        else if (Name == "sell_deposit") MyTool.MySecurity.SellDeposit = double.Parse(xr.Value, IC);
-                        else if (Name == "minprice") MyTool.MySecurity.MinPrice = double.Parse(xr.Value, IC);
-                        else if (Name == "maxprice") MyTool.MySecurity.MaxPrice = double.Parse(xr.Value, IC);
-                        else if (Name == "point_cost") MyTool.MySecurity.PointCost = double.Parse(xr.Value, IC);
-                    }
-                }
-                xr.Close();
-                return section;
+                var tool = TradingSystem.Tools
+                    .Single(x => x.MySecurity.Seccode == xr.Value || x.BasicSecurity?.Seccode == trade.Seccode);
+                TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
             }
-            else if (section == "sec_info")
-            {
-                if (!xr.ReadToFollowing("seccode"))
-                {
-                    AddInfo("sec_info: Нет seccode.");
-                    xr.Close();
-                    return section;
-                }
-                xr.Read();
-
-                Tool MyTool;
-                if (tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value) == null) { xr.Close(); return section; }
-                else MyTool = tools.Single(x => x.MySecurity.Seccode == xr.Value);
-
-                if (!xr.ReadToFollowing("minprice"))
-                {
-                    AddInfo("sec_info: Нет minprice.");
-                    xr.Close();
-                    return section;
-                }
-                xr.Read(); MyTool.MySecurity.MinPrice = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("maxprice"))
-                {
-                    AddInfo("sec_info: Нет maxprice.");
-                    xr.Close();
-                    return section;
-                }
-                xr.Read(); MyTool.MySecurity.MaxPrice = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("buy_deposit"))
-                {
-                    AddInfo("sec_info: Нет buy_deposit.");
-                    xr.Close();
-                    return section;
-                }
-                xr.Read(); MyTool.MySecurity.BuyDeposit = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("sell_deposit"))
-                {
-                    AddInfo("sec_info: Нет sell_deposit.");
-                    xr.Close();
-                    return section;
-                }
-                xr.Read(); MyTool.MySecurity.SellDeposit = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("point_cost"))
-                {
-                    AddInfo("sec_info: Нет point_cost.");
-                    xr.Close();
-                    return section;
-                }
-                xr.Read(); MyTool.MySecurity.PointCost = double.Parse(xr.Value, IC);
-                xr.Close(); return section;
-            }
-            else if (section == "cln_sec_permissions")
-            {
-                if (!xr.ReadToFollowing("seccode")) { AddInfo("sec_permissions: no seccode"); xr.Close(); return section; }
-                xr.Read(); string Seccode = xr.Value;
-
-                if (tools.SingleOrDefault(x => x.MySecurity.Seccode == Seccode) == null)
-                { AddInfo("sec_permissions: неактуальный инструмент: " + Seccode); xr.Close(); return section; }
-                var tool = tools.Single(x => x.MySecurity.Seccode == Seccode);
-
-                if (!xr.ReadToFollowing("riskrate_long")) { AddInfo("sec_permissions: no riskrate_long"); xr.Close(); return section; }
-                xr.Read(); tool.MySecurity.RiskrateLong = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("reserate_long")) { AddInfo("sec_permissions: no reserate_long"); xr.Close(); return section; }
-                xr.Read(); tool.MySecurity.ReserateLong = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("riskrate_short")) { AddInfo("sec_permissions: no riskrate_short"); xr.Close(); return section; }
-                xr.Read(); tool.MySecurity.RiskrateShort = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("reserate_short")) { AddInfo("sec_permissions: no reserate_short"); xr.Close(); return section; }
-                xr.Read(); tool.MySecurity.ReserateShort = double.Parse(xr.Value, IC);
-
-                if (tool.MySecurity.Bars == null) Task.Run(tool.MySecurity.UpdateRequirements);
-
-                /*if (!XR.ReadToFollowing("riskrate_longx")) { AddInfo("sec_permissions: no riskrate_longx"); XR.Close(); return Section; }
-                XR.Read(); MyTool.MySecurity.MinRiskrateLong = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("reserate_longx")) { AddInfo("sec_permissions: no reserate_longx"); XR.Close(); return Section; }
-                XR.Read(); MyTool.MySecurity.MinReserateLong = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("riskrate_shortx")) { AddInfo("sec_permissions: no riskrate_shortx"); XR.Close(); return Section; }
-                XR.Read(); MyTool.MySecurity.MinRiskrateShort = double.Parse(XR.Value, IC);
-
-                if (!XR.ReadToFollowing("reserate_shortx")) { AddInfo("sec_permissions: no reserate_shortx"); XR.Close(); return Section; }
-                XR.Read(); MyTool.MySecurity.MinReserateShort = double.Parse(XR.Value, IC);*/
-
-                xr.Close(); return section;
-            }
-            else if (section == "messages") // Текстовые сообщения
-            {
-                if (xr.ReadToFollowing("text")) { xr.Read(); AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages); }
-                break;
-            }
-            else if (section == "error") // Внутренние ошибки dll
-            {
-                xr.Read(); AddInfo(xr.Value);
-                break;
-            }
-            else if (section == "securities")
-            {
-                while (xr.Read())
-                {
-                    if (xr.Name != "security" && !xr.ReadToFollowing("security")) { xr.Close(); return section; }
-                    if (xr.GetAttribute("active") == "false") continue;
-
-                    if (!xr.ReadToFollowing("seccode")) { AddInfo("Не найден seccode."); continue; }
-                    xr.Read(); Connector.Securities.Add(new Security(xr.Value));
-
-                    while (xr.Read())
-                    {
-                        if (xr.NodeType == XmlNodeType.EndElement)
-                        {
-                            if (xr.Name == "security") break;
-                            continue;
-                        }
-                        if (xr.NodeType == XmlNodeType.Element)
-                        {
-                            if (xr.Name == "currency")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].Currency = xr.Value;
-                            }
-                            else if (xr.Name == "board")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].Board = xr.Value;
-                            }
-                            else if (xr.Name == "shortname")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].ShortName = xr.Value;
-                            }
-                            else if (xr.Name == "decimals")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].Decimals = int.Parse(xr.Value, IC);
-                            }
-                            else if (xr.Name == "market")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].Market = xr.Value;
-                            }
-                            else if (xr.Name == "minstep")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].MinStep = double.Parse(xr.Value, IC);
-                            }
-                            else if (xr.Name == "lotsize")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].LotSize = int.Parse(xr.Value, IC);
-                            }
-                            else if (xr.Name == "point_cost")
-                            {
-                                xr.Read();
-                                Connector.Securities[^1].PointCost = double.Parse(xr.Value, IC);
-                            }
-                        }
-
-                        /*if (!XR.ReadToFollowing("currency")) { AddInfo(Securities[^1].Seccode + ": Не найден currency.", false); continue; }
-                        XR.Read(); Securities[^1].Currency = XR.Value;
-
-                        if (!XR.ReadToFollowing("board")) { AddInfo(Securities[^1].Seccode + ": Не найден board."); continue; }
-                        XR.Read(); Securities[^1].Board = XR.Value;
-
-                        if (!XR.ReadToFollowing("shortname")) { AddInfo(Securities[^1].Seccode + ": Не найден shortname."); continue; }
-                        XR.Read(); Securities[^1].ShortName = XR.Value;
-
-                        if (!XR.ReadToFollowing("decimals")) { AddInfo(Securities[^1].Seccode + ": Не найден decimals."); continue; }
-                        XR.Read(); Securities[^1].Decimals = int.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("market")) { AddInfo(Securities[^1].Seccode + ": Не найден market."); continue; }
-                        XR.Read(); Securities[^1].Market = XR.Value;
-
-                        if (!XR.ReadToFollowing("minstep")) { AddInfo(Securities[^1].Seccode + ": Не найден minstep."); continue; }
-                        XR.Read(); Securities[^1].MinStep = double.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("lotsize")) { AddInfo(Securities[^1].Seccode + ": Не найден lotsize."); continue; }
-                        XR.Read(); Securities[^1].LotSize = int.Parse(XR.Value, IC);
-
-                        if (!XR.ReadToFollowing("point_cost")) { AddInfo(Securities[^1].Seccode + ": Не найден point_cost."); continue; }
-                        XR.Read(); Securities[^1].PointCost = double.Parse(XR.Value, IC);*/
-                    }
-                }
-            }
-            else if (section == "client")
-            {
-                string id, market;
-                if (xr.GetAttribute("remove") == "false")
-                {
-                    if (Connector.Clients.SingleOrDefault(x => x.ID == xr.GetAttribute("id")) == null)
-                        id = xr.GetAttribute("id");
-                    else { AddInfo("Клиент уже есть в коллекции."); xr.Close(); return section; }
-                }
-                else { Connector.Clients.Remove(Connector.Clients.Single(x => x.ID == xr.GetAttribute("id"))); xr.Close(); return section; }
-
-                if (!xr.ReadToFollowing("market")) { AddInfo("client: no market"); xr.Close(); return section; };
-                xr.Read(); market = xr.Value;
-
-                if (!xr.ReadToFollowing("union")) { AddInfo("client: no union"); xr.Close(); return section; };
-                xr.Read(); Connector.Clients.Add(new(id, market, xr.Value));
-
-                xr.Close(); return section;
-            }
-            else if (section == "markets")
-            {
-                string ID = null;
-                while (xr.Read())
-                {
-                    if (xr.HasAttributes) ID = xr.GetAttribute("id");
-                    else if (xr.HasValue) Connector.Markets.Add(new Market(ID, xr.Value));
-                }
-                xr.Close(); return section;
-            }
-            else if (section == "candlekinds")
-            {
-                string ID = null;
-                while (xr.Read())
-                {
-                    if (!xr.ReadToFollowing("id")) { xr.Close(); return section; }
-                    xr.Read(); ID = xr.Value;
-
-                    if (!xr.ReadToFollowing("period")) { AddInfo("candlekinds: no period"); xr.Close(); return section; }
-                    xr.Read(); int Period = int.Parse(xr.Value, IC);
-
-                    if (!xr.ReadToFollowing("name")) { AddInfo("candlekinds: no name"); xr.Close(); return section; }
-                    xr.Read(); Connector.TimeFrames.Add(new TimeFrame(ID, Period, xr.Value));
-                }
-            }
-            else if (section is "marketord" or "pits" or "boards" or "union" or "overnight" or "news_header") return section;
-            else { AddInfo("ProcessData: Неизвестная секция: " + section); return section; }
-            //else if (Section == "clientlimits" || Section == "quotes" || Section == "quotations") return Section;
         }
+        else if (section == "candles") ProcessBars(xr);
+        // Базовые секции
+        else if (section == "orders") ProcessOrders(xr);
+        else if (section == "positions") ProcessPositions(xr);
+        else if (section == "trades") ProcessTrades(xr);
+        else if (section == "server_status") ProcessStatus(xr);
+        else if (section == "mc_portfolio") ProcessPortfolio(xr);
+        else if (section == "cln_sec_permissions") ProcessPermissions(xr);
+        else if (section is "sec_info" or "sec_info_upd") ProcessSecInfo(xr);
+        else ProcessSecondarySections(xr, section);
         xr.Close();
-        return section;
     }
 
-    private void ProcessBars(XmlReader xr, Tool tool, Security security)
+    private void ProcessSecondarySections(XmlReader xr, string section)
     {
-        int tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Period / 60;
+        if (section == "messages")
+        {
+            if (xr.ReadToFollowing("text"))
+            {
+                xr.Read();
+                AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages);
+            }
+        }
+        else if (section == "error") // Внутренние ошибки dll
+        {
+            xr.Read();
+            AddInfo(xr.Value);
+        }
+        else if (section == "securities") ProcessSecurities(xr);
+        else if (section == "client") ProcessClients(xr);
+        else if (section == "markets") ProcessMarkets(xr);
+        else if (section == "candlekinds") ProcessTimeFrames(xr);
+        else if (section is "marketord" or "pits" or "boards" or "union" or "overnight" or "news_header") { }
+        else AddInfo("ProcessData: unknown section: " + section);
+        //else if (section == "clientlimits" || section == "quotes" || section == "quotations") { }
+    }
+
+
+    private void ProcessBars(XmlReader xr)
+    {
+        if (xr.GetAttribute("status") == "3")
+        {
+            AddInfo("ProcessBars: data is not available");
+            return;
+        }
+
+        var sec = xr.GetAttribute("seccode");
+        var tool = TradingSystem.Tools.ToArray()
+            .SingleOrDefault(t => t.MySecurity.Seccode == sec || t.BasicSecurity?.Seccode == sec);
+        if (tool == null)
+        {
+            xr.Read();
+            if (sec.Contains("USD")) Connector.USDRUB = double.Parse(xr.GetAttribute("close"), IC);
+            else if (sec.Contains("EUR")) Connector.EURRUB = double.Parse(xr.GetAttribute("close"), IC);
+            else AddInfo("ProcessBars: unknown asset: " + sec);
+            return;
+        }
+
+        var security = tool.MySecurity.Seccode == sec ? tool.MySecurity : tool.BasicSecurity;
+        var tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Period / 60;
+        ProcessBars(xr, tool, security, tf);
+    }
+
+    private void ProcessBars(XmlReader xr, Tool tool, Security security, int tf)
+    {
         if (security.SourceBars == null || security.SourceBars.TF != tf) security.SourceBars = new Bars(tf);
 
         List<DateTime> dateTime = new();
@@ -456,12 +150,13 @@ internal class TXmlDataProcessor
         List<double> close = new();
         List<double> volume = new();
 
-        bool Filter = security.Market != "4";
+        bool filter = security.Market != "4";
         while (xr.Read())
         {
-            if (Filter && xr.HasAttributes && (dateTime.Count == 0 ||
+            if (filter && xr.HasAttributes && (dateTime.Count == 0 ||
                 dateTime[^1].Date != DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC).Date) &&
-                double.Parse(xr.GetAttribute("high"), IC) - double.Parse(xr.GetAttribute("low"), IC) < 0.00001) xr.Read();
+                double.Parse(xr.GetAttribute("high"), IC) - double.Parse(xr.GetAttribute("low"), IC) < 0.00001)
+                xr.Read();
 
             if (xr.HasAttributes)
             {
@@ -576,7 +271,7 @@ internal class TXmlDataProcessor
         AddInfo("ProcessBars: Не найден EndElement");
     }
 
-    private void ProcessOrders(XmlReader xr, ObservableCollection<Order> orders)
+    private void ProcessOrders(XmlReader xr)
     {
         while (xr.Read())
         {
@@ -584,239 +279,178 @@ internal class TXmlDataProcessor
 
             // Первичная идентификация
             int trID = int.Parse(xr.GetAttribute("transactionid"), IC);
-            Order[] arrOrders = orders.ToArray();
-            if (arrOrders.Where(x => x.TrID == trID).Count() > 1)
+            var orders = TradingSystem.Orders.ToArray();
+            if (orders.Where(x => x.TrID == trID).Count() > 1)
             {
-                AddInfo("orders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", notify: true);
-                Window.Dispatcher.Invoke(() =>
+                AddInfo("ProcessOrders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", notify: true);
+                TradingSystem.Window.Dispatcher.Invoke(() =>
                 {
-                    while (arrOrders.Where(x => x.TrID == trID).Count() > 1)
+                    while (orders.Where(x => x.TrID == trID).Count() > 1)
                     {
-                        orders.Remove(arrOrders.First(x => x.TrID == trID));
-                        arrOrders = orders.ToArray();
+                        TradingSystem.Orders.Remove(orders.First(x => x.TrID == trID));
+                        orders = TradingSystem.Orders.ToArray();
                     }
                 });
             }
 
-            Order myOrder = arrOrders.SingleOrDefault(x => x.TrID == trID); // Проверка наличия заявки с данным TrID
-            if (myOrder == null) myOrder = new Order(trID); // Создание новой заявки с данным TrID
+            var order = orders.SingleOrDefault(x => x.TrID == trID); // Проверка наличия заявки с данным TrID
+            if (order == null) order = new Order(trID); // Создание новой заявки с данным TrID
 
             // Вторичная идентификация
-            if (!xr.ReadToFollowing("orderno"))
+            if (!xr.ReadToFollowing("orderno")) 
             {
-                AddInfo("orders: Не найден orderno заявки: " + myOrder.TrID, notify: true);
+                AddInfo("ProcessOrders: Не найден orderno заявки: " + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
 
-            if (xr.Value == "0") myOrder.OrderNo = 0;
-            else if (arrOrders.SingleOrDefault(x => x.OrderNo == long.Parse(xr.Value, IC)) == null) myOrder.OrderNo = long.Parse(xr.Value, IC);
+            if (xr.Value == "0") order.OrderNo = 0;
+            else if (orders.SingleOrDefault(x => x.OrderNo == long.Parse(xr.Value, IC)) == null)
+                order.OrderNo = long.Parse(xr.Value, IC);
             else // Заявка с данным биржевым номером уже есть в коллекции, обновление TrID и её фиксация
             {
-                arrOrders.Single(x => x.OrderNo == long.Parse(xr.Value, IC)).TrID = trID;
-                myOrder = arrOrders.Single(x => x.TrID == trID); // Фиксация существующей заявки
+                orders.Single(x => x.OrderNo == long.Parse(xr.Value, IC)).TrID = trID;
+                order = orders.Single(x => x.TrID == trID); // Фиксация существующей заявки
             }
 
             if (!xr.ReadToFollowing("seccode"))
             {
-                AddInfo("orders: Не найден seccode заявки: " + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найден seccode заявки: " + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.Seccode = xr.Value;
+            order.Seccode = xr.Value;
 
             if (!xr.ReadToFollowing("status"))
             {
-                AddInfo("orders: Не найден status заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найден status заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.Status = xr.Value;
+            order.Status = xr.Value;
 
             if (!xr.ReadToFollowing("buysell"))
             {
-                AddInfo("orders: Не найден buysell заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найден buysell заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.BuySell = xr.Value;
+            order.BuySell = xr.Value;
 
             xr.Read();
             xr.Read();
             if (xr.Name == "time")
             {
                 xr.Read();
-                myOrder.Time = DateTime.ParseExact(xr.Value, DTForm, IC);
-                xr.Read(); xr.Read();
+                order.Time = DateTime.ParseExact(xr.Value, DTForm, IC);
+                xr.Read();
+                xr.Read();
                 if (xr.Name == "accepttime")
                 {
                     xr.Read();
-                    myOrder.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+                    order.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
                 }
             }
             else if (xr.Name == "accepttime")
             {
                 xr.Read();
-                myOrder.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+                order.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
             }
-            else if (myOrder.Status == "active" && myOrder.OrderNo == 0) { }
+            else if (order.Status == "active" && order.OrderNo == 0) { }
 
             if (!xr.ReadToFollowing("balance"))
             {
-                AddInfo("orders: Не найден balance заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найден balance заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.Balance = int.Parse(xr.Value, IC);
+            order.Balance = int.Parse(xr.Value, IC);
 
             if (!xr.ReadToFollowing("price"))
             {
-                AddInfo("orders: Не найдена price заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найдена price заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.Price = double.Parse(xr.Value, IC);
+            order.Price = double.Parse(xr.Value, IC);
 
             if (!xr.ReadToFollowing("quantity"))
             {
-                AddInfo("orders: Не найдено quantity заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найдено quantity заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.Quantity = int.Parse(xr.Value, IC);
+            order.Quantity = int.Parse(xr.Value, IC);
 
             if (!xr.ReadToFollowing("withdrawtime"))
             {
-                AddInfo("orders: Не найдено withdrawtime заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найдено withdrawtime заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            if (xr.Value != "0") myOrder.WithdrawTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+            if (xr.Value != "0") order.WithdrawTime = DateTime.ParseExact(xr.Value, DTForm, IC);
 
             if (!xr.ReadToFollowing("condition"))
             {
-                AddInfo("orders: Не найдено condition заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найдено condition заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
-            myOrder.Condition = xr.Value;
+            order.Condition = xr.Value;
 
-            if (myOrder.Condition != "None")
+            if (order.Condition != "None")
             {
                 if (!xr.ReadToFollowing("conditionvalue"))
                 {
-                    AddInfo("orders: Не найдено conditionvalue заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                    AddInfo("orders: Не найдено conditionvalue заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                     continue;
                 }
                 xr.Read();
-                myOrder.ConditionValue = double.Parse(xr.Value, IC);
+                order.ConditionValue = double.Parse(xr.Value, IC);
 
                 if (!xr.ReadToFollowing("validafter"))
                 {
-                    AddInfo("orders: Не найдено validafter заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                    AddInfo("orders: Не найдено validafter заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                     continue;
                 }
                 xr.Read();
-                if (xr.Value != "0") myOrder.ValidAfter = DateTime.ParseExact(xr.Value, DTForm, IC);
+                if (xr.Value != "0") order.ValidAfter = DateTime.ParseExact(xr.Value, DTForm, IC);
 
                 if (!xr.ReadToFollowing("validbefore"))
                 {
-                    AddInfo("orders: Не найдено validbefore заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                    AddInfo("orders: Не найдено validbefore заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                     continue;
                 }
                 xr.Read();
-                if (xr.Value != "" && xr.Value != "0") myOrder.ValidBefore = DateTime.ParseExact(xr.Value, DTForm, IC);
+                if (xr.Value != "" && xr.Value != "0") order.ValidBefore = DateTime.ParseExact(xr.Value, DTForm, IC);
             }
             if (!xr.ReadToFollowing("result"))
             {
-                AddInfo("orders: Не найден result заявки: " + myOrder.Seccode + "/" + myOrder.TrID, notify: true);
+                AddInfo("orders: Не найден result заявки: " + order.Seccode + "/" + order.TrID, notify: true);
                 continue;
             }
             xr.Read();
             if (xr.HasValue)
             {
                 if (xr.Value.StartsWith("{37}", SC) || xr.Value.StartsWith("{42}", SC))
-                    AddInfo(myOrder.Seccode + "/" + myOrder.TrID + ": OrderReply: " + xr.Value, false);
-                else AddInfo(myOrder.Seccode + "/" + myOrder.TrID + ": OrderReply: " + xr.Value);
+                    AddInfo(order.Seccode + "/" + order.TrID + ": OrderReply: " + xr.Value, false);
+                else AddInfo(order.Seccode + "/" + order.TrID + ": OrderReply: " + xr.Value);
             }
 
-            int i = Array.FindIndex(orders.ToArray(), x => x.TrID == myOrder.TrID);
-            Window.Dispatcher.Invoke(() =>
+            int i = Array.FindIndex(TradingSystem.Orders.ToArray(), x => x.TrID == order.TrID);
+            TradingSystem.Window.Dispatcher.Invoke(() =>
             {
-                if (i > -1) orders[i] = myOrder;
-                else orders.Add(myOrder);
+                if (i > -1) TradingSystem.Orders[i] = order;
+                else TradingSystem.Orders.Add(order);
             });
         }
     }
 
-    private void ProcessTrades(XmlReader xr, ObservableCollection<Trade> trades)
+    private void ProcessPositions(XmlReader xr)
     {
-        Trade trade;
-        while (xr.Read())
-        {
-            if (!xr.ReadToFollowing("tradeno")) return;
-            xr.Read();
-
-            if (trades.SingleOrDefault(x => x.TradeNo == long.Parse(xr.Value, IC)) != null) continue;
-            else trade = new Trade(long.Parse(xr.Value, IC));
-
-            if (!xr.ReadToFollowing("orderno"))
-            {
-                AddInfo("Нет orderno моей сделки.");
-                continue;
-            }
-            xr.Read();
-            trade.OrderNo = long.Parse(xr.Value, IC);
-
-            if (!xr.ReadToFollowing("seccode"))
-            {
-                AddInfo("Нет seccode моей сделки.");
-                continue;
-            }
-            xr.Read();
-            trade.Seccode = xr.Value;
-
-            if (!xr.ReadToFollowing("buysell"))
-            {
-                AddInfo("Нет buysell моей сделки.");
-                continue;
-            }
-            xr.Read();
-            trade.BuySell = xr.Value;
-
-            if (!xr.ReadToFollowing("time"))
-            {
-                AddInfo("Нет time моей сделки.");
-                continue;
-            }
-            xr.Read();
-            trade.DateTime = DateTime.ParseExact(xr.Value, DTForm, IC);
-
-            if (!xr.ReadToFollowing("price"))
-            {
-                AddInfo("Нет price моей сделки.");
-                continue;
-            }
-            xr.Read();
-            trade.Price = double.Parse(xr.Value, IC);
-
-            if (!xr.ReadToFollowing("quantity"))
-            {
-                AddInfo("Нет quantity моей сделки.");
-                continue;
-            }
-            xr.Read();
-            trade.Quantity = int.Parse(xr.Value, IC);
-
-            Window.Dispatcher.Invoke(() => trades.Add(trade));
-            bool display = TradingSystem.Settings.DisplayNewTrades && trades.Count > 1 && (trades[^2].Seccode != trade.Seccode ||
-                trades[^2].BuySell != trade.BuySell || trades[^2].DateTime < trade.DateTime.AddMinutes(-30));
-            AddInfo("Новая сделка: " + trade.Seccode + "/" + trade.BuySell + "/" + trade.Price + "/" + trade.Quantity, display);
-        }
-    }
-
-    private void ProcessPositions(XmlReader xr, string subsection, UnitedPortfolio portfolio)
-    {
+        xr.Read();
+        var subsection = xr.Name;
+        var portfolio = TradingSystem.Portfolio;
         while (xr.Read())
         {
             if (subsection is "sec_position" or "forts_position")
@@ -824,7 +458,7 @@ internal class TXmlDataProcessor
                 if (!xr.ReadToFollowing("seccode")) return;
                 xr.Read();
 
-                Position pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
+                var pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
                 if (pos == null)
                 {
                     pos = CreatePosition(xr.Value);
@@ -978,13 +612,131 @@ internal class TXmlDataProcessor
         {
             var market = Connector.Markets.SingleOrDefault(x => x.ID == sec.Market);
             if (market != null) return new(seccode, sec.ShortName, sec.Market, market.Name);
-            else throw new ArgumentException("Не найден рынок по Market актива.");
+            else throw new ArgumentException("Market is not found", nameof(seccode));
         }
-        else throw new ArgumentException("Не найден актив по Seccode позиции.");
+        else throw new ArgumentException("Security with this seccode is not found", nameof(seccode));
     }
 
-    private void ProcessPortfolio(XmlReader xr, UnitedPortfolio portfolio)
+    private void ProcessTrades(XmlReader xr)
     {
+        var trades = TradingSystem.Trades;
+        while (xr.Read())
+        {
+            if (!xr.ReadToFollowing("tradeno")) return;
+            xr.Read();
+
+            if (trades.SingleOrDefault(x => x.TradeNo == long.Parse(xr.Value, IC)) != null) continue;
+            var trade = new Trade(long.Parse(xr.Value, IC));
+
+            if (!xr.ReadToFollowing("orderno"))
+            {
+                AddInfo("Нет orderno моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.OrderNo = long.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("seccode"))
+            {
+                AddInfo("Нет seccode моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.Seccode = xr.Value;
+
+            if (!xr.ReadToFollowing("buysell"))
+            {
+                AddInfo("Нет buysell моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.BuySell = xr.Value;
+
+            if (!xr.ReadToFollowing("time"))
+            {
+                AddInfo("Нет time моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.DateTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+
+            if (!xr.ReadToFollowing("price"))
+            {
+                AddInfo("Нет price моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.Price = double.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("quantity"))
+            {
+                AddInfo("Нет quantity моей сделки.");
+                continue;
+            }
+            xr.Read();
+            trade.Quantity = int.Parse(xr.Value, IC);
+
+            TradingSystem.Window.Dispatcher.Invoke(() => trades.Add(trade));
+            var display = TradingSystem.Settings.DisplayNewTrades && trades.Count > 1 &&
+                (trades[^2].Seccode != trade.Seccode || trades[^2].BuySell != trade.BuySell ||
+                trades[^2].DateTime < trade.DateTime.AddMinutes(-30));
+
+            AddInfo("New trade: " + trade.Seccode + "/" +
+                trade.BuySell + "/" + trade.Price + "/" + trade.Quantity, display);
+        }
+    }
+
+    private void ProcessStatus(XmlReader xr)
+    {
+        if (xr.GetAttribute("connected") == "true")
+        {
+            Connector.ServerAvailable = true;
+            if (xr.GetAttribute("recover") != "true")
+            {
+                Connector.Connection = ConnectionState.Connected;
+                AddInfo("Connected", !Connector.Scheduled);
+                Connector.Scheduled = false;
+            }
+            else
+            {
+                Connector.TriggerReconnection = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
+                Connector.Connection = ConnectionState.Connecting;
+                AddInfo("Recover connection");
+            }
+        }
+        else if (xr.GetAttribute("connected") == "false")
+        {
+            TradingSystem.ReadyToTrade = false;
+            Connector.ServerAvailable = true;
+
+            if (xr.GetAttribute("recover") != "true")
+            {
+                Connector.Connection = ConnectionState.Disconnected;
+                AddInfo("Disconnected", !Connector.Scheduled);
+                Connector.Scheduled = false;
+            }
+            else
+            {
+                Connector.Connection = ConnectionState.Connecting;
+                AddInfo("Recover");
+            }
+        }
+        else if (xr.GetAttribute("connected") == "error")
+        {
+            TradingSystem.ReadyToTrade = false;
+            Connector.ServerAvailable = false;
+            Connector.BackupServer = !Connector.BackupServer;
+
+            Connector.Connection = ConnectionState.Disconnected;
+            xr.Read();
+            AddInfo("Server error: " + xr.Value + " BackupServer: " + !Connector.BackupServer, notify: true);
+        }
+    }
+
+    private void ProcessPortfolio(XmlReader xr)
+    {
+        var portfolio = TradingSystem.Portfolio;
+
         portfolio.Union = xr.GetAttribute("union");
         if (!xr.ReadToFollowing("open_equity"))
         {
@@ -1069,6 +821,196 @@ internal class TXmlDataProcessor
             }
             xr.Read();
             pos.PL = double.Parse(xr.Value, IC);
+        }
+    }
+
+    private void ProcessSecInfo(XmlReader xr)
+    {
+        if (!xr.ReadToFollowing("seccode"))
+        {
+            AddInfo("ProcessSecInfoUpd: no seccode.");
+            return;
+        }
+        xr.Read();
+
+        var tool = TradingSystem.Tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value);
+        if (tool == null) return;
+
+        var property = "";
+        while (xr.Read())
+        {
+            if (xr.Name.Length > 0) property = xr.Name;
+            else if (xr.HasValue)
+            {
+                if (property == "buy_deposit") tool.MySecurity.BuyDeposit = double.Parse(xr.Value, IC);
+                else if (property == "sell_deposit") tool.MySecurity.SellDeposit = double.Parse(xr.Value, IC);
+                else if (property == "minprice") tool.MySecurity.MinPrice = double.Parse(xr.Value, IC);
+                else if (property == "maxprice") tool.MySecurity.MaxPrice = double.Parse(xr.Value, IC);
+                else if (property == "point_cost") tool.MySecurity.PointCost = double.Parse(xr.Value, IC);
+            }
+        }
+    }
+
+    private void ProcessPermissions(XmlReader xr)
+    {
+        if (!xr.ReadToFollowing("seccode"))
+        {
+            AddInfo("ProcessClientPermissions: no seccode");
+            return;
+        }
+        xr.Read();
+
+        var tool = TradingSystem.Tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value);
+        if (tool == null)
+        {
+            AddInfo("ProcessClientPermissions: unknown tool: " + xr.Value);
+            return;
+        }
+
+        if (!xr.ReadToFollowing("riskrate_long"))
+        {
+            AddInfo("sec_permissions: no riskrate_long");
+            return;
+        }
+        xr.Read();
+        tool.MySecurity.RiskrateLong = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("reserate_long"))
+        {
+            AddInfo("sec_permissions: no reserate_long");
+            return;
+        }
+        xr.Read();
+        tool.MySecurity.ReserateLong = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("riskrate_short"))
+        {
+            AddInfo("sec_permissions: no riskrate_short");
+            return;
+        }
+        xr.Read();
+        tool.MySecurity.RiskrateShort = double.Parse(xr.Value, IC);
+
+        if (!xr.ReadToFollowing("reserate_short"))
+        {
+            AddInfo("sec_permissions: no reserate_short");
+            return;
+        }
+        xr.Read();
+        tool.MySecurity.ReserateShort = double.Parse(xr.Value, IC);
+
+        if (tool.MySecurity.Bars == null) Task.Run(tool.MySecurity.UpdateRequirements);
+    }
+
+
+    private void ProcessSecurities(XmlReader xr)
+    {
+        while (xr.Read())
+        {
+            if (xr.Name != "security" && !xr.ReadToFollowing("security")) return;
+            if (xr.GetAttribute("active") == "false") continue;
+
+            if (!xr.ReadToFollowing("seccode"))
+            {
+                AddInfo("ProcessSecurities: no seccode.");
+                continue;
+            }
+            xr.Read();
+            Connector.Securities.Add(new Security(xr.Value));
+
+            while (xr.Read())
+            {
+                if (xr.NodeType == XmlNodeType.EndElement)
+                {
+                    if (xr.Name == "security") break;
+                    continue;
+                }
+                if (xr.NodeType == XmlNodeType.Element)
+                {
+                    var name = xr.Name;
+                    xr.Read();
+                    if (name == "currency") Connector.Securities[^1].Currency = xr.Value;
+                    else if (name == "board") Connector.Securities[^1].Board = xr.Value;
+                    else if (name == "shortname") Connector.Securities[^1].ShortName = xr.Value;
+                    else if (name == "decimals") Connector.Securities[^1].Decimals = int.Parse(xr.Value, IC);
+                    else if (name == "market") Connector.Securities[^1].Market = xr.Value;
+                    else if (name == "minstep") Connector.Securities[^1].MinStep = double.Parse(xr.Value, IC);
+                    else if (name == "lotsize") Connector.Securities[^1].LotSize = int.Parse(xr.Value, IC);
+                    else if (name == "point_cost") Connector.Securities[^1].PointCost = double.Parse(xr.Value, IC);
+                }
+            }
+        }
+    }
+
+    private void ProcessClients(XmlReader xr)
+    {
+        string id, market;
+        if (xr.GetAttribute("remove") == "false")
+        {
+            if (Connector.Clients.SingleOrDefault(x => x.ID == xr.GetAttribute("id")) == null)
+                id = xr.GetAttribute("id");
+            else
+            {
+                AddInfo("ProcessClients: client already exists");
+                return;
+            }
+        }
+        else
+        {
+            Connector.Clients.Remove(Connector.Clients.Single(x => x.ID == xr.GetAttribute("id")));
+            return;
+        }
+
+        if (!xr.ReadToFollowing("market"))
+        {
+            AddInfo("ProcessClients: no market");
+            return;
+        };
+        xr.Read();
+        market = xr.Value;
+
+        if (!xr.ReadToFollowing("union"))
+        {
+            AddInfo("ProcessClients: no union");
+            return;
+        };
+        xr.Read();
+        Connector.Clients.Add(new(id, market, xr.Value));
+    }
+
+    private void ProcessTimeFrames(XmlReader xr)
+    {
+        while (xr.Read())
+        {
+            if (!xr.ReadToFollowing("id")) return;
+            xr.Read();
+            var id = xr.Value;
+
+            if (!xr.ReadToFollowing("period"))
+            {
+                AddInfo("ProcessTimeFrames: no period");
+                return;
+            }
+            xr.Read();
+            var period = int.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("name"))
+            {
+                AddInfo("ProcessTimeFrames: no name");
+                return;
+            }
+            xr.Read();
+            Connector.TimeFrames.Add(new TimeFrame(id, period, xr.Value));
+        }
+    }
+
+    private void ProcessMarkets(XmlReader xr)
+    {
+        string id = null;
+        while (xr.Read())
+        {
+            if (xr.HasAttributes) id = xr.GetAttribute("id");
+            else if (xr.HasValue) Connector.Markets.Add(new Market(id, xr.Value));
         }
     }
 }

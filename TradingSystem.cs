@@ -9,6 +9,8 @@ using ProSystem.Services;
 
 namespace ProSystem;
 
+internal delegate void AddInformation(string data, bool important = true, bool notify = false);
+
 public class TradingSystem
 {
     private bool isWorking;
@@ -38,7 +40,7 @@ public class TradingSystem
     public TradingSystem(MainWindow window, Type connectorType, UnitedPortfolio portfolio, Settings settings)
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
-        if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(Window, this, Window.AddInfo);
+        if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, Window.AddInfo);
         else throw new ArgumentException("Unknow connector", nameof(connectorType));
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -134,7 +136,7 @@ public class TradingSystem
         }
     }
 
-    private async Task UpdateState()
+    private async Task UpdateState() // TODO check catching of all exceptions
     {
         if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio) await CheckPortfolio();
 
