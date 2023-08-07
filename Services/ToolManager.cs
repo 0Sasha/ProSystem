@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using HarfBuzzSharp;
 using OxyPlot;
 using OxyPlot.Annotations;
 using OxyPlot.Axes;
@@ -40,13 +41,13 @@ internal class ToolManager : IToolManager
         tool.Controller = PlotExtensions.GetController();
 
         UpdateModel(tool);
-        ScriptManager.InitializeScripts(tool.Scripts, tabTool);
+        ScriptManager.InitializeScripts(tool, tabTool);
         if (tool.BasicSecurity == null && tool.MySecurity.Bars != null || tool.BasicSecurity?.Bars != null)
         {
             foreach (var script in tool.Scripts)
             {
                 script.Calculate(tool.BasicSecurity ?? tool.MySecurity);
-                UpdateScriptView(tool, script);
+                ScriptManager.UpdateView(tool, script);
             }
         }
         UpdateModel(tool);
@@ -281,6 +282,7 @@ internal class ToolManager : IToolManager
         double[] SmallATR = Indicators.ATR(security.Bars.High, security.Bars.Low, security.Bars.Close, 150);
         double Average = Math.Round(Close[(Close.Length - 1 - 30)..(Close.Length - 1)].Average(), security.Decimals);
         bool NormalPrice = Math.Abs(Average - Close[^1]) < SmallATR[^2] * 10;
+        if (!NormalPrice) AddInfo(tool.Name + ": the price is out of range", notify: true);
 
         // Ожидание определённости заявок и позиции
         WaitCertainty(tool);
@@ -293,7 +295,8 @@ internal class ToolManager : IToolManager
         // Получение текущей позиции и вычисление объёмов заявок
         int Balance = GetAndCheckBalance(tool, PosVolumes, ref ReadyToTrade, ref tool.triggerPosition, out int RealBalance);
         (int Long, int Short) OrderVolumes = scripts.Length == 1 || Balance == 0 ?
-            (Math.Abs(Balance) + PosVolumes.Long, Math.Abs(Balance) + PosVolumes.Short) : (Math.Abs(Balance), Math.Abs(Balance));
+            (Math.Abs(Balance) + PosVolumes.Long, Math.Abs(Balance) + PosVolumes.Short) :
+            (Math.Abs(Balance), Math.Abs(Balance));
 
         // Обновление информации на контрольной панели и логирование риск-параметров
         UpdateControlPanel(tool, Balance, RealBalance, NowBidding, ReadyToTrade,
@@ -302,15 +305,14 @@ internal class ToolManager : IToolManager
             NowBidding, ReadyToTrade, RubReqs, ClearVolumes, PosVolumes, OrderVolumes);
 
         // Идентификация заявок, проверка соответствия общей позиции позициям скриптов и нормализация общей позиции
-        ScriptManager.IdentifyOrders(scripts, TradingSystem.Orders, security.Seccode);
-        ScriptManager.IdentifyTrades(scripts, TradingSystem.Trades, security.Seccode);
+        ScriptManager.IdentifyOrdersAndTrades(tool);
         IdentifySystemOrdersAndTrades(tool);
         if (!tool.StopTrading)
         {
             if (!CancelUnknownsOrders(tool)) return;
             if (ReadyToTrade)
             {
-                foreach (Script MyScript in scripts) ScriptManager.UpdateOrdersAndPosition(MyScript);
+                foreach (Script MyScript in scripts) await ScriptManager.UpdateOrdersAndPositionAsync(MyScript);
                 if (!CheckPositionMatching(tool, Balance, PosVolumes, NowBidding, NormalPrice)) return;
                 await NormalizePosition(tool, Balance, PosVolumes, ClearVolumes, NowBidding);
             }
@@ -318,27 +320,23 @@ internal class ToolManager : IToolManager
         else if (!CancelActiveOrders(tool)) return;
 
         // Работа со скриптами
-        foreach (Script MyScript in scripts)
+        foreach (Script script in scripts)
         {
             // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
-            if (!ScriptManager.Calculate(MyScript, basicSecurity)) continue;
+            if (!await ScriptManager.CalculateAsync(script, basicSecurity)) continue;
 
             // Обновление моделей, информационной панели скрипта и логирование
-            UpdateScriptView(tool, MyScript);
-            if (NowLogging) ScriptManager.WriteLog(MyScript, tool.Name);
+            ScriptManager.UpdateView(tool, script);
+            if (NowLogging) ScriptManager.WriteLog(script, tool.Name);
 
             // Выравнивание данных и проверка условий для выхода
-            if (basicSecurity != security && !AlignData(tool, MyScript)) continue;
-            if (!ReadyToTrade || MyScript.Result.Type != ScriptType.StopLine && !NowBidding) continue;
+            if (basicSecurity != security && !ScriptManager.AlignData(tool, script)) continue;
+            if (!ReadyToTrade || script.Result.Type != ScriptType.StopLine && !NowBidding) continue;
 
             // Работа с заявками
-            if (MyScript.Result.Type is ScriptType.OSC or ScriptType.Line)
-                await ProcessOrders(tool, MyScript, OrderVolumes, NormalPrice);
-            else if (MyScript.Result.Type is ScriptType.LimitLine)
-                await ProcessOrdersLimitLine(tool, MyScript, OrderVolumes);
-            else if (MyScript.Result.Type is ScriptType.StopLine)
-                await ProcessOrdersStopLine(tool, MyScript, OrderVolumes, NormalPrice, NowBidding, SmallATR);
-            else AddInfo(MyScript.Name + ": Неизвестный тип скрипта: " + MyScript.Result.Type);
+            if (!NormalPrice) continue;
+            var volume = script.CurrentPosition == PositionType.Long ? OrderVolumes.Short : OrderVolumes.Long;
+            await ScriptManager.ProcessOrdersAsync(tool, script, volume, NowBidding, SmallATR[^2]);
         }
     }
 
@@ -422,7 +420,7 @@ internal class ToolManager : IToolManager
                 foreach (var script in tool.Scripts)
                 {
                     script.Calculate(tool.BasicSecurity ?? tool.MySecurity);
-                    UpdateScriptView(tool, script);
+                    ScriptManager.UpdateView(tool, script);
                 }
             }
             UpdateModel(tool);
@@ -1352,403 +1350,6 @@ internal class ToolManager : IToolManager
                 "\nMinLots " + tool.MinNumberOfLots + "\nMaxLots " + tool.MaxNumberOfLots + "\n");
         }
         catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования NM: " + e.Message); }
-    }
-
-    private async Task ProcessOrders(Tool tool, Script MyScript, (int, int) OrderVolumes, bool NormalPrice)
-    {
-        var basicSecurity = tool.BasicSecurity;
-        var security = tool.MySecurity;
-        double PrevClose =
-            basicSecurity?.Bars.DateTime[^1] > security.Bars.DateTime[^1] ? security.Bars.Close[^1] : security.Bars.Close[^2];
-        int VolumeOrder = MyScript.CurrentPosition == PositionType.Long ? OrderVolumes.Item2 : OrderVolumes.Item1;
-
-        bool[] IsGrow = MyScript.Result.IsGrow;
-        Order ActiveOrder = MyScript.ActiveOrder;
-        Order LastExecuted = MyScript.LastExecuted;
-
-        // Работа с активной заявкой
-        if (ActiveOrder != null)
-        {
-            if (MyScript.Result.OnlyLimit)
-            {
-                if (ActiveOrder.Quantity - ActiveOrder.Balance > 0.00001 || ActiveOrder.Note == "PartEx")
-                {
-                    if (Math.Abs(ActiveOrder.Price - PrevClose) > 0.00001)
-                        await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
-                            PrevClose, ActiveOrder.Balance, ActiveOrder.Signal, MyScript, "PartEx");
-                }
-                else if ((ActiveOrder.BuySell == "B") != IsGrow[^1] ||
-                    (MyScript.CurrentPosition == PositionType.Short) != IsGrow[^1] || VolumeOrder == 0)
-                    await Connector.CancelOrderAsync(ActiveOrder);
-                else if (Math.Abs(ActiveOrder.Price - PrevClose) > 0.00001 || Math.Abs(ActiveOrder.Balance - VolumeOrder) > 1)
-                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
-                        PrevClose, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
-            }
-            else if (DateTime.Now >= ActiveOrder.Time.AddMinutes(5))
-            {
-                if (NormalPrice)
-                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market, PrevClose,
-                    ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
-                else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
-            }
-            else if ((ActiveOrder.BuySell == "B") != IsGrow[^1] || VolumeOrder == 0)
-                await Connector.CancelOrderAsync(ActiveOrder);
-            return;
-        }
-
-        // Проверка условий для выхода
-        if (LastExecuted != null && LastExecuted.DateTime >= MyScript.Result.iLastDT || VolumeOrder == 0 ||
-            basicSecurity == null && security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date ||
-            basicSecurity != null && basicSecurity.Bars.DateTime[^1].Date != basicSecurity.Bars.DateTime[^2].Date) return;
-
-        // Проверка условий для выставления новой заявки
-        if (MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] ||
-            MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1])
-        {
-            await Connector.SendOrderAsync(security, OrderType.Limit,
-                IsGrow[^1], PrevClose, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
-            ScriptManager.WriteLog(MyScript, tool.Name);
-        }
-    }
-
-    private async Task ProcessOrdersLimitLine(Tool tool, Script MyScript, (int, int) OrderVolumes)
-    {
-        var security = tool.MySecurity;
-        var basicSecurity = tool.BasicSecurity;
-        double PriceOrder = basicSecurity?.Bars.DateTime[^1] > security.Bars.DateTime[^1] ?
-            MyScript.Result.Indicators[0][^1] : MyScript.Result.Indicators[0][^2];
-        int VolumeOrder = MyScript.CurrentPosition == PositionType.Long ? OrderVolumes.Item2 : OrderVolumes.Item1;
-
-        bool[] IsGrow = MyScript.Result.IsGrow;
-        Order ActiveOrder = MyScript.ActiveOrder;
-        Order LastExecuted = MyScript.LastExecuted;
-
-        // Работа с активной заявкой // Нужно сделать уверенную замену через ReplaceOrder
-        if (ActiveOrder != null)
-        {
-            if (ActiveOrder.Quantity - ActiveOrder.Balance > 0.00001)
-            {
-                if (Math.Abs(ActiveOrder.Price - PriceOrder) > 0.00001)
-                {
-                    int Quantity = ActiveOrder.Quantity - ActiveOrder.Balance; // Нужно сделать уверенную замену через ReplaceOrder
-                    if (await Connector.CancelOrderAsync(ActiveOrder))
-                        await Connector.SendOrderAsync(security, OrderType.Market,
-                            ActiveOrder.BuySell == "S", PriceOrder, Quantity, "CancelPartEx", MyScript, "NM");
-                }
-            }
-            else if (VolumeOrder == 0) await Connector.CancelOrderAsync(ActiveOrder);
-            else if (Math.Abs(ActiveOrder.Price - PriceOrder) > 0.00001 || Math.Abs(ActiveOrder.Balance - VolumeOrder) > 1)
-            {
-                if (PriceOrder - security.MinPrice > -0.00001 && PriceOrder - security.MaxPrice < 0.00001)
-                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
-                        PriceOrder, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
-                else await Connector.CancelOrderAsync(ActiveOrder);
-            }
-            return;
-        }
-
-        // Проверка условий для выхода
-        if (LastExecuted != null && LastExecuted.DateTime >= MyScript.Result.iLastDT || VolumeOrder == 0 ||
-            basicSecurity == null && security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date ||
-            basicSecurity != null && basicSecurity.Bars.DateTime[^1].Date != basicSecurity.Bars.DateTime[^2].Date) return;
-
-        // Проверка условий для выставления новой заявки
-        if ((MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] ||
-            MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1]) &&
-            PriceOrder - security.MinPrice > -0.00001 && PriceOrder - security.MaxPrice < 0.00001)
-        {
-            await Connector.SendOrderAsync(security, OrderType.Limit,
-                IsGrow[^1], PriceOrder, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
-            ScriptManager.WriteLog(MyScript, tool.Name);
-        }
-    }
-
-    private async Task ProcessOrdersStopLine(Tool tool, Script MyScript, (int, int) OrderVolumes, bool NormalPrice, bool NowBidding, double[] SmallATR)
-    {
-        var security = tool.MySecurity;
-        var basicSecurity = tool.BasicSecurity;
-        double PrevClose = security.Bars.Close[^2];
-        double PrevStopLine = MyScript.Result.Indicators[0][^2];
-        int VolumeOrder = MyScript.CurrentPosition == PositionType.Long ? OrderVolumes.Item2 : OrderVolumes.Item1;
-        if (basicSecurity?.Bars.DateTime[^1] > security.Bars.DateTime[^1])
-        {
-            PrevClose = security.Bars.Close[^1];
-            PrevStopLine = MyScript.Result.Indicators[0][^1];
-        }
-
-        bool[] IsGrow = MyScript.Result.IsGrow;
-        Order ActiveOrder = MyScript.ActiveOrder;
-        Order LastExecuted = MyScript.LastExecuted;
-        PositionType CurPosition = MyScript.CurrentPosition;
-
-        // Работа с активной заявкой
-        if (ActiveOrder != null)
-        {
-            if (ActiveOrder.Condition != "None")
-            {
-                double Price = ActiveOrder.BuySell == "B" ? PrevStopLine + security.MinStep : PrevStopLine - security.MinStep;
-                if (ActiveOrder.Status == "active")
-                {
-                    if (DateTime.Now > ActiveOrder.Time.AddSeconds(tool.WaitingLimit) && NowBidding)
-                    {
-                        if (NormalPrice)
-                            await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market,
-                                PrevClose, ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript);
-                        else AddInfo(MyScript.Name +
-                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
-                    }
-                }
-                else if (VolumeOrder == 0 || DateTime.Now < DateTime.Today.AddHours(7.5) && ActiveOrder.Note == null ||
-                    (ActiveOrder.BuySell == "B") == IsGrow[^1]) await Connector.CancelOrderAsync(ActiveOrder);
-                else if (Math.Abs(ActiveOrder.Price - Price) > 0.00001 || ActiveOrder.Balance - VolumeOrder > 1)
-                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Conditional, Price, VolumeOrder, ActiveOrder.Signal, MyScript);
-            }
-            else if (NowBidding)
-            {
-                if (ActiveOrder.Note == "NB")
-                {
-                    if (DateTime.Now > DateTime.Today.AddHours(7.5) && security.LastTrade.DateTime > DateTime.Today.AddHours(7.5) &&
-                        DateTime.Now < DateTime.Today.AddHours(9.5) ||
-                        DateTime.Now > DateTime.Today.AddHours(10.5) && security.LastTrade.DateTime > DateTime.Today.AddHours(10.5))
-                    {
-                        if (NormalPrice) await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit, PrevClose,
-                            ActiveOrder.Balance, ActiveOrder.Signal + "AtClose", MyScript, "CloseNB");
-                        else AddInfo(MyScript.Name +
-                            ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
-                    }
-                }
-                else if (DateTime.Now >= ActiveOrder.Time.AddSeconds(tool.WaitingLimit))
-                {
-                    if (NormalPrice) await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market, PrevClose,
-                        ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
-                    else AddInfo(MyScript.Name +
-                        ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
-                }
-            }
-            return;
-        }
-
-        // Проверка условий для выхода
-        if (!NowBidding || VolumeOrder == 0) return;
-        if (LastExecuted != null && LastExecuted.DateTime.Date == DateTime.Today && LastExecuted.DateTime >= MyScript.Result.iLastDT)
-        {
-            if (LastExecuted.Note == null ||
-                LastExecuted.Note == "NB" && LastExecuted.DateTime < DateTime.Today.AddHours(7.5)) return;
-
-            for (int bar = MyScript.Result.Indicators[0].Length - 1; bar > 1; bar--)
-            {
-                if (LastExecuted.BuySell == "B" && !IsGrow[bar - 1] || LastExecuted.BuySell == "S" && IsGrow[bar - 1])
-                {
-                    if (Math.Abs(MyScript.Result.Indicators[0][bar - 1] - MyScript.Result.Indicators[0][^2]) < 0.00001) return;
-                    else break;
-                }
-            }
-        }
-
-        // Проверка условий для выставления новой заявки
-        if (security.LastTrade.DateTime < DateTime.Today.AddHours(7.5) && DateTime.Now < DateTime.Today.AddHours(7.5))
-        {
-            if (CurPosition == PositionType.Short && IsGrow[^1] || CurPosition == PositionType.Long && !IsGrow[^1])
-            {
-                double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
-                await Connector.SendOrderAsync(security, OrderType.Limit,
-                    IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
-                ScriptManager.WriteLog(MyScript, tool.Name);
-            }
-        }
-        else if (CurPosition == PositionType.Short && !IsGrow[^1] || CurPosition == PositionType.Long && IsGrow[^1])
-        {
-            double Price = IsGrow[^1] ? PrevStopLine - security.MinStep : PrevStopLine + security.MinStep;
-            await Connector.SendOrderAsync(security, OrderType.Conditional,
-                !IsGrow[^1], Price, VolumeOrder, !IsGrow[^1] ? "BuyAtStop" : "SellAtStop", MyScript);
-            ScriptManager.WriteLog(MyScript, tool.Name);
-        }
-        else
-        {
-            AddInfo(MyScript.Name + ": Текущая позиция скрипта не соответствует IsGrow.", notify: true);
-            if (security.LastTrade.DateTime < DateTime.Today.AddHours(10.5) && DateTime.Now < DateTime.Today.AddHours(10.5))
-            {
-                double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
-                await Connector.SendOrderAsync(security, OrderType.Limit,
-                    IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
-            }
-            else
-            {
-                double Price = IsGrow[^1] ? PrevStopLine - security.MinStep : PrevStopLine + security.MinStep;
-                await Connector.SendOrderAsync(security, OrderType.Limit, IsGrow[^1], Price, VolumeOrder, "UnknowEvent", MyScript);
-            }
-            ScriptManager.WriteLog(MyScript, tool.Name);
-        }
-    }
-
-    private bool AlignData(Tool tool, Script MyScript)
-    {
-        var security = tool.MySecurity;
-        int InitialLength = tool.MySecurity.Bars.Close.Length;
-        int y = MyScript.Result.IsGrow.Length - InitialLength;
-        if (y > 0)
-        {
-            MyScript.Result.IsGrow = MyScript.Result.IsGrow[y..];
-            for (int i = 0; i < MyScript.Result.Indicators.Length; i++)
-                if (MyScript.Result.Indicators[i] != null) MyScript.Result.Indicators[i] = MyScript.Result.Indicators[i][y..];
-        }
-        else if (y < 0)
-        {
-            if (MyScript.Result.IsGrow.Length > 500)
-            {
-                AddInfo(tool.Name + ": Количество торговых баров больше базисных: " +
-                    InitialLength + "/" + MyScript.Result.IsGrow.Length + " Обрезка.", notify: true);
-
-                y = security.SourceBars.Close.Length - tool.BasicSecurity.SourceBars.Close.Length + 20;
-                if (y > -1 && y < security.SourceBars.DateTime.Length)
-                    security.SourceBars = security.SourceBars.Trim(y);
-                else AddInfo(tool.Name + ": обрезка баров невозможна.");
-
-                y = InitialLength - MyScript.Result.IsGrow.Length;
-                if (y > -1 && y < security.Bars.DateTime.Length)
-                    security.Bars = security.Bars.Trim(y);
-                else AddInfo(tool.Name + ": обрезка баров невозможна.");
-            }
-            else AddInfo(tool.Name + ": Количество торговых баров больше базисных: " +
-                InitialLength + "/" + MyScript.Result.IsGrow.Length, notify: true);
-            return false;
-        }
-        return true;
-    }
-
-    private void UpdateScriptView(Tool tool, Script MyScript)
-    {
-        string SelectedScript = null;
-        var mainModel = tool.MainModel;
-        Window.Dispatcher.Invoke(() =>
-        {
-            Grid MyGrid = (((Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
-            as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
-            SelectedScript = MyGrid.Children.OfType<ComboBox>().Last().Text;
-
-            MyScript.BlockInfo.Text = "IsGrow[i] " + MyScript.Result.IsGrow[^1] +
-            "     IsGrow[i-1] " + MyScript.Result.IsGrow[^2] + "\nType " + MyScript.Result.Type;
-        });
-
-        foreach (Annotation MyAnn in mainModel.Annotations.ToArray())
-            if (MyAnn.ToolTip == MyScript.Name || MyAnn.ToolTip is "System" or null) mainModel.Annotations.Remove(MyAnn);
-
-        if (MyScript.Result.Type != ScriptType.OSC)
-            foreach (Series MySeries in mainModel.Series.ToArray())
-                if (MySeries.Title == MyScript.Name) mainModel.Series.Remove(MySeries);
-
-        if (SelectedScript == MyScript.Name || SelectedScript == "AllScripts")
-        {
-            if (MyScript.Result.Type == ScriptType.OSC) UpdateMiniModel(tool, MyScript);
-            else foreach (double[] Indicator in MyScript.Result.Indicators)
-                    mainModel.Series.Add(MakeLineSeries(Indicator, MyScript.Name));
-
-            if (!tool.ShowBasicSecurity)
-            {
-                Trade[] MyTrades = MyScript.Trades.ToArray()
-                    .Concat(TradingSystem.SystemTrades.ToArray().Where(x => x.Seccode == tool.MySecurity.Seccode)).ToArray();
-                Order[] MyOrders =
-                    TradingSystem.Orders.ToArray().Where(x => x.Seccode == tool.MySecurity.Seccode && x.Status is "active" or "watching").ToArray();
-                if (MyTrades.Length > 0 || MyOrders.Length > 0) AddAnnotations(tool, MyTrades, MyOrders);
-            }
-        }
-    }
-
-    private void AddAnnotations(Tool tool, Trade[] MyTrades, Order[] MyOrders)
-    {
-        int i;
-        OxyColor MyColor;
-        var security = tool.MySecurity;
-        double yStartPoint, yEndPoint;
-        List<(Trade, int)> trades = new();
-        List<(Trade, int)> tradesOnlyWithPoint = new();
-        foreach (Trade trade in MyTrades)
-        {
-            i = Array.FindIndex(security.Bars.DateTime, x => x.AddMinutes(security.Bars.TF) > trade.DateTime);
-            if (i < 0)
-            {
-                AddInfo("AddAnnotations: Не найден бар, на котором произошла сделка.");
-                continue;
-            }
-
-            var sameTrade = trades.SingleOrDefault(x => x.Item2 == i && x.Item1.BuySell == trade.BuySell);
-            if (sameTrade.Item1 != null)
-            {
-                sameTrade.Item1.Quantity += trade.Quantity;
-                if (sameTrade.Item1.Price != trade.Price) tradesOnlyWithPoint.Add((trade, i));
-            }
-            else trades.Add((trade.GetCopy(), i));
-        }
-        foreach ((Trade, int) MyTrade in trades)
-        {
-            var trade = MyTrade.Item1;
-            i = MyTrade.Item2;
-
-            if (trade.BuySell == "B")
-            {
-                MyColor = Theme.GreenBar;
-                yStartPoint = security.Bars.Low[i] - security.Bars.Low[i] * 0.001;
-                yEndPoint = security.Bars.Low[i];
-            }
-            else
-            {
-                MyColor = Theme.RedBar;
-                yStartPoint = security.Bars.High[i] + security.Bars.High[i] * 0.001;
-                yEndPoint = security.Bars.High[i];
-            }
-
-            string text = trade.SignalOrder is "BuyAtLimit" or "SellAtLimit" or "BuyAtStop" or "SellAtStop" ?
-                trade.Price + "; " + trade.Quantity : trade.SignalOrder + "; " + trade.Price + "; " + trade.Quantity;
-            tool.MainModel.Annotations.Add(new ArrowAnnotation()
-            {
-                Color = MyColor,
-                Text = text,
-                StartPoint = new DataPoint(i, yStartPoint),
-                EndPoint = new DataPoint(i, yEndPoint),
-                ToolTip = trade.SenderOrder
-            });
-            tool.MainModel.Annotations.Add(new PointAnnotation()
-            {
-                X = i,
-                Y = trade.Price,
-                Fill = OxyColors.WhiteSmoke,
-                Stroke = OxyColors.Black,
-                StrokeThickness = 1,
-                ToolTip = trade.SenderOrder
-            });
-        }
-        foreach ((Trade, int) MyTrade in tradesOnlyWithPoint)
-        {
-            tool.MainModel.Annotations.Add(new PointAnnotation()
-            {
-                X = MyTrade.Item2,
-                Y = MyTrade.Item1.Price,
-                Fill = OxyColors.WhiteSmoke,
-                Stroke = OxyColors.Black,
-                StrokeThickness = 1,
-                ToolTip = MyTrade.Item1.SenderOrder
-            });
-        }
-        foreach (Order ActiveOrder in MyOrders)
-        {
-            tool.MainModel.Annotations.Add(new LineAnnotation()
-            {
-                Type = LineAnnotationType.Horizontal,
-                Y = ActiveOrder.Price,
-                MinimumX = tool.MainModel.Axes[0].ActualMaximum - 20,
-                Color = ActiveOrder.BuySell == "B" ? Theme.GreenBar : Theme.RedBar,
-                ToolTip = ActiveOrder.Sender,
-                Text = ActiveOrder.Signal,
-                StrokeThickness = 2
-            });
-        }
-    }
-
-    private static LineSeries MakeLineSeries(double[] Indicator, string Name)
-    {
-        DataPoint[] Points = new DataPoint[Indicator.Length];
-        for (int i = 0; i < Indicator.Length; i++) Points[i] = new DataPoint(i, Indicator[i]);
-        return new LineSeries() { ItemsSource = Points, Color = Theme.Indicator, Title = Name };
     }
 
     private static void ScaleModel(CandleStickSeries candles, DateTimeAxis xAxis, LinearAxis yAxis)

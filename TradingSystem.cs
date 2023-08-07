@@ -44,7 +44,7 @@ public class TradingSystem
         else throw new ArgumentException("Unknow connector", nameof(connectorType));
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        ScriptManager = new ScriptManager(Window, Connector);
+        ScriptManager = new ScriptManager(Window, this, Window.AddInfo);
         ToolManager = new ToolManager(Window, this, ScriptManager, Window.AddInfo);
         PortfolioManager = new PortfolioManager(this, Window.AddInfo);
     }
@@ -89,7 +89,7 @@ public class TradingSystem
         await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
         foreach (var tool in Tools)
         {
-            ScriptManager.BringOrdersInLine(tool, Orders);
+            ScriptManager.BringOrdersInLine(tool);
 
             if (tool.MySecurity.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
             {
@@ -218,7 +218,7 @@ public class TradingSystem
         {
             foreach (var trade in obsolete) Trades.Remove(trade);
         });
-        foreach (var tool in Tools) ScriptManager.ClearObsoleteData(tool, Settings);
+        foreach (var tool in Tools) ScriptManager.ClearObsoleteData(tool);
         Window.AddInfo("ClearObsoleteData: data is cleared", false);
     }
 }

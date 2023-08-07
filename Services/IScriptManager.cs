@@ -1,24 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 
 namespace ProSystem.Services;
 
 public interface IScriptManager
 {
-    public void InitializeScripts(IEnumerable<Script> scripts, TabItem tab);
+    public void InitializeScripts(Tool tool, TabItem tab);
 
-    public void IdentifyOrders(IEnumerable<Script> scripts, IEnumerable<Order> orders, string seccode);
+    public void IdentifyOrdersAndTrades(Tool tool);
 
-    public void IdentifyTrades(IEnumerable<Script> scripts, IEnumerable<Trade> trades, string seccode);
+    public void BringOrdersInLine(Tool tool);
 
-    public void BringOrdersInLine(Tool tool, IEnumerable<Order> orders);
+    public void ClearObsoleteData(Tool tool);
 
-    public void ClearObsoleteData(Tool tool, Settings settings);
+    public Task<bool> UpdateOrdersAndPositionAsync(Script script);
 
-    public bool UpdateOrdersAndPosition(Script script);
+    public Task<bool> CalculateAsync(Script script, Security security);
 
-    public bool Calculate(Script script, Security security);
+    public Task ProcessOrdersAsync(Tool tool, Script script, int volume, bool nowBidding, double atr);
+
+    public bool AlignData(Tool tool, Script script);
+
+    public void UpdateView(Tool tool, Script script);
 
     public void WriteLog(Script script, string toolName);
 }
