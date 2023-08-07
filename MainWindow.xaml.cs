@@ -337,7 +337,7 @@ public partial class MainWindow : Window
     }
     private void SaveData(object sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == "InitReqs") Task.Run(() => SaveData());
+        if (e.PropertyName == nameof(TradingSystem.Portfolio.InitReqs)) Task.Run(() => SaveData());
     }
     private void ShowUsedMemory(object sender, RoutedEventArgs e) =>
         AddInfo("Использование памяти: " + (GC.GetTotalMemory(false) / 1000000).ToString(IC) + " МБ");
@@ -614,7 +614,7 @@ public partial class MainWindow : Window
     }
     private void UpdatePortfolio(object sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == "Positions")
+        if (e.PropertyName == nameof(TradingSystem.Portfolio.Positions))
         {
             Window.Dispatcher.Invoke(() =>
             {
@@ -642,9 +642,9 @@ public partial class MainWindow : Window
     private async void ChangeСonnection(object sender, RoutedEventArgs e)
     {
         if (Connector.Connection is ConnectionState.Connected or ConnectionState.Connecting)
-            await Connector.DisconnectAsync(false);
+            await Connector.DisconnectAsync();
         else if (TxtLog.Text.Length > 0 && TxtPas.SecurePassword.Length > 0)
-            await Connector.ConnectAsync(TxtLog.Text, TxtPas.SecurePassword, false);
+            await Connector.ConnectAsync(TxtLog.Text, TxtPas.SecurePassword);
         else AddInfo("Type login and password");
     }
     private async void ClosingMainWindow(object sender, CancelEventArgs e)

@@ -37,8 +37,6 @@ internal class TXmlConnector : Connector
     private readonly StringComparison SC = StringComparison.Ordinal;
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    public bool Scheduled { get; set; }
-
     public List<ClientAccount> Clients { get; } = new();
 
     public override ConnectionState Connection
@@ -104,7 +102,7 @@ internal class TXmlConnector : Connector
     }
 
     #region High level methods
-    public override async Task<bool> ConnectAsync(string login, SecureString password, bool scheduled)
+    public override async Task<bool> ConnectAsync(string login, SecureString password)
     {
         if (!Initialized) throw new Exception("Connector is not initialized.");
 
@@ -116,7 +114,6 @@ internal class TXmlConnector : Connector
         waitingTime = settings.RequestTM * 1000 + 3000;
         Connection = ConnectionState.Connecting;
         TriggerReconnection = DateTime.Now.AddSeconds(settings.SessionTM);
-        Scheduled = scheduled;
 
         // Частота обращений коннектора к серверу Transaq в миллисекундах. Минимум 10.
         var delay = "20";
@@ -140,12 +137,11 @@ internal class TXmlConnector : Connector
         return false;
     }
 
-    public override async Task<bool> DisconnectAsync(bool scheduled = false)
+    public override async Task<bool> DisconnectAsync()
     {
         var result = true;
         TradingSystem.ReadyToTrade = false;
         Connection = ConnectionState.Disconnecting;
-        Scheduled = scheduled;
 
         var res = await SendCommand("<command id=\"disconnect\"/>");
         if (res.StartsWith("<result success=\"true\"", SC)) Connection = ConnectionState.Disconnected;

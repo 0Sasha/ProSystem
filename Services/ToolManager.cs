@@ -18,15 +18,20 @@ namespace ProSystem.Services;
 internal class ToolManager : IToolManager
 {
     private readonly MainWindow Window;
+    private readonly AddInformation AddInfo;
     private readonly TradingSystem TradingSystem;
-    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
     private readonly IScriptManager ScriptManager;
+    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    public ToolManager(MainWindow window, TradingSystem tradingSystem, IScriptManager scriptManager)
+    private Connector Connector { get => TradingSystem.Connector; }
+
+    public ToolManager(MainWindow window, TradingSystem tradingSystem,
+        IScriptManager scriptManager, AddInformation addInfo)
     {
-        Window = window;
-        ScriptManager = scriptManager;
-        TradingSystem = tradingSystem;
+        Window = window ?? throw new ArgumentNullException(nameof(window));
+        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
+        ScriptManager = scriptManager ?? throw new ArgumentNullException(nameof(scriptManager));
+        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
     }
 
     public void Initialize(Tool tool, TabItem tabTool)
@@ -174,12 +179,12 @@ internal class ToolManager : IToolManager
         if (tool.Active)
         {
             tool.Active = false;
-            if (TradingSystem.Connector.Connection == ConnectionState.Connected)
+            if (Connector.Connection == ConnectionState.Connected)
             {
                 await Task.Run(async () =>
                 {
-                    await TradingSystem.Connector.UnsubscribeFromTradesAsync(security);
-                    if (basicSecurity != null) await TradingSystem.Connector.UnsubscribeFromTradesAsync(basicSecurity);
+                    await Connector.UnsubscribeFromTradesAsync(security);
+                    if (basicSecurity != null) await Connector.UnsubscribeFromTradesAsync(basicSecurity);
                 });
             }
 
@@ -190,24 +195,24 @@ internal class ToolManager : IToolManager
         }
         else
         {
-            if (TradingSystem.Connector.Connection == ConnectionState.Connected)
+            if (Connector.Connection == ConnectionState.Connected)
             {
                 if (!await Task.Run(async () =>
                 {
                     await RequestBarsAsync(tool);
-                    await TradingSystem.Connector.OrderSecurityInfoAsync(security);
+                    await Connector.OrderSecurityInfoAsync(security);
                     if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
                     {
                         System.Threading.Thread.Sleep(500);
                         if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
                         {
-                            Window.AddInfo("Не удалось активировать инструмент, потому что не пришли бары. Попробуйте ещё раз.");
+                            AddInfo("Не удалось активировать инструмент, потому что не пришли бары. Попробуйте ещё раз.");
                             return false;
                         }
                     }
 
-                    await TradingSystem.Connector.SubscribeToTradesAsync(security);
-                    if (basicSecurity != null) await TradingSystem.Connector.SubscribeToTradesAsync(basicSecurity);
+                    await Connector.SubscribeToTradesAsync(security);
+                    if (basicSecurity != null) await Connector.SubscribeToTradesAsync(basicSecurity);
                     await RequestBarsAsync(tool);
                     return true;
                 })) return;
@@ -221,34 +226,34 @@ internal class ToolManager : IToolManager
         tool.Notify();
     }
 
-    public async Task CalculateAsync(Tool tool, double WaitingAfterLastRecalc = 3)
+    public async Task CalculateAsync(Tool tool)
     {
         // Блокировка или ожидание освобождения блокировки
         while (Interlocked.Exchange(ref tool.IsBusy, 1) != 0)
         {
-            Window.AddInfo(tool.Name + ": Calculate: Метод используется другим потоком", false);
+            AddInfo(tool.Name + ": Calculate: Метод используется другим потоком", false);
             Thread.Sleep(500);
         }
 
         // Пересчёт или ожидание потенциальных данных с сервера
-        while (DateTime.Now.AddSeconds(-WaitingAfterLastRecalc) < tool.TimeLastRecalc)
+        while (DateTime.Now.AddSeconds(-3) < tool.TimeLastRecalc)
         {
-            Window.AddInfo(tool.Name + ": Calculate: Ожидание потенциальных данных с сервера", false);
+            AddInfo(tool.Name + ": Calculate: Ожидание потенциальных данных с сервера", false);
             Thread.Sleep(250);
         }
         try
         {
             await Calculate(tool);
-            Window.AddInfo("Calculate: Выполнены скрипты инструмента: " + tool.Name, false);
+            AddInfo("Calculate: Выполнены скрипты инструмента: " + tool.Name, false);
         }
         catch (Exception e)
         {
-            Window.AddInfo(tool.Name + ": Calculate: Исключение: " + e.Message, notify: true);
-            Window.AddInfo("Трассировка стека: " + e.StackTrace);
+            AddInfo(tool.Name + ": Calculate: Исключение: " + e.Message, notify: true);
+            AddInfo("Трассировка стека: " + e.StackTrace);
             if (e.InnerException != null)
             {
-                Window.AddInfo("Внутреннее исключение: " + e.InnerException.Message);
-                Window.AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
+                AddInfo("Внутреннее исключение: " + e.InnerException.Message);
+                AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
             }
         }
 
@@ -333,16 +338,16 @@ internal class ToolManager : IToolManager
                 await ProcessOrdersLimitLine(tool, MyScript, OrderVolumes);
             else if (MyScript.Result.Type is ScriptType.StopLine)
                 await ProcessOrdersStopLine(tool, MyScript, OrderVolumes, NormalPrice, NowBidding, SmallATR);
-            else Window.AddInfo(MyScript.Name + ": Неизвестный тип скрипта: " + MyScript.Result.Type);
+            else AddInfo(MyScript.Name + ": Неизвестный тип скрипта: " + MyScript.Result.Type);
         }
     }
 
     public async Task RequestBarsAsync(Tool tool)
     {
         TimeFrame tf;
-        if (TradingSystem.Connector.TimeFrames.Count > 0)
-            tf = TradingSystem.Connector.TimeFrames.Last(x => x.Period / 60 <= tool.BaseTF);
-        else { Window.AddInfo("RequestBars: пустой массив таймфреймов."); return; }
+        if (Connector.TimeFrames.Count > 0)
+            tf = Connector.TimeFrames.Last(x => x.Period / 60 <= tool.BaseTF);
+        else { AddInfo("RequestBars: пустой массив таймфреймов."); return; }
 
         int count = 25;
         var security = tool.MySecurity;
@@ -353,7 +358,7 @@ internal class ToolManager : IToolManager
                 basicSecurity.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
             tool.BaseTF != basicSecurity.SourceBars.TF && tool.BaseTF != basicSecurity.Bars.TF) count = 10000;
 
-            await TradingSystem.Connector.OrderHistoricalDataAsync(basicSecurity, tf, count);
+            await Connector.OrderHistoricalDataAsync(basicSecurity, tf, count);
         }
 
         count = 25;
@@ -361,7 +366,7 @@ internal class ToolManager : IToolManager
             security.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
         tool.BaseTF != security.SourceBars.TF && tool.BaseTF != security.Bars.TF) count = 10000;
 
-        await TradingSystem.Connector.OrderHistoricalDataAsync(security, tf, count);
+        await Connector.OrderHistoricalDataAsync(security, tf, count);
     }
 
     public async Task ReloadBarsAsync(Tool tool)
@@ -370,7 +375,7 @@ internal class ToolManager : IToolManager
         var basicSecurity = tool.BasicSecurity;
         if (tool.Active)
         {
-            while (TradingSystem.Connector.Connection == ConnectionState.Connected &&
+            while (Connector.Connection == ConnectionState.Connected &&
                 !TradingSystem.ReadyToTrade) await Task.Delay(100);
             await ChangeActivityAsync(tool);
             await Task.Delay(250);
@@ -383,7 +388,7 @@ internal class ToolManager : IToolManager
             basicSecurity.Bars = null;
         }
 
-        if (TradingSystem.Connector.Connection == ConnectionState.Connected)
+        if (Connector.Connection == ConnectionState.Connected)
         {
             await RequestBarsAsync(tool);
             await System.Threading.Tasks.Task.Delay(500);
@@ -425,12 +430,12 @@ internal class ToolManager : IToolManager
         }
         catch (Exception ex)
         {
-            Window.AddInfo("UpdateView: " + tool.Name + ": Исключение: " + ex.Message);
-            Window.AddInfo("Трассировка стека: " + ex.StackTrace);
+            AddInfo("UpdateView: " + tool.Name + ": Исключение: " + ex.Message);
+            AddInfo("Трассировка стека: " + ex.StackTrace);
             if (ex.InnerException != null)
             {
-                Window.AddInfo("Внутреннее исключение: " + ex.InnerException.Message);
-                Window.AddInfo("Трассировка стека внутреннего исключения: " + ex.InnerException.StackTrace);
+                AddInfo("Внутреннее исключение: " + ex.InnerException.Message);
+                AddInfo("Трассировка стека внутреннего исключения: " + ex.InnerException.StackTrace);
             }
         }
     }
@@ -638,7 +643,7 @@ internal class ToolManager : IToolManager
 
                 if (lastExecuted != null && lastExecuted.DateTime.AddSeconds(3) > DateTime.Now)
                 {
-                    Window.AddInfo(tool.Name + ": an order is executed during the bar opening. Waiting.", false);
+                    AddInfo(tool.Name + ": an order is executed during the bar opening. Waiting.", false);
                     await Task.Delay(2000);
                 }
                 else if (tool.MySecurity.Seccode == security.Seccode)
@@ -647,7 +652,7 @@ internal class ToolManager : IToolManager
                         .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
                     if (active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.00001))
                     {
-                        Window.AddInfo(tool.Name + ": active order price equals bar opening. Waiting.", false);
+                        AddInfo(tool.Name + ": active order price equals bar opening. Waiting.", false);
                         await Task.Delay(2000);
                     }
                 }
@@ -769,14 +774,14 @@ internal class ToolManager : IToolManager
         var basicSecurity = tool.BasicSecurity;
         if (security.LastTrade == null || security.LastTrade.DateTime < DateTime.Now.AddDays(-5))
         {
-            Window.AddInfo(tool.Name +
+            AddInfo(tool.Name +
                 ": Последняя сделка не актуальна или её не существует. Подписка на сделки и выход.", notify: true);
-            await TradingSystem.Connector.SubscribeToTradesAsync(security);
+            await Connector.SubscribeToTradesAsync(security);
             return false;
         }
         else if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
         {
-            Window.AddInfo(tool.Name + ": Базовых баров не существует. Запрос баров и выход.", notify: true);
+            AddInfo(tool.Name + ": Базовых баров не существует. Запрос баров и выход.", notify: true);
             await RequestBarsAsync(tool);
             return false;
         }
@@ -785,13 +790,13 @@ internal class ToolManager : IToolManager
         {
             string Counts = security.Bars.Close.Length.ToString();
             if (basicSecurity != null) Counts += "/" + basicSecurity.Bars.Close.Length;
-            Window.AddInfo(tool.Name + ": Недостаточно базовых баров: " + Counts + " Запрос баров и выход.", notify: true);
+            AddInfo(tool.Name + ": Недостаточно базовых баров: " + Counts + " Запрос баров и выход.", notify: true);
             await RequestBarsAsync(tool);
             return false;
         }
         else if (tool.Scripts.Length > 2)
         {
-            Window.AddInfo(tool.Name + ": Непредвиденное количество скриптов: " + tool.Scripts.Length, notify: true);
+            AddInfo(tool.Name + ": Непредвиденное количество скриптов: " + tool.Scripts.Length, notify: true);
             return false;
         }
         return true;
@@ -839,7 +844,7 @@ internal class ToolManager : IToolManager
                 System.IO.File.AppendAllText(Path, Data);
                 return true;
             }
-            catch (Exception e) { Window.AddInfo(tool.Name + ": Исключение логирования: " + e.Message); }
+            catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования: " + e.Message); }
         }
         return false;
     }
@@ -850,7 +855,7 @@ internal class ToolManager : IToolManager
             .Where(x => x.Seccode == tool.MySecurity.Seccode && (x.Status is "forwarding" or "inactive")).ToArray();
         if (Undefined.Length > 0)
         {
-            Window.AddInfo(tool.Name + ": Неопределённый статус заявки: " + Undefined[0].Status);
+            AddInfo(tool.Name + ": Неопределённый статус заявки: " + Undefined[0].Status);
 
             Thread.Sleep(500);
             if (!Undefined.Where(x => x.Status is "forwarding" or "inactive").Any()) return;
@@ -861,7 +866,7 @@ internal class ToolManager : IToolManager
             Thread.Sleep(1500);
             if (!Undefined.Where(x => x.Status is "forwarding" or "inactive").Any()) return;
 
-            Window.AddInfo(tool.Name + ": Не удалось вовремя получить определённый статус заявки.");
+            AddInfo(tool.Name + ": Не удалось вовремя получить определённый статус заявки.");
         }
 
         Trade LastTrade = TradingSystem.Trades.ToArray().LastOrDefault(x => x.Seccode == tool.MySecurity.Seccode);
@@ -877,19 +882,19 @@ internal class ToolManager : IToolManager
     private (double, double) GetAndCheckRubReqs(Tool tool, ref bool ReadyToTrade)
     {
         var security = tool.MySecurity;
-        var usdrub = TradingSystem.Connector.USDRUB;
-        var eurrub = TradingSystem.Connector.EURRUB;
+        var usdrub = Connector.USDRUB;
+        var eurrub = Connector.EURRUB;
         (double, double) RubReqs = (0, 0);
         if (security.Market != "7") RubReqs = (security.InitReqLong, security.InitReqShort);
         else
         {
             if (usdrub < 0.1 || eurrub < 0.1)
             {
-                Window.AddInfo(tool.Name + ": Запрос USDRUB и EURRUB", notify: true);
+                AddInfo(tool.Name + ": Запрос USDRUB и EURRUB", notify: true);
                 Task.Run(async () =>
                 {
-                    await TradingSystem.Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
-                    await TradingSystem.Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
+                    await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
+                    await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
                 });
                 ReadyToTrade = false;
             }
@@ -899,16 +904,16 @@ internal class ToolManager : IToolManager
                 RubReqs = (security.InitReqLong * eurrub, security.InitReqShort * eurrub);
             else
             {
-                Window.AddInfo(tool.Name + ": Неизвестная валюта: " + security.Currency, notify: true);
+                AddInfo(tool.Name + ": Неизвестная валюта: " + security.Currency, notify: true);
                 ReadyToTrade = false;
             }
         }
 
         if (RubReqs.Item1 < 10 || RubReqs.Item2 < 10 || security.SellDeposit < 10 || RubReqs.Item1 < security.SellDeposit / 2)
         {
-            Window.AddInfo(tool.Name + ": Требования за пределами нормы: " +
+            AddInfo(tool.Name + ": Требования за пределами нормы: " +
                 RubReqs.Item1 + "/" + RubReqs.Item2 + " SellDep: " + security.SellDeposit, true, true);
-            Task.Run(async () => await TradingSystem.Connector.OrderSecurityInfoAsync(security));
+            Task.Run(async () => await Connector.OrderSecurityInfoAsync(security));
             ReadyToTrade = false;
         }
         return RubReqs;
@@ -926,7 +931,7 @@ internal class ToolManager : IToolManager
             double OptShare = portfolio.Saldo / 100 * tool.ShareOfFunds;
             if (OptShare > MaxShare)
             {
-                Window.AddInfo(tool.Name + ": ShareOfFunds превышает допустимый объём риска: " +
+                AddInfo(tool.Name + ": ShareOfFunds превышает допустимый объём риска: " +
                     settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
                 OptShare = MaxShare;
             }
@@ -941,20 +946,20 @@ internal class ToolManager : IToolManager
 
             if (LongVolume * RubReqs.Item1 > MaxShare)
             {
-                Window.AddInfo(tool.Name + ": LongVolume превышает допустимый объём риска: " +
+                AddInfo(tool.Name + ": LongVolume превышает допустимый объём риска: " +
                     settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
                 LongVolume = (int)Math.Floor(OptShare / RubReqs.Item1);
             }
             if (ShortVolume * RubReqs.Item2 > MaxShare)
             {
-                Window.AddInfo(tool.Name + ": ShortVolume превышает допустимый объём риска: " +
+                AddInfo(tool.Name + ": ShortVolume превышает допустимый объём риска: " +
                     settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
                 ShortVolume = (int)Math.Floor(OptShare / RubReqs.Item2);
             }
         }
         else if (tool.NumberOfLots * Math.Max(RubReqs.Item1, RubReqs.Item2) > MaxShare)
         {
-            Window.AddInfo(tool.Name + ": NumberOfLots превышает допустимый объём риска.", notify: true);
+            AddInfo(tool.Name + ": NumberOfLots превышает допустимый объём риска.", notify: true);
             LongVolume = (int)Math.Floor(MaxShare / RubReqs.Item1);
             ShortVolume = (int)Math.Floor(MaxShare / RubReqs.Item2);
         }
@@ -987,20 +992,20 @@ internal class ToolManager : IToolManager
                 ReadyToTrade = false;
                 if (TriggerPosition == DateTime.MinValue)
                 {
-                    Window.AddInfo(tool.Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
+                    AddInfo(tool.Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
                     TriggerPosition = DateTime.Now.AddHours(12);
                 }
             }
             else
             {
-                Window.AddInfo(tool.Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
+                AddInfo(tool.Name + ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
                 if (TriggerPosition == DateTime.MinValue)
                 {
                     TriggerPosition = DateTime.Now.AddHours(4);
                     ReadyToTrade = false;
                 }
                 else if (DateTime.Now < TriggerPosition) ReadyToTrade = false;
-                else Window.AddInfo(tool.Name + ": Объём текущей позиции всё ещё за пределами допустимого отклонения, но торговля разрешена.");
+                else AddInfo(tool.Name + ": Объём текущей позиции всё ещё за пределами допустимого отклонения, но торговля разрешена.");
             }
         }
         else if (TriggerPosition != DateTime.MinValue) TriggerPosition = DateTime.MinValue;
@@ -1010,16 +1015,16 @@ internal class ToolManager : IToolManager
     private async Task NormalizePosition(Tool tool, int Balance, (int, int) PosVolumes, (double, double) ClearVolumes, bool NowBidding)
     {
         var security = tool.MySecurity;
-        var cancelOrder = TradingSystem.Connector.CancelOrderAsync;
-        var sendOrder = TradingSystem.Connector.SendOrderAsync;
-        var replaceOrder = TradingSystem.Connector.ReplaceOrderAsync;
+        var cancelOrder = Connector.CancelOrderAsync;
+        var sendOrder = Connector.SendOrderAsync;
+        var replaceOrder = Connector.ReplaceOrderAsync;
 
         var activeOrders = TradingSystem.Orders.ToArray().Where(x => x.Sender == "System" &&
         x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
         if (activeOrders.Length == 0 && !tool.UseNormalization || !NowBidding) return;
         if (activeOrders.Length > 1)
         {
-            Window.AddInfo(tool.Name + ": Отмена нескольких активных заявок System: " + activeOrders.Length);
+            AddInfo(tool.Name + ": Отмена нескольких активных заявок System: " + activeOrders.Length);
             foreach (Order MyOrder in activeOrders) await cancelOrder(MyOrder);
             return;
         }
@@ -1040,7 +1045,7 @@ internal class ToolManager : IToolManager
                 foreach (Script MyScript in tool.Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)
                     {
-                        Window.AddInfo(tool.Name +
+                        AddInfo(tool.Name +
                             ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
                         await cancelOrder(ActiveOrder);
                         return;
@@ -1057,7 +1062,7 @@ internal class ToolManager : IToolManager
                 foreach (Script MyScript in tool.Scripts)
                     if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)
                     {
-                        Window.AddInfo(tool.Name +
+                        AddInfo(tool.Name +
                             ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
                         await cancelOrder(ActiveOrder);
                         return;
@@ -1076,7 +1081,7 @@ internal class ToolManager : IToolManager
             foreach (Script MyScript in tool.Scripts)
                 if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)
                 {
-                    Window.AddInfo(tool.Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.", false);
+                    AddInfo(tool.Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.", false);
                     return;
                 }
 
@@ -1116,8 +1121,8 @@ internal class ToolManager : IToolManager
         var security = tool.MySecurity;
         var scripts = tool.Scripts;
         var name = tool.Name;
-        var cancelOrder = TradingSystem.Connector.CancelOrderAsync;
-        var sendOrder = TradingSystem.Connector.SendOrderAsync;
+        var cancelOrder = Connector.CancelOrderAsync;
+        var sendOrder = Connector.SendOrderAsync;
         var settings = TradingSystem.Settings;
         var orders = TradingSystem.Orders;
 
@@ -1134,11 +1139,11 @@ internal class ToolManager : IToolManager
             {
                 if (!NowBidding || !NormalPrice)
                 {
-                    Window.AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                    AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
                         settings.DisplaySpecialInfo, true);
                     return true;
                 }
-                Window.AddInfo(name + ": Позиция скрипта не соответствует позиции в портфеле. Нормализация по рынку.", notify: true);
+                AddInfo(name + ": Позиция скрипта не соответствует позиции в портфеле. Нормализация по рынку.", notify: true);
 
                 Order[] ActiveOrders =
                     orders.ToArray().Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
@@ -1173,11 +1178,11 @@ internal class ToolManager : IToolManager
                 {
                     if (!NowBidding || !NormalPrice)
                     {
-                        Window.AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                        AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
                             settings.DisplaySpecialInfo, true);
                         return true;
                     }
-                    Window.AddInfo(name +
+                    AddInfo(name +
                         ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", notify: true);
 
                     Order[] ActiveOrders = orders.ToArray()
@@ -1201,11 +1206,11 @@ internal class ToolManager : IToolManager
                 {
                     if (!NowBidding || !NormalPrice)
                     {
-                        Window.AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                        AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
                             settings.DisplaySpecialInfo, true);
                         return true;
                     }
-                    Window.AddInfo(name +
+                    AddInfo(name +
                         ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", notify: true);
 
                     Order[] ActiveOrders = orders.ToArray()
@@ -1224,11 +1229,11 @@ internal class ToolManager : IToolManager
                 {
                     if (!NowBidding || !NormalPrice)
                     {
-                        Window.AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
+                        AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
                             settings.DisplaySpecialInfo, true);
                         return true;
                     }
-                    Window.AddInfo(name +
+                    AddInfo(name +
                         ": Текущие позиции скриптов не соответствуют позиции в портфеле. Нормализация по рынку.", notify: true);
 
                     Order[] ActiveOrders = orders.ToArray()
@@ -1251,8 +1256,8 @@ internal class ToolManager : IToolManager
             .Where(x => x.Seccode == tool.MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
         if (active.Length == 0) return true;
 
-        Window.AddInfo(tool.Name + ": Отмена всех активных заявок: " + active.Length);
-        foreach (Order MyOrder in active) TradingSystem.Connector.CancelOrderAsync(MyOrder);
+        AddInfo(tool.Name + ": Отмена всех активных заявок: " + active.Length);
+        foreach (Order MyOrder in active) Connector.CancelOrderAsync(MyOrder);
 
         Thread.Sleep(500);
         if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
@@ -1266,7 +1271,7 @@ internal class ToolManager : IToolManager
         Thread.Sleep(2000);
         if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
 
-        Window.AddInfo(tool.Name + ": Не удалось вовремя отменить все активные заявки");
+        AddInfo(tool.Name + ": Не удалось вовремя отменить все активные заявки");
         return false;
     }
 
@@ -1276,8 +1281,8 @@ internal class ToolManager : IToolManager
             .Where(x => x.Sender == null && x.Seccode == tool.MySecurity.Seccode && (x.Status is "active" or "watching")).ToArray();
         if (Unknowns.Length == 0) return true;
 
-        Window.AddInfo(tool.Name + ": Отмена неизвестных активных заявок: " + Unknowns.Length);
-        foreach (Order MyOrder in Unknowns) TradingSystem.Connector.CancelOrderAsync(MyOrder);
+        AddInfo(tool.Name + ": Отмена неизвестных активных заявок: " + Unknowns.Length);
+        foreach (Order MyOrder in Unknowns) Connector.CancelOrderAsync(MyOrder);
 
         Thread.Sleep(500);
         if (!Unknowns.Where(x => x.Status is "active" or "watching").Any()) return true;
@@ -1291,7 +1296,7 @@ internal class ToolManager : IToolManager
         Thread.Sleep(2000);
         if (!Unknowns.Where(x => x.Status is "active" or "watching").Any()) return true;
 
-        Window.AddInfo(tool.Name + ": Не удалось вовремя отменить неизвестные активные заявки");
+        AddInfo(tool.Name + ": Не удалось вовремя отменить неизвестные активные заявки");
         return false;
     }
 
@@ -1331,7 +1336,7 @@ internal class ToolManager : IToolManager
                 "\nOrderVol " + OrderVolumes.Item1 + "/" + OrderVolumes.Item2 +
                 "\nMinLots " + tool.MinNumberOfLots + "\nMaxLots " + tool.MaxNumberOfLots + "\n");
         }
-        catch (Exception e) { Window.AddInfo(tool.Name + ": Исключение логирования рисков: " + e.Message); }
+        catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования рисков: " + e.Message); }
     }
 
     private void WriteLogNM(Tool tool, int Balance, (int, int) PosVolumes)
@@ -1346,7 +1351,7 @@ internal class ToolManager : IToolManager
                 "\nPosVols " + PosVolumes.Item1 + "/" + PosVolumes.Item2 +
                 "\nMinLots " + tool.MinNumberOfLots + "\nMaxLots " + tool.MaxNumberOfLots + "\n");
         }
-        catch (Exception e) { Window.AddInfo(tool.Name + ": Исключение логирования NM: " + e.Message); }
+        catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования NM: " + e.Message); }
     }
 
     private async Task ProcessOrders(Tool tool, Script MyScript, (int, int) OrderVolumes, bool NormalPrice)
@@ -1369,25 +1374,25 @@ internal class ToolManager : IToolManager
                 if (ActiveOrder.Quantity - ActiveOrder.Balance > 0.00001 || ActiveOrder.Note == "PartEx")
                 {
                     if (Math.Abs(ActiveOrder.Price - PrevClose) > 0.00001)
-                        await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
+                        await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
                             PrevClose, ActiveOrder.Balance, ActiveOrder.Signal, MyScript, "PartEx");
                 }
                 else if ((ActiveOrder.BuySell == "B") != IsGrow[^1] ||
                     (MyScript.CurrentPosition == PositionType.Short) != IsGrow[^1] || VolumeOrder == 0)
-                    await TradingSystem.Connector.CancelOrderAsync(ActiveOrder);
+                    await Connector.CancelOrderAsync(ActiveOrder);
                 else if (Math.Abs(ActiveOrder.Price - PrevClose) > 0.00001 || Math.Abs(ActiveOrder.Balance - VolumeOrder) > 1)
-                    await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
+                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
                         PrevClose, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
             }
             else if (DateTime.Now >= ActiveOrder.Time.AddMinutes(5))
             {
                 if (NormalPrice)
-                    await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market, PrevClose,
+                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market, PrevClose,
                     ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
-                else Window.AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
+                else AddInfo(MyScript.Name + ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
             }
             else if ((ActiveOrder.BuySell == "B") != IsGrow[^1] || VolumeOrder == 0)
-                await TradingSystem.Connector.CancelOrderAsync(ActiveOrder);
+                await Connector.CancelOrderAsync(ActiveOrder);
             return;
         }
 
@@ -1400,7 +1405,7 @@ internal class ToolManager : IToolManager
         if (MyScript.CurrentPosition == PositionType.Short && IsGrow[^1] ||
             MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1])
         {
-            await TradingSystem.Connector.SendOrderAsync(security, OrderType.Limit,
+            await Connector.SendOrderAsync(security, OrderType.Limit,
                 IsGrow[^1], PrevClose, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
             ScriptManager.WriteLog(MyScript, tool.Name);
         }
@@ -1426,18 +1431,18 @@ internal class ToolManager : IToolManager
                 if (Math.Abs(ActiveOrder.Price - PriceOrder) > 0.00001)
                 {
                     int Quantity = ActiveOrder.Quantity - ActiveOrder.Balance; // Нужно сделать уверенную замену через ReplaceOrder
-                    if (await TradingSystem.Connector.CancelOrderAsync(ActiveOrder))
-                        await TradingSystem.Connector.SendOrderAsync(security, OrderType.Market,
+                    if (await Connector.CancelOrderAsync(ActiveOrder))
+                        await Connector.SendOrderAsync(security, OrderType.Market,
                             ActiveOrder.BuySell == "S", PriceOrder, Quantity, "CancelPartEx", MyScript, "NM");
                 }
             }
-            else if (VolumeOrder == 0) await TradingSystem.Connector.CancelOrderAsync(ActiveOrder);
+            else if (VolumeOrder == 0) await Connector.CancelOrderAsync(ActiveOrder);
             else if (Math.Abs(ActiveOrder.Price - PriceOrder) > 0.00001 || Math.Abs(ActiveOrder.Balance - VolumeOrder) > 1)
             {
                 if (PriceOrder - security.MinPrice > -0.00001 && PriceOrder - security.MaxPrice < 0.00001)
-                    await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
+                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit,
                         PriceOrder, VolumeOrder, ActiveOrder.Signal, MyScript, ActiveOrder.Note);
-                else await TradingSystem.Connector.CancelOrderAsync(ActiveOrder);
+                else await Connector.CancelOrderAsync(ActiveOrder);
             }
             return;
         }
@@ -1452,7 +1457,7 @@ internal class ToolManager : IToolManager
             MyScript.CurrentPosition == PositionType.Long && !IsGrow[^1]) &&
             PriceOrder - security.MinPrice > -0.00001 && PriceOrder - security.MaxPrice < 0.00001)
         {
-            await TradingSystem.Connector.SendOrderAsync(security, OrderType.Limit,
+            await Connector.SendOrderAsync(security, OrderType.Limit,
                 IsGrow[^1], PriceOrder, VolumeOrder, IsGrow[^1] ? "BuyAtLimit" : "SellAtLimit", MyScript);
             ScriptManager.WriteLog(MyScript, tool.Name);
         }
@@ -1487,16 +1492,16 @@ internal class ToolManager : IToolManager
                     if (DateTime.Now > ActiveOrder.Time.AddSeconds(tool.WaitingLimit) && NowBidding)
                     {
                         if (NormalPrice)
-                            await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market,
+                            await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market,
                                 PrevClose, ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript);
-                        else Window.AddInfo(MyScript.Name +
+                        else AddInfo(MyScript.Name +
                             ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
                     }
                 }
                 else if (VolumeOrder == 0 || DateTime.Now < DateTime.Today.AddHours(7.5) && ActiveOrder.Note == null ||
-                    (ActiveOrder.BuySell == "B") == IsGrow[^1]) await TradingSystem.Connector.CancelOrderAsync(ActiveOrder);
+                    (ActiveOrder.BuySell == "B") == IsGrow[^1]) await Connector.CancelOrderAsync(ActiveOrder);
                 else if (Math.Abs(ActiveOrder.Price - Price) > 0.00001 || ActiveOrder.Balance - VolumeOrder > 1)
-                    await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Conditional, Price, VolumeOrder, ActiveOrder.Signal, MyScript);
+                    await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Conditional, Price, VolumeOrder, ActiveOrder.Signal, MyScript);
             }
             else if (NowBidding)
             {
@@ -1506,17 +1511,17 @@ internal class ToolManager : IToolManager
                         DateTime.Now < DateTime.Today.AddHours(9.5) ||
                         DateTime.Now > DateTime.Today.AddHours(10.5) && security.LastTrade.DateTime > DateTime.Today.AddHours(10.5))
                     {
-                        if (NormalPrice) await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit, PrevClose,
+                        if (NormalPrice) await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Limit, PrevClose,
                             ActiveOrder.Balance, ActiveOrder.Signal + "AtClose", MyScript, "CloseNB");
-                        else Window.AddInfo(MyScript.Name +
+                        else AddInfo(MyScript.Name +
                             ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
                     }
                 }
                 else if (DateTime.Now >= ActiveOrder.Time.AddSeconds(tool.WaitingLimit))
                 {
-                    if (NormalPrice) await TradingSystem.Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market, PrevClose,
+                    if (NormalPrice) await Connector.ReplaceOrderAsync(ActiveOrder, security, OrderType.Market, PrevClose,
                         ActiveOrder.Balance, ActiveOrder.Signal + "AtMarket", MyScript, ActiveOrder.Note);
-                    else Window.AddInfo(MyScript.Name +
+                    else AddInfo(MyScript.Name +
                         ": Цена за пределами нормального диапазона. Ожидание возвращения.", notify: true);
                 }
             }
@@ -1546,7 +1551,7 @@ internal class ToolManager : IToolManager
             if (CurPosition == PositionType.Short && IsGrow[^1] || CurPosition == PositionType.Long && !IsGrow[^1])
             {
                 double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
-                await TradingSystem.Connector.SendOrderAsync(security, OrderType.Limit,
+                await Connector.SendOrderAsync(security, OrderType.Limit,
                     IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
                 ScriptManager.WriteLog(MyScript, tool.Name);
             }
@@ -1554,23 +1559,23 @@ internal class ToolManager : IToolManager
         else if (CurPosition == PositionType.Short && !IsGrow[^1] || CurPosition == PositionType.Long && IsGrow[^1])
         {
             double Price = IsGrow[^1] ? PrevStopLine - security.MinStep : PrevStopLine + security.MinStep;
-            await TradingSystem.Connector.SendOrderAsync(security, OrderType.Conditional,
+            await Connector.SendOrderAsync(security, OrderType.Conditional,
                 !IsGrow[^1], Price, VolumeOrder, !IsGrow[^1] ? "BuyAtStop" : "SellAtStop", MyScript);
             ScriptManager.WriteLog(MyScript, tool.Name);
         }
         else
         {
-            Window.AddInfo(MyScript.Name + ": Текущая позиция скрипта не соответствует IsGrow.", notify: true);
+            AddInfo(MyScript.Name + ": Текущая позиция скрипта не соответствует IsGrow.", notify: true);
             if (security.LastTrade.DateTime < DateTime.Today.AddHours(10.5) && DateTime.Now < DateTime.Today.AddHours(10.5))
             {
                 double Price = IsGrow[^1] ? PrevStopLine - SmallATR[^2] : PrevStopLine + SmallATR[^2];
-                await TradingSystem.Connector.SendOrderAsync(security, OrderType.Limit,
+                await Connector.SendOrderAsync(security, OrderType.Limit,
                     IsGrow[^1], Price, VolumeOrder, IsGrow[^1] ? "BuyAtLimitNB" : "SellAtLimitNB", MyScript, "NB");
             }
             else
             {
                 double Price = IsGrow[^1] ? PrevStopLine - security.MinStep : PrevStopLine + security.MinStep;
-                await TradingSystem.Connector.SendOrderAsync(security, OrderType.Limit, IsGrow[^1], Price, VolumeOrder, "UnknowEvent", MyScript);
+                await Connector.SendOrderAsync(security, OrderType.Limit, IsGrow[^1], Price, VolumeOrder, "UnknowEvent", MyScript);
             }
             ScriptManager.WriteLog(MyScript, tool.Name);
         }
@@ -1591,20 +1596,20 @@ internal class ToolManager : IToolManager
         {
             if (MyScript.Result.IsGrow.Length > 500)
             {
-                Window.AddInfo(tool.Name + ": Количество торговых баров больше базисных: " +
+                AddInfo(tool.Name + ": Количество торговых баров больше базисных: " +
                     InitialLength + "/" + MyScript.Result.IsGrow.Length + " Обрезка.", notify: true);
 
                 y = security.SourceBars.Close.Length - tool.BasicSecurity.SourceBars.Close.Length + 20;
                 if (y > -1 && y < security.SourceBars.DateTime.Length)
                     security.SourceBars = security.SourceBars.Trim(y);
-                else Window.AddInfo(tool.Name + ": обрезка баров невозможна.");
+                else AddInfo(tool.Name + ": обрезка баров невозможна.");
 
                 y = InitialLength - MyScript.Result.IsGrow.Length;
                 if (y > -1 && y < security.Bars.DateTime.Length)
                     security.Bars = security.Bars.Trim(y);
-                else Window.AddInfo(tool.Name + ": обрезка баров невозможна.");
+                else AddInfo(tool.Name + ": обрезка баров невозможна.");
             }
-            else Window.AddInfo(tool.Name + ": Количество торговых баров больше базисных: " +
+            else AddInfo(tool.Name + ": Количество торговых баров больше базисных: " +
                 InitialLength + "/" + MyScript.Result.IsGrow.Length, notify: true);
             return false;
         }
@@ -1662,7 +1667,7 @@ internal class ToolManager : IToolManager
             i = Array.FindIndex(security.Bars.DateTime, x => x.AddMinutes(security.Bars.TF) > trade.DateTime);
             if (i < 0)
             {
-                Window.AddInfo("AddAnnotations: Не найден бар, на котором произошла сделка.");
+                AddInfo("AddAnnotations: Не найден бар, на котором произошла сделка.");
                 continue;
             }
 

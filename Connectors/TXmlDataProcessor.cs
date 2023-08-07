@@ -24,6 +24,8 @@ internal class TXmlDataProcessor
     private readonly StringComparison SC = StringComparison.Ordinal;
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
+    private static bool Scheduled { get => DateTime.Now.TimeOfDay.TotalMinutes is 50 or 400; }
+
     public TXmlDataProcessor(TXmlConnector connector, TradingSystem tradingSystem, AddInformation addInfo)
     {
         Connector = connector ?? throw new ArgumentNullException(nameof(connector));
@@ -34,50 +36,49 @@ internal class TXmlDataProcessor
     public void ProcessData(string data)
     {
         using XmlReader xr = XmlReader.Create(new StringReader(data), XS);
-
         xr.Read();
-        var section = xr.Name;
 
-        // Высокочастотные секции
-        if (section == "alltrades")
+        if (xr.Name != "alltrades") ProcessSections(xr, xr.Name);
+        while (xr.Read())
         {
-            while (xr.Read())
+            if (!xr.ReadToFollowing("time")) break;
+            xr.Read();
+            var trade = new Trade(DateTime.ParseExact(xr.Value, DTForm, IC));
+
+            if (!xr.ReadToFollowing("price"))
             {
-                if (!xr.ReadToFollowing("time")) break;
-                xr.Read();
-                var trade = new Trade(DateTime.ParseExact(xr.Value, DTForm, IC));
-
-                if (!xr.ReadToFollowing("price"))
-                {
-                    AddInfo("alltrades: no price");
-                    continue;
-                }
-                xr.Read();
-                trade.Price = double.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("quantity"))
-                {
-                    AddInfo("alltrades: no quantity");
-                    continue;
-                }
-                xr.Read();
-                trade.Quantity = int.Parse(xr.Value, IC);
-
-                if (!xr.ReadToFollowing("seccode"))
-                {
-                    AddInfo("alltrades: no seccode");
-                    continue;
-                }
-                xr.Read();
-                trade.Seccode = xr.Value;
-
-                var tool = TradingSystem.Tools
-                    .Single(x => x.MySecurity.Seccode == xr.Value || x.BasicSecurity?.Seccode == trade.Seccode);
-                TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
+                AddInfo("alltrades: no price");
+                continue;
             }
+            xr.Read();
+            trade.Price = double.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("quantity"))
+            {
+                AddInfo("alltrades: no quantity");
+                continue;
+            }
+            xr.Read();
+            trade.Quantity = int.Parse(xr.Value, IC);
+
+            if (!xr.ReadToFollowing("seccode"))
+            {
+                AddInfo("alltrades: no seccode");
+                continue;
+            }
+            xr.Read();
+            trade.Seccode = xr.Value;
+
+            var tool = TradingSystem.Tools
+                .Single(x => x.MySecurity.Seccode == trade.Seccode || x.BasicSecurity?.Seccode == trade.Seccode);
+            TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
         }
-        else if (section == "candles") ProcessBars(xr);
-        // Базовые секции
+        xr.Close();
+    }
+
+    private void ProcessSections(XmlReader xr, string section)
+    {
+        if (section == "candles") ProcessBars(xr);
         else if (section == "orders") ProcessOrders(xr);
         else if (section == "positions") ProcessPositions(xr);
         else if (section == "trades") ProcessTrades(xr);
@@ -85,32 +86,15 @@ internal class TXmlDataProcessor
         else if (section == "mc_portfolio") ProcessPortfolio(xr);
         else if (section == "cln_sec_permissions") ProcessPermissions(xr);
         else if (section is "sec_info" or "sec_info_upd") ProcessSecInfo(xr);
-        else ProcessSecondarySections(xr, section);
-        xr.Close();
-    }
-
-    private void ProcessSecondarySections(XmlReader xr, string section)
-    {
-        if (section == "messages")
-        {
-            if (xr.ReadToFollowing("text"))
-            {
-                xr.Read();
-                AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages);
-            }
-        }
-        else if (section == "error") // Внутренние ошибки dll
-        {
-            xr.Read();
-            AddInfo(xr.Value);
-        }
         else if (section == "securities") ProcessSecurities(xr);
         else if (section == "client") ProcessClients(xr);
         else if (section == "markets") ProcessMarkets(xr);
         else if (section == "candlekinds") ProcessTimeFrames(xr);
-        else if (section is "marketord" or "pits" or "boards" or "union" or "overnight" or "news_header") { }
-        else AddInfo("ProcessData: unknown section: " + section);
-        //else if (section == "clientlimits" || section == "quotes" || section == "quotations") { }
+        else if (section == "error" && xr.Read()) AddInfo(xr.Value);
+        else if (section == "messages" && xr.ReadToFollowing("text") && xr.Read())
+            AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages);
+        else if (section is not "marketord" or "pits" or "boards" or "union" or "overnight" or "news_header")
+            AddInfo("ProcessData: unknown section: " + section);
     }
 
 
@@ -694,8 +678,7 @@ internal class TXmlDataProcessor
             if (xr.GetAttribute("recover") != "true")
             {
                 Connector.Connection = ConnectionState.Connected;
-                AddInfo("Connected", !Connector.Scheduled);
-                Connector.Scheduled = false;
+                AddInfo("Connected", !Scheduled);
             }
             else
             {
@@ -712,8 +695,7 @@ internal class TXmlDataProcessor
             if (xr.GetAttribute("recover") != "true")
             {
                 Connector.Connection = ConnectionState.Disconnected;
-                AddInfo("Disconnected", !Connector.Scheduled);
-                Connector.Scheduled = false;
+                AddInfo("Disconnected", !Scheduled);
             }
             else
             {

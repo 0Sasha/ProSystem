@@ -14,11 +14,11 @@ public interface IToolManager
 
     public Task ChangeActivityAsync(Tool tool);
 
-    public Task CalculateAsync(Tool tool, double waitingAfterLastRecalc = 3);
+    public Task CalculateAsync(Tool tool);
 
     public Task RequestBarsAsync(Tool tool);
 
-    public void UpdateBars(Tool tool, bool updateBasicSecurity);  // async
+    public void UpdateBars(Tool tool, bool updateBasicSecurity);
 
     public Task ReloadBarsAsync(Tool tool);
 

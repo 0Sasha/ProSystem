@@ -45,8 +45,8 @@ public class TradingSystem
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         ScriptManager = new ScriptManager(Window, Connector);
-        ToolManager = new ToolManager(Window, this, ScriptManager);
-        PortfolioManager = new PortfolioManager(this);
+        ToolManager = new ToolManager(Window, this, ScriptManager, Window.AddInfo);
+        PortfolioManager = new PortfolioManager(this, Window.AddInfo);
     }
 
     public TradingSystem(MainWindow window, Type connectorType, UnitedPortfolio portfolio, Settings settings,
@@ -70,7 +70,7 @@ public class TradingSystem
     {
         isWorking = false;
         Thread.Sleep(50);
-        if (Connector.Connection != ConnectionState.Disconnected) await Connector.DisconnectAsync(true);
+        if (Connector.Connection != ConnectionState.Disconnected) await Connector.DisconnectAsync();
         if (!Connector.Initialized) Connector.Uninitialize();
     }
 
@@ -164,11 +164,9 @@ public class TradingSystem
 
         if (DateTime.Now > triggerRequestInfo) await RequestInfo();
 
-        if (Settings.ScheduledConnection && DateTime.Now.Minute == 50)
-        {
-            if (DateTime.Now < DateTime.Today.AddMinutes(400)) //DateTime.Now.Hour == 18 && DateTime.Now.Second < 3
-                await Connector.DisconnectAsync(true);
-        }
+        if (Settings.ScheduledConnection &&
+            DateTime.Now.Minute == 50 && DateTime.Now < DateTime.Today.AddMinutes(400))
+            await Connector.DisconnectAsync();
     }
 
     private async Task Connect()
@@ -177,9 +175,8 @@ public class TradingSystem
             (Connector.ServerAvailable || DateTime.Now > Connector.TriggerReconnection) &&
             Window.Dispatcher.Invoke(() => Window.TxtLog.Text.Length > 0 && Window.TxtPas.SecurePassword.Length > 0))
         {
-            bool scheduled = DateTime.Now.Minute == 40 && DateTime.Now.Hour == 6;
             await Window.Dispatcher.Invoke(async () =>
-                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword, scheduled));
+                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword));
         }
         else if (!Settings.ScheduledConnection && DateTime.Now.Minute is 0 or 30)
             Settings.ScheduledConnection = true;
@@ -190,9 +187,9 @@ public class TradingSystem
         if (DateTime.Now > Connector.TriggerReconnection)
         {
             Window.AddInfo("Reconnection on timeout");
-            await Connector.DisconnectAsync(false);
+            await Connector.DisconnectAsync();
             if (!Settings.ScheduledConnection) await Window.Dispatcher.Invoke(async () =>
-                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword, false));
+                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword));
         }
     }
 
@@ -222,6 +219,6 @@ public class TradingSystem
             foreach (var trade in obsolete) Trades.Remove(trade);
         });
         foreach (var tool in Tools) ScriptManager.ClearObsoleteData(tool, Settings);
-        Window.AddInfo("ClearObsoleteData: удалены устаревшие заявки и сделки", false);
+        Window.AddInfo("ClearObsoleteData: data is cleared", false);
     }
 }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using static ProSystem.Controls;
@@ -10,13 +11,15 @@ namespace ProSystem.Services;
 
 internal class ScriptManager : IScriptManager
 {
-    private readonly MainWindow Window;
+    private readonly Window Window;
     private readonly Connector Connector;
+    private readonly AddInformation AddInfo;
 
-    public ScriptManager(MainWindow window, Connector connector)
+    public ScriptManager(Window window, Connector connector, AddInformation addInfo)
     {
-        Window = window;
-        Connector = connector;
+        Window = window ?? throw new ArgumentNullException(nameof(window));
+        Connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
     }
 
     public void InitializeScripts(IEnumerable<Script> scripts, TabItem tabTool)
@@ -131,7 +134,7 @@ internal class ScriptManager : IScriptManager
                     {
                         script.Orders[i].Status = "lost";
                         script.Orders[i].DateTime = DateTime.Now.AddDays(-2);
-                        Window.AddInfo("BringOrdersInLine: " +
+                        AddInfo("BringOrdersInLine: " +
                             script.Name + ": Активная заявка не актуальна. Статус обновлён.");
                     }
                 }
@@ -166,7 +169,7 @@ internal class ScriptManager : IScriptManager
         if (activeOrders.Length > 1)
         {
             script.ActiveOrder = null;
-            Window.AddInfo(script.Name + ": Отмена активных заявок скрипта: " + activeOrders.Length);
+            AddInfo(script.Name + ": Отмена активных заявок скрипта: " + activeOrders.Length);
             foreach (Order MyOrder in activeOrders) Connector.CancelOrderAsync(MyOrder);
 
             for (int timeout = 500; timeout <= 1500; timeout += 500)
@@ -175,7 +178,7 @@ internal class ScriptManager : IScriptManager
                 if (!activeOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
             }
 
-            Window.AddInfo(script.Name + ": Не удалось вовремя отменить активные заявки.");
+            AddInfo(script.Name + ": Не удалось вовремя отменить активные заявки.");
             return false;
         }
         script.ActiveOrder = activeOrders.SingleOrDefault();
@@ -207,7 +210,7 @@ internal class ScriptManager : IScriptManager
         {
             System.IO.File.AppendAllText("Logs/LogsTools/" + toolName + ".txt", data + "\n");
         }
-        catch (Exception e) { Window.AddInfo(toolName + ": Исключение логирования скрипта: " + e.Message); }
+        catch (Exception e) { AddInfo(toolName + ": Исключение логирования скрипта: " + e.Message); }
     }
 
     private void AddUpperControls(Script script, UIElementCollection uiCollection, ScriptProperties properties)
@@ -240,7 +243,7 @@ internal class ScriptManager : IScriptManager
             uiCollection.Add(GetTextBlock(props[5], 105, 60));
             uiCollection.Add(GetTextBox(script, props[5], 165, 60));
         }
-        if (props.Length > 6) Window.AddInfo(script.Name + ": Непредвиденное количество верхних контролов.");
+        if (props.Length > 6) AddInfo(script.Name + ": Непредвиденное количество верхних контролов.");
 
         ComboBox comboBox = new()
         {
@@ -284,6 +287,6 @@ internal class ScriptManager : IScriptManager
         if (props.Length > 3) uiCollection.Add(GetCheckBox(script, props[3], props[3], 105, 110));
         if (props.Length > 4) uiCollection.Add(GetCheckBox(script, props[4], props[4], 105, 130));
         if (props.Length > 5) uiCollection.Add(GetCheckBox(script, props[5], props[5], 105, 150));
-        if (props.Length > 6) Window.AddInfo(script.Name + ": Непредвиденное количество средних контролов.");
+        if (props.Length > 6) AddInfo(script.Name + ": Непредвиденное количество средних контролов.");
     }
 }

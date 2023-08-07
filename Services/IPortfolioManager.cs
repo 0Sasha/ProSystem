@@ -5,8 +5,6 @@ namespace ProSystem.Services;
 
 public interface IPortfolioManager
 {
-    public TradingSystem TradingSystem { get; }
-
     public bool CheckShares();
 
     public bool CheckEquity();

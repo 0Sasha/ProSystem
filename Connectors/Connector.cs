@@ -28,9 +28,9 @@ public abstract class Connector : INotifyPropertyChanged
 
     public abstract bool Uninitialize();
 
-    public abstract Task<bool> ConnectAsync(string login, SecureString password, bool scheduled);
+    public abstract Task<bool> ConnectAsync(string login, SecureString password);
 
-    public abstract Task<bool> DisconnectAsync(bool scheduled);
+    public abstract Task<bool> DisconnectAsync();
 
     public abstract Task<bool> SendOrderAsync(Security security, OrderType type, bool isBuy,
         double price, int quantity, string signal, Script sender = null, string note = null);
