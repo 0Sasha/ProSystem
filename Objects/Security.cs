@@ -48,8 +48,9 @@ public class Security
 
     public async Task UpdateRequirements()
     {
-        for (int i = 0; Bars == null && i < 15; i++) await Task.Delay(1000);
+        for (int i = 0; Bars == null && i < 20; i++) await Task.Delay(250);
         if (Bars == null) throw new Exception("There is no bars to update requirements");
+        if (MinStep < double.Epsilon) throw new Exception("MinStep is <= 0");
 
         LastTrade ??= new Trade()
         {

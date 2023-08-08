@@ -710,7 +710,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        await TradingSystem.Stop();
+        await TradingSystem.StopAsync();
         Logger.StopLogging();
     }
     internal async void ChangeActivityTool(object sender, RoutedEventArgs e)

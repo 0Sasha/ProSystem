@@ -54,43 +54,43 @@ public class Tool : INotifyPropertyChanged
     public PlotModel MainModel
     {
         get => plot;
-        set { plot = value; Notify(); }
+        set { plot = value; Notify(nameof(MainModel)); }
     }
     public PlotModel Model
     {
         get => miniPlot;
-        set { miniPlot = value; Notify(); }
+        set { miniPlot = value; Notify(nameof(Model)); }
     }
 
     public int WaitingLimit
     {
         get => waitingLimit;
-        set { waitingLimit = value; Notify(); }
+        set { waitingLimit = value; Notify(nameof(WaitingLimit)); }
     }
     public double ShareOfFunds
     {
         get => shareOfFunds;
-        set { shareOfFunds = value > 15 ? 5 : value; Notify(); }
+        set { shareOfFunds = value > 15 ? 5 : value; Notify(nameof(ShareOfFunds)); }
     }
     public int MinNumberOfLots
     {
         get => minNumberLots;
-        set { minNumberLots = value; Notify(); }
+        set { minNumberLots = value; Notify(nameof(MinNumberOfLots)); }
     }
     public int MaxNumberOfLots
     {
         get => maxNumberLots;
-        set { maxNumberLots = value; Notify(); }
+        set { maxNumberLots = value; Notify(nameof(MaxNumberOfLots)); }
     }
     public int NumberOfLots
     {
         get => numberLots;
-        set { numberLots = value; Notify(); }
+        set { numberLots = value; Notify(nameof(NumberOfLots)); }
     }
     public int BaseBalance
     {
         get => baseBalance;
-        set { baseBalance = value; Notify(); }
+        set { baseBalance = value; Notify(nameof(BaseBalance)); }
     }
 
     public bool StopTrading
@@ -100,7 +100,7 @@ public class Tool : INotifyPropertyChanged
         {
             stopTrading = value;
             if (Active) BrushState = stopTrading ? Theme.Orange : Theme.Green;
-            Notify();
+            Notify(nameof(StopTrading));
         }
     }
     public bool TradeShare
@@ -109,13 +109,13 @@ public class Tool : INotifyPropertyChanged
         set
         {
             tradeShare = value;
-            Notify(nameof(tradeShare));
+            Notify(nameof(TradeShare));
         }
     }
     public bool UseNormalization
     {
         get => useNormalization;
-        set { useNormalization = value; Notify(); }
+        set { useNormalization = value; Notify(nameof(UseNormalization)); }
     }
     public bool UseShiftBalance
     {
@@ -130,17 +130,17 @@ public class Tool : INotifyPropertyChanged
     public Border BorderState
     {
         get => borderState;
-        set { borderState = value; Notify(); }
+        set { borderState = value; Notify(nameof(BorderState)); }
     }
     public TextBlock BlockInfo
     {
         get => blockInfo;
-        set { blockInfo = value; Notify(); }
+        set { blockInfo = value; Notify(nameof(BlockInfo)); }
     }
     public TextBlock MainBlockInfo
     {
         get => mainBlockInfo;
-        set { mainBlockInfo = value; Notify(); }
+        set { mainBlockInfo = value; Notify(nameof(MainBlockInfo)); }
     }
 
     [field: NonSerialized] public Brush BrushState { get; set; } = Theme.Red;

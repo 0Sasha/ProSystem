@@ -13,13 +13,12 @@ internal delegate void AddInformation(string data, bool important = true, bool n
 
 public class TradingSystem
 {
-    private bool isWorking;
+    private Thread stateChecker;
     private DateTime triggerRequestInfo;
     private DateTime triggerCheckState;
     private DateTime triggerRecalc;
     private DateTime triggerUpdateModels;
     private DateTime triggerCheckPortfolio;
-    private Thread stateChecker;
 
     public MainWindow Window { get; init; }
     public Connector Connector { get; init; }
@@ -29,7 +28,7 @@ public class TradingSystem
     public IScriptManager ScriptManager { get; init; }
     public IPortfolioManager PortfolioManager { get; init; }
     public bool ReadyToTrade { get; set; }
-    public bool IsWorking { get => isWorking; }
+    public bool IsWorking { get; private set; }
 
     public ObservableCollection<Tool> Tools { get; init; } = new();
     public ObservableCollection<Trade> Trades { get; init; } = new();
@@ -61,14 +60,14 @@ public class TradingSystem
         if (File.Exists("txmlconnector64.dll")) Connector.Initialize(Settings.LogLevelConnector);
         else Window.AddInfo("Не найден коннектор txmlconnector64.dll");
 
-        isWorking = true;
-        stateChecker = new(CheckState) { IsBackground = true, Name = "StateChecker" };
+        IsWorking = true;
+        stateChecker = new(CheckStateAsync) { IsBackground = true, Name = "StateChecker" };
         stateChecker.Start();
     }
 
-    public async Task Stop()
+    public async Task StopAsync()
     {
-        isWorking = false;
+        IsWorking = false;
         Thread.Sleep(50);
         if (Connector.Connection != ConnectionState.Disconnected) await Connector.DisconnectAsync();
         if (!Connector.Initialized) Connector.Uninitialize();
@@ -80,11 +79,11 @@ public class TradingSystem
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
             foreach (var tool in Tools) await ToolManager.RequestBarsAsync(tool);
-            Window.AddInfo("PrepareForTrading: Bars updated.", false);
+            Window.AddInfo("PrepareForTrading: bars updated.", false);
             return;
         }
 
-        await RequestInfo(false);
+        await RequestInfoAsync(false);
         await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
         await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
         foreach (var tool in Tools)
@@ -94,7 +93,7 @@ public class TradingSystem
             if (tool.Security.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
             {
                 tool.Active = false;
-                Window.AddInfo("PrepareForTrading: " + tool.Name + " деактивирован, потому что не пришли бары.");
+                Window.AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
             }
             else if (tool.Active)
             {
@@ -112,16 +111,16 @@ public class TradingSystem
         Window.AddInfo("System is ready to trade.", false);
     }
 
-    private async void CheckState()
+    private async void CheckStateAsync()
     {
-        while (isWorking)
+        while (IsWorking)
         {
             if (DateTime.Now > triggerCheckState)
             {
                 triggerCheckState = DateTime.Now.AddSeconds(1);
-                if (Connector.Connection == ConnectionState.Connected) await UpdateState();
-                else if (Connector.Connection == ConnectionState.Connecting) await Reconnect();
-                else if (DateTime.Now > DateTime.Today.AddMinutes(400)) await Connect();
+                if (Connector.Connection == ConnectionState.Connected) await UpdateStateAsync();
+                else if (Connector.Connection == ConnectionState.Connecting) await ReconnectAsync();
+                else if (DateTime.Now > DateTime.Today.AddMinutes(400)) await ConnectAsync();
                 else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0)
                 {
                     Connector.BackupServer = false;
@@ -136,9 +135,10 @@ public class TradingSystem
         }
     }
 
-    private async Task UpdateState() // TODO check catching of all exceptions
+    // TODO check catching of all exceptions
+    private async Task UpdateStateAsync()
     {
-        if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio) await CheckPortfolio();
+        if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio) await CheckPortfolioAsync();
 
         if (ReadyToTrade && DateTime.Now > triggerRecalc)
         {
@@ -162,14 +162,14 @@ public class TradingSystem
             foreach (Tool MyTool in Tools) if (MyTool.Active) ToolManager.UpdateView(MyTool, false);
         }
 
-        if (DateTime.Now > triggerRequestInfo) await RequestInfo();
+        if (DateTime.Now > triggerRequestInfo) await RequestInfoAsync();
 
         if (Settings.ScheduledConnection &&
             DateTime.Now.Minute == 50 && DateTime.Now < DateTime.Today.AddMinutes(400))
             await Connector.DisconnectAsync();
-    }
+    } 
 
-    private async Task Connect()
+    private async Task ConnectAsync()
     {
         if (Settings.ScheduledConnection &&
             (Connector.ServerAvailable || DateTime.Now > Connector.TriggerReconnection) &&
@@ -182,7 +182,7 @@ public class TradingSystem
             Settings.ScheduledConnection = true;
     }
 
-    private async Task Reconnect()
+    private async Task ReconnectAsync()
     {
         if (DateTime.Now > Connector.TriggerReconnection)
         {
@@ -193,7 +193,7 @@ public class TradingSystem
         }
     }
 
-    private async Task RequestInfo(bool orderBars = true)
+    private async Task RequestInfoAsync(bool orderBars = true)
     {
         triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute).AddSeconds(-DateTime.Now.Second);
         await Connector.OrderPortfolioInfoAsync(Portfolio);
@@ -204,7 +204,7 @@ public class TradingSystem
         }
     }
 
-    private async Task CheckPortfolio()
+    private async Task CheckPortfolioAsync()
     {
         triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
         if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
