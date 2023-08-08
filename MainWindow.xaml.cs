@@ -146,6 +146,7 @@ public partial class MainWindow : Window
         TradingSystem.Orders.CollectionChanged += UpdateOrders;
         TradingSystem.Trades.CollectionChanged += UpdateTrades;
         Connector.PropertyChanged += UpdateConnection;
+        foreach (var tool in TradingSystem.Tools) tool.PropertyChanged += UpdateTool;
     }
 
     private void BindData(Settings settings)
@@ -312,6 +313,47 @@ public partial class MainWindow : Window
         if (notify) Notifier.Notify(data);
     }
 
+    public async Task SaveTool(Tool tool, bool newTool = true)
+    {
+        if (newTool)
+        {
+            Tools.Add(tool);
+            TradingSystem.ToolManager.CreateTab(tool);
+            TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
+            ToolsByPriorityView.Items.Refresh();
+            tool.PropertyChanged += UpdateTool;
+        }
+        else
+        {
+            tool.MainModel.Series.Clear();
+            tool.MainModel.Series.Add(new OxyPlot.Series.CandleStickSeries { });
+            tool.MainModel.Annotations.Clear();
+
+            int i = Tools.IndexOf(tool);
+            TradingSystem.ToolManager.UpdateControlGrid(tool);
+            if (tool.Scripts.Length < 2)
+            {
+                ((TabsTools.Items[i] as TabItem).Content as Grid)
+                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[1].Children.Clear();
+                ((TabsTools.Items[i] as TabItem).Content as Grid)
+                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[2].Children.Clear();
+            }
+        }
+
+        if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)
+        {
+            await TradingSystem.ToolManager.RequestBarsAsync(tool);
+            await TradingSystem.Connector.OrderSecurityInfoAsync(tool.Security);
+            _ = Task.Run(() =>
+            {
+                System.Threading.Thread.Sleep(4000);
+                TradingSystem.ToolManager.UpdateView(tool, true);
+            });
+        }
+        else AddInfo("SaveTool: отсутствует соединение.");
+        AddInfo("Saved tool: " + tool.Name);
+    }
+
     #region Menu
     private bool SaveData(bool SaveInfoPanel = false)
     {
@@ -417,7 +459,7 @@ public partial class MainWindow : Window
         if (ToolsView.SelectedItem != null)
         {
             int i = Tools.IndexOf(Tools.Single(x => x == ToolsView.SelectedItem));
-            Tools[i].MySecurity.SourceBars.Write(Tools[i].MySecurity.ShortName);
+            Tools[i].Security.SourceBars.Write(Tools[i].Security.ShortName);
             Tools[i].BasicSecurity?.SourceBars.Write(Tools[i].BasicSecurity.ShortName);
         }
     }
@@ -502,7 +544,7 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    Tool MyTool = Tools.Single(x => x.MySecurity.Seccode == MyOrder.Seccode);
+                    Tool MyTool = Tools.Single(x => x.Security.Seccode == MyOrder.Seccode);
                     if (MyOrder.Sender != null) MyTool.Scripts.Single(x => x.Name == MyOrder.Sender).Orders.Remove(MyOrder);
                     else
                     {
@@ -550,7 +592,7 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    Tools.Single(x => x.MySecurity.Seccode == MyTrade.Seccode).Scripts.Single
+                    Tools.Single(x => x.Security.Seccode == MyTrade.Seccode).Scripts.Single
                         (x => x.Name == MyTrade.SenderOrder).Trades.Remove(MyTrade);
                 }
                 catch (Exception ex) { AddInfo("Исключение во время попытки удаления сделки: " + ex.Message); }
@@ -621,6 +663,17 @@ public partial class MainWindow : Window
                 Window.PortfolioView.ItemsSource = Portfolio.AllPositions;
                 Window.PortfolioView.ScrollIntoView(this);
             });
+        }
+    }
+    private void UpdateTool(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Tool.ShowBasicSecurity))
+        {
+            TradingSystem.ToolManager.UpdateView(sender as Tool, true);
+        }
+        else if (e.PropertyName is nameof(Tool.TradeShare) or nameof(Tool.UseShiftBalance))
+        {
+            TradingSystem.ToolManager.UpdateControlGrid(sender as Tool);
         }
     }
     private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)

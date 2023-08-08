@@ -10,6 +10,7 @@ public abstract class Script : INotifyPropertyChanged
 {
     protected Order lastExecuted;
     protected PositionType curPosition;
+    protected ScriptProperties properties;
 
     [field: NonSerialized] protected TextBlock infoBlock;
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
@@ -47,9 +48,9 @@ public abstract class Script : INotifyPropertyChanged
 
     public virtual ObservableCollection<Trade> Trades { get; set; } = new();
 
-    public Script(string name) => Name = name;
+    public ScriptProperties Properties { get => properties; }
 
-    public abstract ScriptProperties GetScriptProperties();
+    public Script(string name) => Name = name;
 
     public abstract void Calculate(Security symbol);
 

@@ -38,7 +38,7 @@ internal class ScriptManager : IScriptManager
         var scripts = tool.Scripts;
         for (int i = 0; i < scripts.Length; i++)
         {
-            var props = scripts[i].GetScriptProperties();
+            var props = scripts[i].Properties;
             Window.Dispatcher.Invoke(() =>
             {
                 if (props.IsOSC)
@@ -69,7 +69,7 @@ internal class ScriptManager : IScriptManager
         if (tool == null) throw new ArgumentNullException(nameof(tool));
 
         foreach (var unknownOrder in
-            TradingSystem.Orders.ToArray().Where(x => x.Sender == null && x.Seccode == tool.MySecurity.Seccode))
+            TradingSystem.Orders.ToArray().Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode))
         {
             foreach (var script in tool.Scripts)
             {
@@ -88,7 +88,7 @@ internal class ScriptManager : IScriptManager
         }
 
         foreach (var unknownTrade in
-            TradingSystem.Trades.ToArray().Where(x => x.SenderOrder == null && x.Seccode == tool.MySecurity.Seccode))
+            TradingSystem.Trades.ToArray().Where(x => x.SenderOrder == null && x.Seccode == tool.Security.Seccode))
         {
             foreach (var script in tool.Scripts)
             {
@@ -198,24 +198,27 @@ internal class ScriptManager : IScriptManager
         return true;
     }
 
-    public async Task ProcessOrdersAsync(Tool tool, Script script, int volume, bool nowBidding, double atr)
+    public async Task ProcessOrdersAsync(Tool tool, Script script,
+        int volume, bool normalPrice, bool nowBidding, double atr)
     {
         if (tool == null) throw new ArgumentNullException(nameof(tool));
         if (script == null) throw new ArgumentNullException(nameof(script));
         if (volume < 1) throw new ArgumentOutOfRangeException(nameof(volume), "volume must be >= 1");
         if (atr < double.Epsilon) throw new ArgumentOutOfRangeException(nameof(atr), "atr must be > 0");
 
-        if (script.Result.Type is ScriptType.OSC or ScriptType.Line) await ProcessOSCAsync(tool, script, volume);
-        else if (script.Result.Type is ScriptType.LimitLine) await ProcessLimitLineAsync(tool, script, volume);
+        if (script.Result.Type is ScriptType.OSC or ScriptType.Line)
+            await ProcessOSCAsync(tool, script, volume, normalPrice);
+        else if (script.Result.Type is ScriptType.LimitLine)
+            await ProcessLimitLineAsync(tool, script, volume);
         else if (script.Result.Type is ScriptType.StopLine)
-            await ProcessStopLineAsync(tool, script, volume, nowBidding, atr);
+            await ProcessStopLineAsync(tool, script, volume, normalPrice, nowBidding, atr);
         else AddInfo(script.Name + ": Неизвестный тип скрипта: " + script.Result.Type, notify: true);
     }
 
-    private async Task ProcessOSCAsync(Tool tool, Script script, int volume)
+    private async Task ProcessOSCAsync(Tool tool, Script script, int volume, bool normalPrice)
     {
         var basicSecurity = tool.BasicSecurity;
-        var security = tool.MySecurity;
+        var security = tool.Security;
         var prevClose = basicSecurity?.Bars.DateTime[^1] > security.Bars.DateTime[^1] ?
             security.Bars.Close[^1] : security.Bars.Close[^2];
 
@@ -248,8 +251,12 @@ internal class ScriptManager : IScriptManager
             }
             else if (DateTime.Now >= activeOrder.Time.AddMinutes(5))
             {
-                await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Market, prevClose,
-                    activeOrder.Balance, activeOrder.Signal + "AtMarket", script, activeOrder.Note);
+                if (normalPrice)
+                {
+                    await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Market, prevClose,
+                        activeOrder.Balance, activeOrder.Signal + "AtMarket", script, activeOrder.Note);
+                }
+                else AddInfo(script.Name + ": price is out of normal range", notify: true);
             }
             else if ((activeOrder.BuySell == "B") != isGrow[^1] || volume == 0)
             {
@@ -276,7 +283,7 @@ internal class ScriptManager : IScriptManager
 
     private async Task ProcessLimitLineAsync(Tool tool, Script script, int volume)
     {
-        var security = tool.MySecurity;
+        var security = tool.Security;
         var basicSecurity = tool.BasicSecurity;
         var orderPrice = basicSecurity?.Bars.DateTime[^1] > security.Bars.DateTime[^1] ?
             script.Result.Indicators[0][^1] : script.Result.Indicators[0][^2];
@@ -326,9 +333,10 @@ internal class ScriptManager : IScriptManager
         }
     }
 
-    private async Task ProcessStopLineAsync(Tool tool, Script script, int volume, bool nowBidding, double atr)
+    private async Task ProcessStopLineAsync(Tool tool, Script script,
+        int volume, bool normalPrice, bool nowBidding, double atr)
     {
-        var security = tool.MySecurity;
+        var security = tool.Security;
         var basicSecurity = tool.BasicSecurity;
         var prevClose = security.Bars.Close[^2];
         var prevStopLine = script.Result.Indicators[0][^2];
@@ -350,8 +358,12 @@ internal class ScriptManager : IScriptManager
                 {
                     if (DateTime.Now > activeOrder.Time.AddSeconds(tool.WaitingLimit) && nowBidding)
                     {
-                        await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Market,
-                            prevClose, activeOrder.Balance, activeOrder.Signal + "AtMarket", script);
+                        if (normalPrice)
+                        {
+                            await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Market,
+                                prevClose, activeOrder.Balance, activeOrder.Signal + "AtMarket", script);
+                        }
+                        else AddInfo(script.Name + ": price is out of normal range", notify: true);
                     }
                 }
                 else if (volume == 0 || DateTime.Now < DateTime.Today.AddHours(7.5) && activeOrder.Note == null ||
@@ -367,14 +379,22 @@ internal class ScriptManager : IScriptManager
                         DateTime.Now < DateTime.Today.AddHours(9.5) ||
                         DateTime.Now > DateTime.Today.AddHours(10.5) && security.LastTrade.DateTime > DateTime.Today.AddHours(10.5))
                     {
-                        await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit, prevClose,
-                            activeOrder.Balance, activeOrder.Signal + "AtClose", script, "CloseNB");
+                        if (normalPrice)
+                        {
+                            await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit, prevClose,
+                                activeOrder.Balance, activeOrder.Signal + "AtClose", script, "CloseNB");
+                        }
+                        else AddInfo(script.Name + ": price is out of normal range", notify: true);
                     }
                 }
                 else if (DateTime.Now >= activeOrder.Time.AddSeconds(tool.WaitingLimit))
                 {
-                    await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Market, prevClose,
-                        activeOrder.Balance, activeOrder.Signal + "AtMarket", script, activeOrder.Note);
+                    if (normalPrice)
+                    {
+                        await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Market, prevClose,
+                            activeOrder.Balance, activeOrder.Signal + "AtMarket", script, activeOrder.Note);
+                    }
+                    else AddInfo(script.Name + ": price is out of normal range", notify: true);
                 }
             }
             return;
@@ -439,8 +459,11 @@ internal class ScriptManager : IScriptManager
 
     public bool AlignData(Tool tool, Script script)
     {
-        var security = tool.MySecurity;
-        var initLength = tool.MySecurity.Bars.Close.Length;
+        if (tool == null) throw new ArgumentNullException(nameof(tool));
+        if (script == null) throw new ArgumentNullException(nameof(script));
+
+        var security = tool.Security;
+        var initLength = tool.Security.Bars.Close.Length;
         var x = script.Result.IsGrow.Length - initLength;
         if (x > 0)
         {
@@ -475,13 +498,16 @@ internal class ScriptManager : IScriptManager
 
     public void UpdateView(Tool tool, Script script)
     {
+        if (tool == null) throw new ArgumentNullException(nameof(tool));
+        if (script == null) throw new ArgumentNullException(nameof(script));
+
         string selectedScript = null;
         var mainModel = tool.MainModel;
         Window.Dispatcher.Invoke(() =>
         {
-            Grid MyGrid = (((TradingSystem.Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
-            as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
-            selectedScript = MyGrid.Children.OfType<ComboBox>().Last().Text;
+            var grid = (((TradingSystem.Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
+                as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
+            selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
 
             script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
             "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
@@ -504,10 +530,10 @@ internal class ScriptManager : IScriptManager
             {
                 var trades = script.Trades.ToArray()
                     .Concat(TradingSystem.SystemTrades.ToArray()
-                    .Where(x => x.Seccode == tool.MySecurity.Seccode)).ToArray();
+                    .Where(x => x.Seccode == tool.Security.Seccode)).ToArray();
                 var orders =
                     TradingSystem.Orders.ToArray()
-                    .Where(x => x.Seccode == tool.MySecurity.Seccode && x.Status is "active" or "watching").ToArray();
+                    .Where(x => x.Seccode == tool.Security.Seccode && x.Status is "active" or "watching").ToArray();
                 if (trades.Length > 0 || orders.Length > 0) AddAnnotations(tool, trades, orders);
             }
         }
@@ -610,15 +636,15 @@ internal class ScriptManager : IScriptManager
         if (props.Length > 6) AddInfo(script.Name + ": Непредвиденное количество средних контролов.");
     }
 
-    private void AddAnnotations(Tool tool, Trade[] MyTrades, Order[] MyOrders)
+    private void AddAnnotations(Tool tool, Trade[] trades, Order[] orders)
     {
         int i;
-        OxyColor MyColor;
-        var security = tool.MySecurity;
+        OxyColor color;
+        var security = tool.Security;
         double yStartPoint, yEndPoint;
-        List<(Trade, int)> trades = new();
+        List<(Trade, int)> myTrades = new();
         List<(Trade, int)> tradesOnlyWithPoint = new();
-        foreach (Trade trade in MyTrades)
+        foreach (Trade trade in trades)
         {
             i = Array.FindIndex(security.Bars.DateTime, x => x.AddMinutes(security.Bars.TF) > trade.DateTime);
             if (i < 0)
@@ -627,28 +653,28 @@ internal class ScriptManager : IScriptManager
                 continue;
             }
 
-            var sameTrade = trades.SingleOrDefault(x => x.Item2 == i && x.Item1.BuySell == trade.BuySell);
+            var sameTrade = myTrades.SingleOrDefault(x => x.Item2 == i && x.Item1.BuySell == trade.BuySell);
             if (sameTrade.Item1 != null)
             {
                 sameTrade.Item1.Quantity += trade.Quantity;
                 if (sameTrade.Item1.Price != trade.Price) tradesOnlyWithPoint.Add((trade, i));
             }
-            else trades.Add((trade.GetCopy(), i));
+            else myTrades.Add((trade.GetCopy(), i));
         }
-        foreach ((Trade, int) MyTrade in trades)
+        foreach ((Trade, int) myTrade in myTrades)
         {
-            var trade = MyTrade.Item1;
-            i = MyTrade.Item2;
+            var trade = myTrade.Item1;
+            i = myTrade.Item2;
 
             if (trade.BuySell == "B")
             {
-                MyColor = Theme.GreenBar;
+                color = Theme.GreenBar;
                 yStartPoint = security.Bars.Low[i] - security.Bars.Low[i] * 0.001;
                 yEndPoint = security.Bars.Low[i];
             }
             else
             {
-                MyColor = Theme.RedBar;
+                color = Theme.RedBar;
                 yStartPoint = security.Bars.High[i] + security.Bars.High[i] * 0.001;
                 yEndPoint = security.Bars.High[i];
             }
@@ -657,7 +683,7 @@ internal class ScriptManager : IScriptManager
                 trade.Price + "; " + trade.Quantity : trade.SignalOrder + "; " + trade.Price + "; " + trade.Quantity;
             tool.MainModel.Annotations.Add(new ArrowAnnotation()
             {
-                Color = MyColor,
+                Color = color,
                 Text = text,
                 StartPoint = new DataPoint(i, yStartPoint),
                 EndPoint = new DataPoint(i, yEndPoint),
@@ -685,7 +711,7 @@ internal class ScriptManager : IScriptManager
                 ToolTip = MyTrade.Item1.SenderOrder
             });
         }
-        foreach (Order ActiveOrder in MyOrders)
+        foreach (Order ActiveOrder in orders)
         {
             tool.MainModel.Annotations.Add(new LineAnnotation()
             {
@@ -700,10 +726,10 @@ internal class ScriptManager : IScriptManager
         }
     }
 
-    private static LineSeries MakeLineSeries(double[] Indicator, string Name)
+    private static LineSeries MakeLineSeries(double[] indicator, string name)
     {
-        DataPoint[] Points = new DataPoint[Indicator.Length];
-        for (int i = 0; i < Indicator.Length; i++) Points[i] = new DataPoint(i, Indicator[i]);
-        return new LineSeries() { ItemsSource = Points, Color = Theme.Indicator, Title = Name };
+        var points = new DataPoint[indicator.Length];
+        for (int i = 0; i < indicator.Length; i++) points[i] = new DataPoint(i, indicator[i]);
+        return new() { ItemsSource = points, Color = Theme.Indicator, Title = name };
     }
 }

@@ -3,8 +3,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using static ProSystem.MainWindow;
 
 namespace ProSystem;
 
@@ -13,7 +11,7 @@ public partial class NewTool : Window
     private Security TrSec = null;
     private Security BsSec = null;
     private readonly Tool SelectedTool = null;
-    private readonly System.Collections.Generic.List<Script> Scripts = new();
+    private readonly List<Script> Scripts = new();
     private readonly MainWindow Window;
 
     private readonly string[] algorithms = new string[]
@@ -94,10 +92,10 @@ public partial class NewTool : Window
         Scripts = SelectedTool.Scripts.ToList();
         ScriptsView.ItemsSource = Scripts;
 
-        TradedSecurity = SelectedTool.MySecurity;
+        TradedSecurity = SelectedTool.Security;
         BasicSecurity = SelectedTool.BasicSecurity;
 
-        SecuritiesView.ItemsSource = new System.Collections.Generic.List<Security>() { SelectedTool.MySecurity };
+        SecuritiesView.ItemsSource = new System.Collections.Generic.List<Security>() { SelectedTool.Security };
         SecuritiesView.SelectedItem = SecuritiesView.Items[0];
     }
 
@@ -168,15 +166,15 @@ public partial class NewTool : Window
             ScriptsView.Items.Refresh();
         }
     }
-    private void SaveTool(object sender, RoutedEventArgs e)
+    private async void SaveTool(object sender, RoutedEventArgs e)
     {
         if (SelectedTool == null)
         {
             if (Tools.SingleOrDefault(x => x.Name == ToolName.Text) == null && TradedSecurity != null &&
-                Tools.SingleOrDefault(x => x.MySecurity.Seccode == TradedSecurity.Seccode) == null)
+                Tools.SingleOrDefault(x => x.Security.Seccode == TradedSecurity.Seccode) == null)
             {
                 BasicSecurity = BasicSecurity != null ? Securities.Single(x => x == BasicSecurity) : null;
-                SaveTool(new Tool(ToolName.Text,
+                await Window.SaveTool(new Tool(ToolName.Text,
                     Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray()));
                 Close();
             }
@@ -185,8 +183,8 @@ public partial class NewTool : Window
         {
             if (TradedSecurity == null ||
                 Tools.SingleOrDefault(x => x.Name == ToolName.Text) != null && SelectedTool.Name != ToolName.Text ||
-                Tools.SingleOrDefault(x => x.MySecurity.Seccode == TradedSecurity.Seccode) != null &&
-                SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode) return;
+                Tools.SingleOrDefault(x => x.Security.Seccode == TradedSecurity.Seccode) != null &&
+                SelectedTool.Security.Seccode != TradedSecurity.Seccode) return;
 
             if (SelectedTool.Name != ToolName.Text)
             {
@@ -194,9 +192,9 @@ public partial class NewTool : Window
                 SelectedTool.Name = ToolName.Text;
                 Window.Settings.ToolsByPriority.Add(SelectedTool.Name);
             }
-            if (SelectedTool.MySecurity.Seccode != TradedSecurity.Seccode)
+            if (SelectedTool.Security.Seccode != TradedSecurity.Seccode)
             {
-                SelectedTool.MySecurity = Securities.Single(x => x == TradedSecurity);
+                SelectedTool.Security = Securities.Single(x => x == TradedSecurity);
                 foreach (Script Script in SelectedTool.Scripts)
                 {
                     Script.Orders.Clear();
@@ -218,53 +216,8 @@ public partial class NewTool : Window
                     if (SelectedTool.Scripts[i].Name != Scripts[i].Name) SelectedTool.Scripts[i] = Scripts[i];
             }
 
-            SaveTool(SelectedTool, false);
+            await Window.SaveTool(SelectedTool, false);
             Close();
         }
-    }
-
-    public async void SaveTool(Tool MyTool, bool NewTool = true)
-    {
-        int k;
-        if (NewTool)
-        {
-            Tools.Add(MyTool);
-            Window.ToolManager.CreateTab(MyTool);
-            Window.Settings.ToolsByPriority.Add(MyTool.Name);
-            Window.ToolsByPriorityView.Items.Refresh();
-            k = Tools.Count - 1;
-        }
-        else
-        {
-            MyTool.MainModel.Series.Clear();
-            MyTool.MainModel.Series.Add(new OxyPlot.Series.CandleStickSeries { });
-            MyTool.MainModel.Annotations.Clear();
-
-            k = Tools.IndexOf(MyTool);
-            Window.ToolManager.UpdateControlGrid(MyTool);
-            if (MyTool.Scripts.Length < 2)
-            {
-                ((Window.TabsTools.Items[k] as TabItem).Content as Grid)
-                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[1].Children.Clear();
-                ((Window.TabsTools.Items[k] as TabItem).Content as Grid)
-                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[2].Children.Clear();
-            }
-        }
-
-        if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)
-        {
-            await Task.Run(async () =>
-            {
-                await Window.ToolManager.RequestBarsAsync(Tools[k]);
-                await Window.TradingSystem.Connector.OrderSecurityInfoAsync(Tools[k].MySecurity);
-                await Task.Run(() =>
-                {
-                    System.Threading.Thread.Sleep(4000);
-                    Window.ToolManager.UpdateView(Tools[k], true);
-                });
-            });
-        }
-        else Window.AddInfo("SaveTool: отсутствует соединение.");
-        Window.AddInfo("Saved tool: " + Tools[k].Name);
     }
 }

@@ -91,19 +91,19 @@ public class TradingSystem
         {
             ScriptManager.BringOrdersInLine(tool);
 
-            if (tool.MySecurity.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
+            if (tool.Security.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
             {
                 tool.Active = false;
                 Window.AddInfo("PrepareForTrading: " + tool.Name + " деактивирован, потому что не пришли бары.");
             }
             else if (tool.Active)
             {
-                await Connector.SubscribeToTradesAsync(tool.MySecurity);
+                await Connector.SubscribeToTradesAsync(tool.Security);
                 if (tool.BasicSecurity != null) await Connector.SubscribeToTradesAsync(tool.BasicSecurity);
             }
 
             await ToolManager.RequestBarsAsync(tool);
-            await Connector.OrderSecurityInfoAsync(tool.MySecurity);
+            await Connector.OrderSecurityInfoAsync(tool.Security);
         }
 
         if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
@@ -199,7 +199,7 @@ public class TradingSystem
         await Connector.OrderPortfolioInfoAsync(Portfolio);
         foreach (Tool tool in Tools)
         {
-            await Connector.OrderSecurityInfoAsync(tool.MySecurity);
+            await Connector.OrderSecurityInfoAsync(tool.Security);
             if (orderBars && !tool.Active) await ToolManager.RequestBarsAsync(tool);
         }
     }

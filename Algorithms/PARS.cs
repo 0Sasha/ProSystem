@@ -1,64 +1,61 @@
 ﻿using System;
-using System.Windows.Controls;
 
 namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class PARS : Script
 {
-    private double CA = 0.02;
-    private double MCA = 0.2;
-    private int TF = 60;
+    private double coefAccel = 0.02;
+    private double maxCoef = 0.2;
+    private int tf = 60;
 
     public double CoefAccel
     {
-        get { return CA; }
-        set { CA = value; Notify(); }
+        get => coefAccel;
+        set { coefAccel = value; Notify(); }
     }
 
     public double MaxCoef
     {
-        get { return MCA; }
-        set { MCA = value; Notify(); }
+        get => maxCoef;
+        set { maxCoef = value; Notify(); }
     }
 
     public int IndicatorTF
     {
-        get { return TF; }
-        set { TF = value; Notify(); }
+        get => tf;
+        set { tf = value; Notify(); }
     }
 
-    public PARS(string name) : base(name) { }
-
-    public override ScriptProperties GetScriptProperties()
+    public PARS(string name) : base(name)
     {
-        bool IsOSC = false;
-        string[] UpperProperties = new string[] { "CoefAccel", "MaxCoef", "IndicatorTF" };
-        return new(IsOSC, UpperProperties);
+        var isOSC = false;
+        var upper = new[] { nameof(CoefAccel), nameof(MaxCoef), nameof(IndicatorTF) };
+        properties = new(isOSC, upper);
     }
 
     public override void Calculate(Security Symbol)
     {
-        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
-        double[] PARStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, Symbol.Decimals);
-        PARStop = Indicators.Synchronize(PARStop, iBars, Symbol.Bars);
+        var iBars = Symbol.Bars.Compress(IndicatorTF);
+        var parStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, Symbol.Decimals);
+        parStop = Indicators.Synchronize(parStop, iBars, Symbol.Bars);
 
-        // Вычисление индикаторов
-        double PastPARStop = 0;
-        bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
+        var pastParStop = 0D;
+        var isGrow = new bool[Symbol.Bars.Close.Length];
         for (int i = 1; i < Symbol.Bars.Close.Length; i++)
         {
-            if (Math.Abs(PastPARStop - PARStop[i - 1]) > 0.00001 || PastPARStop < 0.00001)
+            if (Math.Abs(pastParStop - parStop[i - 1]) > 0.00001 || pastParStop < 0.00001)
             {
-                if (!IsGrow[i - 1] && Symbol.Bars.High[i] - PARStop[i - 1] > 0.00001 || IsGrow[i - 1] && Symbol.Bars.Low[i] - PARStop[i - 1] < -0.00001)
+                if (!isGrow[i - 1] && Symbol.Bars.High[i] - parStop[i - 1] > 0.00001 ||
+                    isGrow[i - 1] && Symbol.Bars.Low[i] - parStop[i - 1] < -0.00001)
                 {
-                    IsGrow[i] = !IsGrow[i - 1];
-                    PastPARStop = PARStop[i - 1];
+                    isGrow[i] = !isGrow[i - 1];
+                    pastParStop = parStop[i - 1];
                 }
-                else IsGrow[i] = IsGrow[i - 1];
+                else isGrow[i] = isGrow[i - 1];
             }
-            else IsGrow[i] = IsGrow[i - 1];
+            else isGrow[i] = isGrow[i - 1];
         }
-        Result = new ScriptResult(ScriptType.StopLine, IsGrow, new double[][] { PARStop }, iBars.DateTime[^1]);
+        Result = new(ScriptType.StopLine, isGrow, new double[][] { parStop }, iBars.DateTime[^1]);
     }
 }

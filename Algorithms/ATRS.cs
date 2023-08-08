@@ -1,77 +1,77 @@
 ﻿using System;
-using System.Windows.Controls;
 
 namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class ATRS : Script
 {
-    private int Per = 10;
-    private int Mul = 0;
-    private int PerEx = 1;
-    private double Cor = 0;
-    private int TF = 60;
+    private int period = 10;
+    private int mult = 0;
+    private int periodEx = 1;
+    private double correction = 0;
+    private int tf = 60;
 
     public int Period
     {
-        get => Per;
-        set { Per = value; Notify(); }
+        get => period;
+        set { period = value; Notify(); }
     }
 
     public int Mult
     {
-        get => Mul;
-        set { Mul = value; Notify(); }
+        get => mult;
+        set { mult = value; Notify(); }
     }
 
     public int PeriodEx
     {
-        get => PerEx;
-        set { PerEx = value; Notify(); }
+        get => periodEx;
+        set { periodEx = value; Notify(); }
     }
 
     public double Correction
     {
-        get => Cor;
-        set { Cor = value; Notify(); }
+        get => correction;
+        set { correction = value; Notify(); }
     }
 
     public int IndicatorTF
     {
-        get => TF;
-        set { TF = value; Notify(); }
+        get => tf;
+        set { tf = value; Notify(); }
     }
 
-    public ATRS(string name) : base(name) { }
-
-    public override ScriptProperties GetScriptProperties()
+    public ATRS(string name) : base(name)
     {
-        bool IsOSC = false;
-        string[] UpperProperties = new string[] { "Period", "Mult", "PeriodEx", "Correction", "IndicatorTF" };
-        return new(IsOSC, UpperProperties);
+        var isOSC = false;
+        var upperProperties =
+            new[] { nameof(Period), nameof(Mult), nameof(PeriodEx), nameof(Correction), nameof(IndicatorTF) };
+        properties = new(isOSC, upperProperties);
     }
 
-    public override void Calculate(Security Symbol)
+    public override void Calculate(Security symbol)
     {
-        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
-        double[] StopATR = Indicators.ATRLine(iBars.High, iBars.Low, iBars.Close, Period, Mult, PeriodEx, Correction, Symbol.Decimals);
-        StopATR = Indicators.Synchronize(StopATR, iBars, Symbol.Bars);
+        var iBars = symbol.Bars.Compress(IndicatorTF);
+        var atr = Indicators.ATRLine(iBars.High, iBars.Low,
+            iBars.Close, Period, Mult, PeriodEx, Correction, symbol.Decimals);
+        atr = Indicators.Synchronize(atr, iBars, symbol.Bars);
 
-        double PastStopATR = 0;
-        bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
-        for (int i = 1; i < Symbol.Bars.Close.Length; i++)
+        var pastStopATR = 0D;
+        var isGrow = new bool[symbol.Bars.Close.Length];
+        for (int i = 1; i < symbol.Bars.Close.Length; i++)
         {
-            if (Math.Abs(PastStopATR - StopATR[i - 1]) > 0.00001 || PastStopATR < 0.00001)
+            if (Math.Abs(pastStopATR - atr[i - 1]) > 0.00001 || pastStopATR < 0.00001)
             {
-                if (!IsGrow[i - 1] && Symbol.Bars.High[i] - StopATR[i - 1] > 0.00001 || IsGrow[i - 1] && Symbol.Bars.Low[i] - StopATR[i - 1] < -0.00001)
+                if (!isGrow[i - 1] && symbol.Bars.High[i] - atr[i - 1] > 0.00001 ||
+                    isGrow[i - 1] && symbol.Bars.Low[i] - atr[i - 1] < -0.00001)
                 {
-                    IsGrow[i] = !IsGrow[i - 1];
-                    PastStopATR = StopATR[i - 1];
+                    isGrow[i] = !isGrow[i - 1];
+                    pastStopATR = atr[i - 1];
                 }
-                else IsGrow[i] = IsGrow[i - 1];
+                else isGrow[i] = isGrow[i - 1];
             }
-            else IsGrow[i] = IsGrow[i - 1];
+            else isGrow[i] = isGrow[i - 1];
         }
-        Result = new ScriptResult(ScriptType.StopLine, IsGrow, new double[][] { StopATR }, iBars.DateTime[^1]);
+        Result = new(ScriptType.StopLine, isGrow, new double[][] { atr }, iBars.DateTime[^1]);
     }
 }

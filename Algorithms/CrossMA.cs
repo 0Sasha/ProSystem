@@ -1,106 +1,103 @@
 ﻿using System;
-using System.Windows.Controls;
 
 namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class CrossMA : Script
 {
-    private int Per = 10;
-    private int Mul = 2;
-    private int TF = 60;
-    private bool OnlyLim = true;
-    private bool IsCrMALim = false;
-    private NameMA NaM = NameMA.SMA;
+    private int period = 10;
+    private int mult = 2;
+    private int tf = 60;
+    private bool onlyLimit = true;
+    private bool isCrossMALimit = false;
+    private NameMA nameMA = NameMA.SMA;
 
     public int Period
     {
-        get => Per;
-        set { Per = value; Notify(); }
+        get => period;
+        set { period = value; Notify(); }
     }
 
     public int Mult
     {
-        get => Mul;
-        set { Mul = value; Notify(); }
+        get => mult;
+        set { mult = value; Notify(); }
     }
 
     public int IndicatorTF
     {
-        get => TF;
-        set { TF = value; Notify(); }
+        get => tf;
+        set { tf = value; Notify(); }
     }
 
     public bool OnlyLimit
     {
-        get => OnlyLim;
-        set { OnlyLim = value; Notify(); }
+        get => onlyLimit;
+        set { onlyLimit = value; Notify(); }
     }
 
     public bool IsCrossMALim
     {
-        get => IsCrMALim;
-        set { IsCrMALim = value; Notify(); }
+        get => isCrossMALimit;
+        set { isCrossMALimit = value; Notify(); }
     }
 
     public NameMA NameMA
     {
-        get => NaM;
-        set { NaM = value; Notify(); }
+        get => nameMA;
+        set { nameMA = value; Notify(); }
     }
 
-    public CrossMA(string name) : base(name) { }
-
-    public override ScriptProperties GetScriptProperties()
+    public CrossMA(string name) : base(name)
     {
-        bool IsOSC = false;
-        string[] UpperProperties = new string[] { "Period", "Mult", "IndicatorTF" };
-        string[] MiddleProperties = new string[] { "IsCrossMALim", "OnlyLimit" };
-        NameMA[] MAObjects = new NameMA[] { NameMA.SMA, NameMA.EMA, NameMA.SMMA, NameMA.DEMA, NameMA.KAMA };
-        return new(IsOSC, UpperProperties, MiddleProperties, "NameMA", MAObjects);
+        var isOSC = false;
+        var upper = new[] { nameof(Period), nameof(Mult), nameof(IndicatorTF) };
+        var middle = new[] { nameof(IsCrossMALim), nameof(OnlyLimit) };
+        var maObjects = new[] { NameMA.SMA, NameMA.EMA, NameMA.SMMA, NameMA.DEMA, NameMA.KAMA };
+        properties = new(isOSC, upper, middle, nameof(NameMA), maObjects);
     }
 
-    public override void Calculate(Security Symbol)
+    public override void Calculate(Security symbol)
     {
-        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
-        double[] ShortMA, LongMA;
+        var iBars = symbol.Bars.Compress(IndicatorTF);
+        double[] shortMA, longMA;
         if (NameMA == NameMA.SMA)
         {
-            ShortMA = Indicators.SMA(iBars.Close, Period, Symbol.Decimals);
-            LongMA = Indicators.SMA(iBars.Close, Period * Mult, Symbol.Decimals);
+            shortMA = Indicators.SMA(iBars.Close, Period, symbol.Decimals);
+            longMA = Indicators.SMA(iBars.Close, Period * Mult, symbol.Decimals);
         }
         else if (NameMA == NameMA.EMA)
         {
-            ShortMA = Indicators.EMA(iBars.Close, Period, Symbol.Decimals);
-            LongMA = Indicators.EMA(iBars.Close, Period * Mult, Symbol.Decimals);
+            shortMA = Indicators.EMA(iBars.Close, Period, symbol.Decimals);
+            longMA = Indicators.EMA(iBars.Close, Period * Mult, symbol.Decimals);
         }
         else if (NameMA == NameMA.SMMA)
         {
-            ShortMA = Indicators.SMMA(iBars.Close, Period, Symbol.Decimals);
-            LongMA = Indicators.SMMA(iBars.Close, Period * Mult, Symbol.Decimals);
+            shortMA = Indicators.SMMA(iBars.Close, Period, symbol.Decimals);
+            longMA = Indicators.SMMA(iBars.Close, Period * Mult, symbol.Decimals);
         }
         else if (NameMA == NameMA.DEMA)
         {
-            ShortMA = Indicators.DEMA(iBars.Close, Period, Symbol.Decimals);
-            LongMA = Indicators.DEMA(iBars.Close, Period * Mult, Symbol.Decimals);
+            shortMA = Indicators.DEMA(iBars.Close, Period, symbol.Decimals);
+            longMA = Indicators.DEMA(iBars.Close, Period * Mult, symbol.Decimals);
         }
         else if (NameMA == NameMA.KAMA)
         {
-            ShortMA = Indicators.KAMA(iBars.Close, Period, Symbol.Decimals);
-            LongMA = Indicators.KAMA(iBars.Close, Period * Mult, Symbol.Decimals);
+            shortMA = Indicators.KAMA(iBars.Close, Period, symbol.Decimals);
+            longMA = Indicators.KAMA(iBars.Close, Period * Mult, symbol.Decimals);
         }
         else throw new Exception("Непредвиденный тип MA");
-        ShortMA = Indicators.Synchronize(ShortMA, iBars, Symbol.Bars);
-        LongMA = Indicators.Synchronize(LongMA, iBars, Symbol.Bars);
+        shortMA = Indicators.Synchronize(shortMA, iBars, symbol.Bars);
+        longMA = Indicators.Synchronize(longMA, iBars, symbol.Bars);
 
-        bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
-        for (int i = 1; i < Symbol.Bars.Close.Length; i++)
+        var isGrow = new bool[symbol.Bars.Close.Length];
+        for (int i = 1; i < symbol.Bars.Close.Length; i++)
         {
-            if (ShortMA[i - 1] - LongMA[i - 1] > 0.00001) IsGrow[i] = true;
-            else if (ShortMA[i - 1] - LongMA[i - 1] < -0.00001) IsGrow[i] = false;
-            else IsGrow[i] = IsGrow[i - 1];
+            if (shortMA[i - 1] - longMA[i - 1] > 0.00001) isGrow[i] = true;
+            else if (shortMA[i - 1] - longMA[i - 1] < -0.00001) isGrow[i] = false;
+            else isGrow[i] = isGrow[i - 1];
         }
-        ScriptType Type = IsCrossMALim ? ScriptType.LimitLine : ScriptType.Line;
-        Result = new ScriptResult(Type, IsGrow, new double[][] { ShortMA, LongMA }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(IsCrossMALim ? ScriptType.LimitLine : ScriptType.Line,
+            isGrow, new double[][] { shortMA, longMA }, iBars.DateTime[^1], OnlyLimit);
     }
 }

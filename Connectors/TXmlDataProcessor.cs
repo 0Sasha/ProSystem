@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -70,7 +71,7 @@ internal class TXmlDataProcessor
             trade.Seccode = xr.Value;
 
             var tool = TradingSystem.Tools
-                .Single(x => x.MySecurity.Seccode == trade.Seccode || x.BasicSecurity?.Seccode == trade.Seccode);
+                .Single(x => x.Security.Seccode == trade.Seccode || x.BasicSecurity?.Seccode == trade.Seccode);
             TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
         }
         xr.Close();
@@ -93,7 +94,7 @@ internal class TXmlDataProcessor
         else if (section == "error" && xr.Read()) AddInfo(xr.Value);
         else if (section == "messages" && xr.ReadToFollowing("text") && xr.Read())
             AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages);
-        else if (section is not "marketord" or "pits" or "boards" or "union" or "overnight" or "news_header")
+        else if (section is not "marketord" and not "pits" and not "boards" and not "union" and not "overnight" and not "news_header")
             AddInfo("ProcessData: unknown section: " + section);
     }
 
@@ -108,7 +109,7 @@ internal class TXmlDataProcessor
 
         var sec = xr.GetAttribute("seccode");
         var tool = TradingSystem.Tools.ToArray()
-            .SingleOrDefault(t => t.MySecurity.Seccode == sec || t.BasicSecurity?.Seccode == sec);
+            .SingleOrDefault(t => t.Security.Seccode == sec || t.BasicSecurity?.Seccode == sec);
         if (tool == null)
         {
             xr.Read();
@@ -118,7 +119,7 @@ internal class TXmlDataProcessor
             return;
         }
 
-        var security = tool.MySecurity.Seccode == sec ? tool.MySecurity : tool.BasicSecurity;
+        var security = tool.Security.Seccode == sec ? tool.Security : tool.BasicSecurity;
         var tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Period / 60;
         ProcessBars(xr, tool, security, tf);
     }
@@ -815,7 +816,7 @@ internal class TXmlDataProcessor
         }
         xr.Read();
 
-        var tool = TradingSystem.Tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value);
+        var tool = TradingSystem.Tools.SingleOrDefault(x => x.Security.Seccode == xr.Value);
         if (tool == null) return;
 
         var property = "";
@@ -824,11 +825,11 @@ internal class TXmlDataProcessor
             if (xr.Name.Length > 0) property = xr.Name;
             else if (xr.HasValue)
             {
-                if (property == "buy_deposit") tool.MySecurity.BuyDeposit = double.Parse(xr.Value, IC);
-                else if (property == "sell_deposit") tool.MySecurity.SellDeposit = double.Parse(xr.Value, IC);
-                else if (property == "minprice") tool.MySecurity.MinPrice = double.Parse(xr.Value, IC);
-                else if (property == "maxprice") tool.MySecurity.MaxPrice = double.Parse(xr.Value, IC);
-                else if (property == "point_cost") tool.MySecurity.PointCost = double.Parse(xr.Value, IC);
+                if (property == "buy_deposit") tool.Security.BuyDeposit = double.Parse(xr.Value, IC);
+                else if (property == "sell_deposit") tool.Security.SellDeposit = double.Parse(xr.Value, IC);
+                else if (property == "minprice") tool.Security.MinPrice = double.Parse(xr.Value, IC);
+                else if (property == "maxprice") tool.Security.MaxPrice = double.Parse(xr.Value, IC);
+                else if (property == "point_cost") tool.Security.PointCost = double.Parse(xr.Value, IC);
             }
         }
     }
@@ -842,7 +843,7 @@ internal class TXmlDataProcessor
         }
         xr.Read();
 
-        var tool = TradingSystem.Tools.SingleOrDefault(x => x.MySecurity.Seccode == xr.Value);
+        var tool = TradingSystem.Tools.SingleOrDefault(x => x.Security.Seccode == xr.Value);
         if (tool == null)
         {
             AddInfo("ProcessClientPermissions: unknown tool: " + xr.Value);
@@ -855,7 +856,7 @@ internal class TXmlDataProcessor
             return;
         }
         xr.Read();
-        tool.MySecurity.RiskrateLong = double.Parse(xr.Value, IC);
+        tool.Security.RiskrateLong = double.Parse(xr.Value, IC);
 
         if (!xr.ReadToFollowing("reserate_long"))
         {
@@ -863,7 +864,7 @@ internal class TXmlDataProcessor
             return;
         }
         xr.Read();
-        tool.MySecurity.ReserateLong = double.Parse(xr.Value, IC);
+        tool.Security.ReserateLong = double.Parse(xr.Value, IC);
 
         if (!xr.ReadToFollowing("riskrate_short"))
         {
@@ -871,7 +872,7 @@ internal class TXmlDataProcessor
             return;
         }
         xr.Read();
-        tool.MySecurity.RiskrateShort = double.Parse(xr.Value, IC);
+        tool.Security.RiskrateShort = double.Parse(xr.Value, IC);
 
         if (!xr.ReadToFollowing("reserate_short"))
         {
@@ -879,9 +880,9 @@ internal class TXmlDataProcessor
             return;
         }
         xr.Read();
-        tool.MySecurity.ReserateShort = double.Parse(xr.Value, IC);
+        tool.Security.ReserateShort = double.Parse(xr.Value, IC);
 
-        if (tool.MySecurity.Bars == null) Task.Run(tool.MySecurity.UpdateRequirements);
+        Task.Run(tool.Security.UpdateRequirements);
     }
 
 
@@ -900,6 +901,7 @@ internal class TXmlDataProcessor
             xr.Read();
             Connector.Securities.Add(new Security(xr.Value));
 
+            var name = "";
             while (xr.Read())
             {
                 if (xr.NodeType == XmlNodeType.EndElement)
@@ -909,17 +911,18 @@ internal class TXmlDataProcessor
                 }
                 if (xr.NodeType == XmlNodeType.Element)
                 {
-                    var name = xr.Name;
-                    xr.Read();
-                    if (name == "currency") Connector.Securities[^1].Currency = xr.Value;
-                    else if (name == "board") Connector.Securities[^1].Board = xr.Value;
-                    else if (name == "shortname") Connector.Securities[^1].ShortName = xr.Value;
-                    else if (name == "decimals") Connector.Securities[^1].Decimals = int.Parse(xr.Value, IC);
-                    else if (name == "market") Connector.Securities[^1].Market = xr.Value;
-                    else if (name == "minstep") Connector.Securities[^1].MinStep = double.Parse(xr.Value, IC);
-                    else if (name == "lotsize") Connector.Securities[^1].LotSize = int.Parse(xr.Value, IC);
-                    else if (name == "point_cost") Connector.Securities[^1].PointCost = double.Parse(xr.Value, IC);
+                    name = xr.Name;
+                    continue;
                 }
+
+                if (name == "currency") Connector.Securities[^1].Currency = xr.Value;
+                else if (name == "board") Connector.Securities[^1].Board = xr.Value;
+                else if (name == "shortname") Connector.Securities[^1].ShortName = xr.Value;
+                else if (name == "decimals") Connector.Securities[^1].Decimals = int.Parse(xr.Value, IC);
+                else if (name == "market") Connector.Securities[^1].Market = xr.Value;
+                else if (name == "minstep") Connector.Securities[^1].MinStep = double.Parse(xr.Value, IC);
+                else if (name == "lotsize") Connector.Securities[^1].LotSize = int.Parse(xr.Value, IC);
+                else if (name == "point_cost") Connector.Securities[^1].PointCost = double.Parse(xr.Value, IC);
             }
         }
     }

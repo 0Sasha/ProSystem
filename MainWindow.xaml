@@ -42,13 +42,13 @@
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=AverageEquity, StringFormat=N0, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="LastTrade">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MySecurity.LastTrade.Price, StringFormat=### ### ###.##}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.LastTrade.Price, StringFormat=### ### ###.##}"/>
         </DataTemplate>
         <DataTemplate x:Key="InitReqLong">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MySecurity.InitReqLong, StringFormat=N2}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.InitReqLong, StringFormat=N2}"/>
         </DataTemplate>
         <DataTemplate x:Key="InitReqShort">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MySecurity.InitReqShort, StringFormat=N2}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.InitReqShort, StringFormat=N2}"/>
         </DataTemplate>
     </Window.Resources>
     <Grid>
@@ -267,7 +267,7 @@
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="60">Name</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ShortName}" Width="90">Security</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ShortName}" Width="90">Security</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource LastTrade}" Width="70">Last trade</GridViewColumn>
                                 <GridViewColumn Width="60">State
                                     <GridViewColumn.CellTemplate>
@@ -277,22 +277,22 @@
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Scripts.Length}" Width="45">Scripts</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Bars.Close.Length}" Width="50">Bars</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Seccode}" Width="60">Seccode</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Currency}" Width="40">Cur</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.Board}" Width="45">Board</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.MinStep}" Width="50">Step</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.MinStepCost}" Width="40">Cost</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.LotSize}" Width="30">Lot</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Bars.Close.Length}" Width="50">Bars</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Seccode}" Width="60">Seccode</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Currency}" Width="40">Cur</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Board}" Width="45">Board</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MinStep}" Width="50">Step</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MinStepCost}" Width="40">Cost</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.LotSize}" Width="30">Lot</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.ShortName}" Width="100">Basic security</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Seccode}" Width="100">Basic seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Bars.Close.Length}" Width="70">Basic bars</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource InitReqLong}"  Width="100">InitReqLong</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource InitReqShort}"  Width="100">InitReqShort</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.RiskrateLong}" Width="50">RiskL</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ReserateLong}" Width="50">ResL</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.RiskrateShort}" Width="50">RiskS</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MySecurity.ReserateShort}" Width="50">ResS</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.RiskrateLong}" Width="50">RiskL</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ReserateLong}" Width="50">ResL</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.RiskrateShort}" Width="50">RiskS</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ReserateShort}" Width="50">ResS</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>

@@ -77,12 +77,12 @@ internal static class PlotExtensions
             if (filter == "All tools" ||
                 filter == "First part" && i < MyTools.Length / 2 || filter == "Second part" && i >= MyTools.Length / 2)
             {
-                Position Pos = positions.SingleOrDefault(x => x.Seccode == MyTools[i].MySecurity.Seccode);
+                Position Pos = positions.SingleOrDefault(x => x.Seccode == MyTools[i].Security.Seccode);
                 if (Pos != null && Math.Abs(Pos.Saldo) > 0.0001)
                 {
                     int shift = excludeBaseBals ? MyTools[i].BaseBalance : 0;
-                    double FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqLong :
-                        (-Pos.Saldo - shift) * MyTools[i].MySecurity.InitReqShort) / saldo * 100);
+                    double FactReq = Math.Abs((Pos.Saldo > 0 ? (Pos.Saldo - shift) * MyTools[i].Security.InitReqLong :
+                        (-Pos.Saldo - shift) * MyTools[i].Security.InitReqShort) / saldo * 100);
                     FactVol.Items.Add(new BarItem
                     {
                         Value = FactReq,
@@ -97,8 +97,8 @@ internal static class PlotExtensions
                 {
                     Value = excludeBaseBals || !MyTools[i].UseShiftBalance ?
                     MyTools[i].ShareOfFunds : (MyTools[i].BaseBalance > 0 ?
-                    MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqLong / saldo * 100) :
-                    MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].MySecurity.InitReqShort / saldo * 100))
+                    MyTools[i].ShareOfFunds + (MyTools[i].BaseBalance * MyTools[i].Security.InitReqLong / saldo * 100) :
+                    MyTools[i].ShareOfFunds + (-MyTools[i].BaseBalance * MyTools[i].Security.InitReqShort / saldo * 100))
                 });
             }
         }

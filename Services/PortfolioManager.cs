@@ -82,16 +82,16 @@ internal class PortfolioManager : IPortfolioManager
                     sumPotInitReqs += inReqs;
                 }
                 else sumPotInitReqs +=
-                        tool.NumberOfLots * Math.Max(tool.MySecurity.InitReqLong, tool.MySecurity.InitReqShort);
+                        tool.NumberOfLots * Math.Max(tool.Security.InitReqLong, tool.Security.InitReqShort);
 
                 if (tool.UseShiftBalance)
                 {
                     sumReqsBaseAssets += tool.BaseBalance *
-                        (tool.MySecurity.LastTrade.Price / tool.MySecurity.MinStep * tool.MySecurity.MinStepCost);
+                        (tool.Security.LastTrade.Price / tool.Security.MinStep * tool.Security.MinStepCost);
 
                     var inReqsBaseAssets = tool.BaseBalance > 0 ?
-                        tool.BaseBalance * tool.MySecurity.InitReqLong :
-                        -tool.BaseBalance * tool.MySecurity.InitReqShort;
+                        tool.BaseBalance * tool.Security.InitReqLong :
+                        -tool.BaseBalance * tool.Security.InitReqShort;
 
                     sumPotInitReqs += inReqsBaseAssets;
                     sumInitReqsBaseAssets += inReqsBaseAssets;
@@ -173,7 +173,7 @@ internal class PortfolioManager : IPortfolioManager
         foreach (var position in Portfolio.Positions.ToArray())
         {
             if ((int)position.Saldo != 0 && TradingSystem.Tools.ToArray()
-                .SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode) == null)
+                .SingleOrDefault(x => x.Active && x.Security.Seccode == position.Seccode) == null)
                 AddInfo("Independent position: " + position.Seccode, notify: true);
         }
     }
@@ -183,7 +183,7 @@ internal class PortfolioManager : IPortfolioManager
         foreach (var position in Portfolio.Positions.ToArray())
         {
             if ((int)position.Saldo != 0 &&
-                tools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode) == null)
+                tools.SingleOrDefault(x => x.Active && x.Security.Seccode == position.Seccode) == null)
             {
                 if (!await CancelActiveOrdersAsync(position.Seccode))
                 {
@@ -206,13 +206,13 @@ internal class PortfolioManager : IPortfolioManager
         double maxShare = Portfolio.Saldo / 100 * Settings.MaxShareInitReqsTool;
         foreach (var position in Portfolio.Positions.ToArray().Where(p => (int)p.Saldo != 0))
         {
-            var tool = tools.SingleOrDefault(x => x.Active && x.MySecurity.Seccode == position.Seccode);
+            var tool = tools.SingleOrDefault(x => x.Active && x.Security.Seccode == position.Seccode);
             if (tool == null) continue;
 
             var isLong = (int)position.Saldo > 0;
             var vol = (int)Math.Abs(position.Saldo);
-            if (isLong && vol * tool.MySecurity.InitReqLong > maxShare ||
-                !isLong && vol * tool.MySecurity.InitReqShort > maxShare)
+            if (isLong && vol * tool.Security.InitReqLong > maxShare ||
+                !isLong && vol * tool.Security.InitReqShort > maxShare)
             {
                 AddInfo("Позиция превышает MaxShareInitReqsTool: " + position.Seccode);
                 if (!await CancelActiveOrdersAsync(position.Seccode))
@@ -259,7 +259,7 @@ internal class PortfolioManager : IPortfolioManager
             if (tool != null)
             {
                 AddInfo("Отключение наименее приоритетного инструмента: " + tool.Name);
-                if (!await CancelActiveOrdersAsync(tool.MySecurity.Seccode))
+                if (!await CancelActiveOrdersAsync(tool.Security.Seccode))
                 {
                     AddInfo("Не удалось отменить заявки наименее приоритетного активного инструмента.");
                     continue;
@@ -268,7 +268,7 @@ internal class PortfolioManager : IPortfolioManager
                 var initStopTrading = tool.StopTrading;
                 tool.StopTrading = true;
                 var position = Portfolio.Positions.ToArray()
-                    .SingleOrDefault(x => x.Seccode == tool.MySecurity.Seccode);
+                    .SingleOrDefault(x => x.Seccode == tool.Security.Seccode);
                 if (position != null && (int)position.Saldo != 0)
                 {
                     if (await ClosePositionByMarketAsync(position))

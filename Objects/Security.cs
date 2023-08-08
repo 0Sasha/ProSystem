@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace ProSystem;
@@ -45,8 +46,9 @@ public class Security
         Seccode = seccode;
     }
 
-    public void UpdateRequirements()
+    public async Task UpdateRequirements()
     {
+        for (int i = 0; Bars == null && i < 15; i++) await Task.Delay(1000);
         if (Bars == null) throw new Exception("There is no bars to update requirements");
 
         LastTrade ??= new Trade()

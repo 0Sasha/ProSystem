@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 
@@ -19,7 +18,8 @@ public interface IScriptManager
 
     public Task<bool> CalculateAsync(Script script, Security security);
 
-    public Task ProcessOrdersAsync(Tool tool, Script script, int volume, bool nowBidding, double atr);
+    public Task ProcessOrdersAsync(Tool tool, Script script,
+        int volume, bool normalPrice, bool nowBidding, double atr);
 
     public bool AlignData(Tool tool, Script script);
 

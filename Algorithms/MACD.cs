@@ -1,72 +1,69 @@
 ﻿using System;
-using System.Windows.Controls;
 
 namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class MACD : Script
 {
-    private int Per = 10;
-    private int Mul = 2;
-    private int TF = 60;
-    private bool OnlyLim = true;
-    private bool IsTr = true;
+    private int period = 10;
+    private int mult = 2;
+    private int tf = 60;
+    private bool onlyLimit = true;
+    private bool isTrend = true;
 
     public int Period
     {
-        get => Per;
-        set { Per = value; Notify(); }
+        get => period;
+        set { period = value; Notify(); }
     }
 
     public int Mult
     {
-        get => Mul;
-        set { Mul = value; Notify(); }
+        get => mult;
+        set { mult = value; Notify(); }
     }
 
     public int IndicatorTF
     {
-        get => TF;
-        set { TF = value; Notify(); }
+        get => tf;
+        set { tf = value; Notify(); }
     }
 
     public bool OnlyLimit
     {
-        get => OnlyLim;
-        set { OnlyLim = value; Notify(); }
+        get => onlyLimit;
+        set { onlyLimit = value; Notify(); }
     }
 
     public bool IsTrend
     {
-        get => IsTr;
-        set { IsTr = value; Notify(); }
+        get => isTrend;
+        set { isTrend = value; Notify(); }
     }
 
-    public MACD(string name) : base(name) { }
-
-    public override ScriptProperties GetScriptProperties()
+    public MACD(string name) : base(name)
     {
-        bool IsOSC = true;
-        string[] UpperProperties = new string[] { "Period", "Mult", "IndicatorTF" };
-        string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit" };
-        return new(IsOSC, UpperProperties, MiddleProperties);
+        var isOSC = true;
+        var upper = new[] { nameof(Period), nameof(Mult), nameof(IndicatorTF) };
+        var middle = new[] { nameof(IsTrend), nameof(OnlyLimit) };
+        properties = new(isOSC, upper, middle);
     }
 
-    public override void Calculate(Security Symbol)
+    public override void Calculate(Security symbol)
     {
-        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
-        double[] MACDLine = Indicators.MACD(iBars.Close, Period, Period * Mult);
-        double[] SignalLine = Indicators.EMA(MACDLine, (int)(Period * 0.75));
-        MACDLine = Indicators.Synchronize(MACDLine, iBars, Symbol.Bars);
-        SignalLine = Indicators.Synchronize(SignalLine, iBars, Symbol.Bars);
+        var iBars = symbol.Bars.Compress(IndicatorTF);
+        var macdLine = Indicators.MACD(iBars.Close, Period, Period * Mult);
+        var signalLine = Indicators.EMA(macdLine, (int)(Period * 0.75));
+        macdLine = Indicators.Synchronize(macdLine, iBars, symbol.Bars);
+        signalLine = Indicators.Synchronize(signalLine, iBars, symbol.Bars);
 
-        bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
-        for (int i = 1; i < Symbol.Bars.Close.Length; i++)
+        var isGrow = new bool[symbol.Bars.Close.Length];
+        for (int i = 1; i < symbol.Bars.Close.Length; i++)
         {
-            if (MACDLine[i - 1] - SignalLine[i - 1] > 0.00001) IsGrow[i] = IsTrend;
-            else if (MACDLine[i - 1] - SignalLine[i - 1] < -0.00001) IsGrow[i] = !IsTrend;
-            else IsGrow[i] = IsGrow[i - 1];
+            if (macdLine[i - 1] - signalLine[i - 1] > 0.00001) isGrow[i] = IsTrend;
+            else if (macdLine[i - 1] - signalLine[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+            else isGrow[i] = isGrow[i - 1];
         }
-        Result = new ScriptResult(ScriptType.OSC, IsGrow, new double[][] { MACDLine, SignalLine }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, new double[][] { macdLine, signalLine }, iBars.DateTime[^1], OnlyLimit);
     }
 }

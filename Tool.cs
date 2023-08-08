@@ -2,7 +2,6 @@
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Media;
-using static ProSystem.MainWindow;
 using OxyPlot;
 using OxyPlot.Axes;
 
@@ -12,9 +11,10 @@ namespace ProSystem;
 public class Tool : INotifyPropertyChanged
 {
     private bool showBasicSec;
-    [NonSerialized] private PlotModel plot;
-    [NonSerialized] private PlotModel miniPlot;
-    [NonSerialized] internal int IsBusy;
+    private bool stopTrading = true;
+    private bool tradeShare = true;
+    private bool useNormalization = false;
+    private bool useShiftBalance = false;
 
     private int waitingLimit = 60;
     private double shareOfFunds = 5;
@@ -22,16 +22,13 @@ public class Tool : INotifyPropertyChanged
     private int maxNumberLots = 2;
     private int numberLots = 1;
     private int baseBalance = 0;
-    internal DateTime triggerPosition;
 
-    private bool stopTrading = true;
-    private bool tradeShare = true;
-    private bool useNormalization = false;
-    private bool useShiftBalance = false;
-
-    [field: NonSerialized] private Border borderState;
-    [field: NonSerialized] private TextBlock blockInfo;
-    [field: NonSerialized] private TextBlock mainBlockInfo;
+    [NonSerialized] private PlotModel plot;
+    [NonSerialized] private PlotModel miniPlot;
+    [NonSerialized] private Border borderState;
+    [NonSerialized] private TextBlock blockInfo;
+    [NonSerialized] private TextBlock mainBlockInfo;
+    [NonSerialized] internal int IsBusy;
 
     public string Name { get; set; }
     public bool Active { get; set; }
@@ -43,15 +40,15 @@ public class Tool : INotifyPropertyChanged
             if (value == false || BasicSecurity != null)
             {
                 showBasicSec = value;
-                Window.TradingSystem.ToolManager.UpdateView(this, true);
+                Notify(nameof(ShowBasicSecurity));
             }
-            else Window.AddInfo("У инструмента нет базисного актива.");
         }
-    } // Remove dependency
-    public int BaseTF { get; set; }
+    }
+    public int BaseTF { get; set; } = 30;
     public DateTime TimeLastRecalc { get; set; }
     public DateTime TimeNextRecalc { get; set; }
-    public Security MySecurity { get; set; }
+    public DateTime TriggerPosition { get; set; }
+    public Security Security { get; set; }
     public Security BasicSecurity { get; set; }
     public Script[] Scripts { get; set; }
     public PlotModel MainModel
@@ -112,8 +109,7 @@ public class Tool : INotifyPropertyChanged
         set
         {
             tradeShare = value;
-            Window.TradingSystem.ToolManager.UpdateControlGrid(this);
-            Notify();
+            Notify(nameof(tradeShare));
         }
     }
     public bool UseNormalization
@@ -127,8 +123,7 @@ public class Tool : INotifyPropertyChanged
         set
         {
             useShiftBalance = value;
-            Window.TradingSystem.ToolManager.UpdateControlGrid(this);
-            Notify();
+            Notify(nameof(UseShiftBalance));
         }
     }
 
@@ -148,8 +143,8 @@ public class Tool : INotifyPropertyChanged
         set { mainBlockInfo = value; Notify(); }
     }
 
-    [field: NonSerialized] public PlotController Controller { get; set; }
-    [field: NonSerialized] public Brush BrushState { get; set; }
+    [field: NonSerialized] public Brush BrushState { get; set; } = Theme.Red;
+    [field: NonSerialized] public PlotController Controller { get; set; } = PlotExtensions.GetController();
     [field: NonSerialized] public EventHandler<AxisChangedEventArgs> Handler { get; set; }
     [field: NonSerialized] public EventHandler<AxisChangedEventArgs> MiniHandler { get; set; }
 
@@ -159,15 +154,11 @@ public class Tool : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     public Tool() { }
-    public Tool(string Name, Security MySecurity, Security BasicSecurity, Script[] Scripts)
+    public Tool(string name, Security security, Security basicSecurity, Script[] scripts)
     {
-        this.Name = Name;
-        this.MySecurity = MySecurity;
-        this.BasicSecurity = BasicSecurity;
-        this.Scripts = Scripts;
-
-        BaseTF = 30;
-        Controller = PlotExtensions.GetController();
-        BrushState = Theme.Red;
+        Name = string.IsNullOrEmpty(name) ? throw new ArgumentNullException(nameof(name)) : name;
+        Security = security ?? throw new ArgumentNullException(nameof(security));
+        BasicSecurity = basicSecurity;
+        Scripts = scripts ?? throw new ArgumentNullException(nameof(scripts));
     }
 }

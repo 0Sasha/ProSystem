@@ -1,77 +1,74 @@
 ﻿using System;
-using System.Windows.Controls;
 
 namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class MA : Script
 {
-    private int Per = 20;
-    private int TF = 60;
-    private bool IsTr = true;
-    private bool OnlyLim = true;
-    private NameMA NaM = NameMA.SMA;
+    private int period = 20;
+    private int tf = 60;
+    private bool isTrend = true;
+    private bool onlyLimit = true;
+    private NameMA nameMA = NameMA.SMA;
 
     public int Period
     {
-        get => Per;
-        set { Per = value; Notify(); }
+        get => period;
+        set { period = value; Notify(); }
     }
 
     public int IndicatorTF
     {
-        get => TF;
-        set { TF = value; Notify(); }
+        get => tf;
+        set { tf = value; Notify(); }
     }
 
     public bool OnlyLimit
     {
-        get => OnlyLim;
-        set { OnlyLim = value; Notify(); }
+        get => onlyLimit;
+        set { onlyLimit = value; Notify(); }
     }
 
     public bool IsTrend
     {
-        get => IsTr;
-        set { IsTr = value; Notify(); }
+        get => isTrend;
+        set { isTrend = value; Notify(); }
     }
 
     public NameMA NameMA
     {
-        get => NaM;
-        set { NaM = value; Notify(); }
+        get => nameMA;
+        set { nameMA = value; Notify(); }
     }
 
-    public MA(string name) : base(name) { }
-
-    public override ScriptProperties GetScriptProperties()
+    public MA(string name) : base(name)
     {
-        bool IsOSC = false;
-        string[] UpperProperties = new string[] { "Period", "IndicatorTF" };
-        string[] MiddleProperties = new string[] { "IsTrend", "OnlyLimit" };
-        NameMA[] MAObjects = new NameMA[] { NameMA.SMA, NameMA.EMA, NameMA.DEMA, NameMA.KAMA, NameMA.Median };
-        return new(IsOSC, UpperProperties, MiddleProperties, "NameMA", MAObjects);
+        var isOSC = false;
+        var upper = new[] { nameof(Period), nameof(IndicatorTF) };
+        var middle = new[] { nameof(IsTrend), nameof(OnlyLimit) };
+        var maObjects = new[] { NameMA.SMA, NameMA.EMA, NameMA.DEMA, NameMA.KAMA, NameMA.Median };
+        properties = new(isOSC, upper, middle, nameof(NameMA), maObjects);
     }
 
-    public override void Calculate(Security Symbol)
+    public override void Calculate(Security symbol)
     {
-        Bars iBars = Symbol.Bars.Compress(IndicatorTF);
-        double[] MA;
-        if (NameMA == NameMA.SMA) MA = Indicators.SMA(iBars.Close, Period);
-        else if (NameMA == NameMA.EMA) MA = Indicators.EMA(iBars.Close, Period);
-        else if (NameMA == NameMA.DEMA) MA = Indicators.DEMA(iBars.Close, Period);
-        else if (NameMA == NameMA.KAMA) MA = Indicators.KAMA(iBars.Close, Period);
-        else if (NameMA == NameMA.Median) MA = Indicators.Median(iBars.Close, Period);
+        var iBars = symbol.Bars.Compress(IndicatorTF);
+        double[] ma;
+        if (NameMA == NameMA.SMA) ma = Indicators.SMA(iBars.Close, Period);
+        else if (NameMA == NameMA.EMA) ma = Indicators.EMA(iBars.Close, Period);
+        else if (NameMA == NameMA.DEMA) ma = Indicators.DEMA(iBars.Close, Period);
+        else if (NameMA == NameMA.KAMA) ma = Indicators.KAMA(iBars.Close, Period);
+        else if (NameMA == NameMA.Median) ma = Indicators.Median(iBars.Close, Period);
         else throw new Exception("Непредвиденный тип MA");
-        MA = Indicators.Synchronize(MA, iBars, Symbol.Bars);
+        ma = Indicators.Synchronize(ma, iBars, symbol.Bars);
 
-        bool[] IsGrow = new bool[Symbol.Bars.Close.Length];
-        for (int i = 2; i < Symbol.Bars.Close.Length; i++)
+        var isGrow = new bool[symbol.Bars.Close.Length];
+        for (int i = 2; i < symbol.Bars.Close.Length; i++)
         {
-            if (MA[i - 1] - MA[i - 2] > 0.00001) IsGrow[i] = IsTrend;
-            else if (MA[i - 1] - MA[i - 2] < -0.00001) IsGrow[i] = !IsTrend;
-            else IsGrow[i] = IsGrow[i - 1];
+            if (ma[i - 1] - ma[i - 2] > 0.00001) isGrow[i] = IsTrend;
+            else if (ma[i - 1] - ma[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+            else isGrow[i] = isGrow[i - 1];
         }
-        Result = new ScriptResult(ScriptType.Line, IsGrow, new double[][] { MA }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(ScriptType.Line, isGrow, new double[][] { ma }, iBars.DateTime[^1], OnlyLimit);
     }
 }

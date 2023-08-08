@@ -16,9 +16,9 @@ public interface IToolManager
 
     public Task CalculateAsync(Tool tool);
 
-    public Task RequestBarsAsync(Tool tool);
-
     public void UpdateBars(Tool tool, bool updateBasicSecurity);
+
+    public Task RequestBarsAsync(Tool tool);
 
     public Task ReloadBarsAsync(Tool tool);
 
