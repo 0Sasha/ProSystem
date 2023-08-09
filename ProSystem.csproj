@@ -65,9 +65,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NUnit" Version="3.13.3" />
     <PackageReference Include="OxyPlot.SkiaSharp.Wpf" Version="2.1.2" />
-    <PackageReference Include="OxyPlot.Wpf" Version="2.1.2" />
   </ItemGroup>
 
   <ItemGroup>

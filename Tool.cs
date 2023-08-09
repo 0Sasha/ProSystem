@@ -25,6 +25,7 @@ public class Tool : INotifyPropertyChanged
 
     [NonSerialized] private PlotModel plot;
     [NonSerialized] private PlotModel miniPlot;
+    [NonSerialized] private PlotController controller;
     [NonSerialized] private Border borderState;
     [NonSerialized] private TextBlock blockInfo;
     [NonSerialized] private TextBlock mainBlockInfo;
@@ -60,6 +61,11 @@ public class Tool : INotifyPropertyChanged
     {
         get => miniPlot;
         set { miniPlot = value; Notify(nameof(Model)); }
+    }
+    public PlotController Controller
+    {
+        get => controller;
+        set { controller = value; Notify(nameof(Controller)); }
     }
 
     public int WaitingLimit
@@ -144,7 +150,6 @@ public class Tool : INotifyPropertyChanged
     }
 
     [field: NonSerialized] public Brush BrushState { get; set; } = Theme.Red;
-    [field: NonSerialized] public PlotController Controller { get; set; } = PlotExtensions.GetController();
     [field: NonSerialized] public EventHandler<AxisChangedEventArgs> Handler { get; set; }
     [field: NonSerialized] public EventHandler<AxisChangedEventArgs> MiniHandler { get; set; }
 
@@ -160,5 +165,6 @@ public class Tool : INotifyPropertyChanged
         Security = security ?? throw new ArgumentNullException(nameof(security));
         BasicSecurity = basicSecurity;
         Scripts = scripts ?? throw new ArgumentNullException(nameof(scripts));
+        Controller = PlotExtensions.GetController();
     }
 }

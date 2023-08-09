@@ -8,9 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using HarfBuzzSharp;
 using OxyPlot;
-using OxyPlot.Annotations;
 using OxyPlot.Axes;
 using OxyPlot.Series;
 using static ProSystem.Controls;
@@ -39,7 +37,7 @@ internal class ToolManager : IToolManager
     public void Initialize(Tool tool, TabItem tabTool)
     {
         if (tool.BaseTF < 1) tool.BaseTF = 30;
-        tool.Controller = PlotExtensions.GetController();
+        tool.Controller ??= PlotExtensions.GetController();
 
         UpdateModel(tool);
         ScriptManager.InitializeScripts(tool, tabTool);
