@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -86,7 +85,7 @@ internal class TXmlDataProcessor
         else if (section == "server_status") ProcessStatus(xr);
         else if (section == "mc_portfolio") ProcessPortfolio(xr);
         else if (section == "cln_sec_permissions") ProcessPermissions(xr);
-        else if (section is "sec_info" or "sec_info_upd") ProcessSecInfo(xr);
+        else if (section == "sec_info" || section == "sec_info_upd") ProcessSecInfo(xr);
         else if (section == "securities") ProcessSecurities(xr);
         else if (section == "client") ProcessClients(xr);
         else if (section == "markets") ProcessMarkets(xr);
@@ -94,8 +93,8 @@ internal class TXmlDataProcessor
         else if (section == "error" && xr.Read()) AddInfo(xr.Value);
         else if (section == "messages" && xr.ReadToFollowing("text") && xr.Read())
             AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages);
-        else if (section is not "marketord" and not "pits" and not "boards" and not "union" and not "overnight" and not "news_header")
-            AddInfo("ProcessData: unknown section: " + section);
+        //else if (section is not "marketord" and not "pits" and not "boards" and not "union" 
+        //    and not "overnight" and not "news_header") AddInfo("ProcessData: unknown section: " + section);
     }
 
 
@@ -279,7 +278,7 @@ internal class TXmlDataProcessor
             }
 
             var order = orders.SingleOrDefault(x => x.TrID == trID); // Проверка наличия заявки с данным TrID
-            if (order == null) order = new Order(trID); // Создание новой заявки с данным TrID
+            order ??= new Order(trID); // Создание новой заявки с данным TrID
 
             // Вторичная идентификация
             if (!xr.ReadToFollowing("orderno")) 

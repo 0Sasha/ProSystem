@@ -12,7 +12,7 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual bool BackupServer { get; set; }
     public virtual bool ServerAvailable { get; set; }
     public virtual ConnectionState Connection { get; set; }
-    public virtual DateTime TriggerReconnection { get; set; } = DateTime.Now.AddMinutes(3);
+    public virtual DateTime TriggerReconnection { get; set; } = DateTime.Now.AddMinutes(5);
 
     public virtual List<Security> Securities { get; protected set; } = new();
     public virtual List<Market> Markets { get; protected set; } = new();
