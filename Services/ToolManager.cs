@@ -37,7 +37,7 @@ internal class ToolManager : IToolManager
     public void Initialize(Tool tool, TabItem tabTool)
     {
         if (tool.BaseTF < 1) tool.BaseTF = 30;
-        tool.Controller ??= PlotExtensions.GetController();
+        tool.Controller ??= Plot.GetController();
 
         UpdateModel(tool);
         ScriptManager.InitializeScripts(tool, tabTool);
@@ -203,7 +203,7 @@ internal class ToolManager : IToolManager
                     await Connector.OrderSecurityInfoAsync(security);
                     if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
                     {
-                        System.Threading.Thread.Sleep(500);
+                        Thread.Sleep(500);
                         if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
                         {
                             AddInfo("Не удалось активировать инструмент, потому что не пришли бары. Попробуйте ещё раз.");
@@ -228,41 +228,39 @@ internal class ToolManager : IToolManager
 
     public async Task CalculateAsync(Tool tool)
     {
-        // Блокировка или ожидание освобождения блокировки
         while (Interlocked.Exchange(ref tool.IsBusy, 1) != 0)
         {
-            AddInfo(tool.Name + ": Calculate: Метод используется другим потоком", false);
+            AddInfo(tool.Name + ": Calculate: method is occupied by another thread", false);
             Thread.Sleep(500);
         }
 
-        // Пересчёт или ожидание потенциальных данных с сервера
         while (DateTime.Now.AddSeconds(-3) < tool.TimeLastRecalc)
         {
-            AddInfo(tool.Name + ": Calculate: Ожидание потенциальных данных с сервера", false);
+            AddInfo(tool.Name + ": Calculate: waiting for data from server", false);
             Thread.Sleep(250);
         }
+
         try
         {
             if (await CheckTool(tool)) await Calculate(tool);
-            AddInfo("Calculate: Выполнены скрипты инструмента: " + tool.Name, false);
+            AddInfo("Calculate: scripts executed: " + tool.Name, false);
         }
         catch (Exception e)
         {
-            AddInfo(tool.Name + ": Calculate: Исключение: " + e.Message, notify: true);
-            AddInfo("Трассировка стека: " + e.StackTrace);
+            AddInfo(tool.Name + ": Calculate: " + e.Message, notify: true);
+            AddInfo("StackTrace: " + e.StackTrace);
             if (e.InnerException != null)
             {
-                AddInfo("Внутреннее исключение: " + e.InnerException.Message);
-                AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
+                AddInfo("Inner exception: " + e.InnerException.Message);
+                AddInfo("StackTrace: " + e.InnerException.StackTrace);
             }
         }
-
-        // Обновление времени последнего пересчёта и следующего
-        tool.TimeLastRecalc = DateTime.Now;
-        tool.TimeNextRecalc = DateTime.Now.AddSeconds(TradingSystem.Settings.RecalcInterval / 2);
-
-        // Освобождение блокировки
-        Interlocked.Exchange(ref tool.IsBusy, 0);
+        finally
+        {
+            tool.TimeLastRecalc = DateTime.Now;
+            tool.TimeNextRecalc = DateTime.Now.AddSeconds(TradingSystem.Settings.RecalcInterval / 2);
+            Interlocked.Exchange(ref tool.IsBusy, 0);
+        }
     }
 
     private async Task Calculate(Tool tool)
@@ -386,7 +384,7 @@ internal class ToolManager : IToolManager
         if (Connector.Connection == ConnectionState.Connected)
         {
             await RequestBarsAsync(tool);
-            await System.Threading.Tasks.Task.Delay(500);
+            await Task.Delay(500);
             if (security.Bars != null) UpdateView(tool, true);
         }
     }
@@ -409,30 +407,17 @@ internal class ToolManager : IToolManager
 
     public void UpdateView(Tool tool, bool updateScriptView)
     {
-        try
+        if (updateScriptView)
         {
-            if (updateScriptView)
+            if (tool.MainModel == null) UpdateModel(tool);
+            foreach (var script in tool.Scripts)
             {
-                if (tool.MainModel == null) UpdateModel(tool);
-                foreach (var script in tool.Scripts)
-                {
-                    script.Calculate(tool.BasicSecurity ?? tool.Security);
-                    ScriptManager.UpdateView(tool, script);
-                }
-            }
-            UpdateModel(tool);
-            if (tool.Model != null) UpdateMiniModel(tool);
-        }
-        catch (Exception ex)
-        {
-            AddInfo("UpdateView: " + tool.Name + ": Исключение: " + ex.Message);
-            AddInfo("Трассировка стека: " + ex.StackTrace);
-            if (ex.InnerException != null)
-            {
-                AddInfo("Внутреннее исключение: " + ex.InnerException.Message);
-                AddInfo("Трассировка стека внутреннего исключения: " + ex.InnerException.StackTrace);
+                script.Calculate(tool.BasicSecurity ?? tool.Security);
+                ScriptManager.UpdateView(tool, script);
             }
         }
+        UpdateModel(tool);
+        if (tool.Model != null) UpdateMiniModel(tool);
     }
 
     public void UpdateModel(Tool tool)
@@ -814,8 +799,8 @@ internal class ToolManager : IToolManager
         var security = tool.Security;
         var basicSecurity = tool.BasicSecurity;
 
-        if (DateTime.Now.Second >= 30 &&
-            (DateTime.Now.Minute == 0 || DateTime.Now.Minute == 29 || DateTime.Now.Minute == 30 || DateTime.Now.Minute == 59))
+        if (DateTime.Now.Second >= 30 && (DateTime.Now.Minute == 0 ||
+            DateTime.Now.Minute == 29 || DateTime.Now.Minute == 30 || DateTime.Now.Minute == 59))
         {
             try
             {
@@ -823,7 +808,7 @@ internal class ToolManager : IToolManager
                 if (!Directory.Exists("Logs/LogsTools")) Directory.CreateDirectory("Logs/LogsTools");
 
                 string Path = "Logs/LogsTools/" + tool.Name + ".txt";
-                if (!System.IO.File.Exists(Path)) System.IO.File.Create(Path).Close();
+                if (!File.Exists(Path)) File.Create(Path).Close();
 
                 string Data = DateTime.Now.ToString(IC) + ": /////////////////// RECOUNT SCRIPTS" +
                     "\nLastTrade " + security.LastTrade.Price.ToString(IC) +
@@ -839,7 +824,7 @@ internal class ToolManager : IToolManager
                         basicSecurity.Bars.Open[^1] + "/" + basicSecurity.Bars.High[^1] + "/" +
                         basicSecurity.Bars.Low[^1] + "/" + basicSecurity.Bars.Close[^1] + "/" + basicSecurity.Bars.Volume[^1] + "\n";
 
-                System.IO.File.AppendAllText(Path, Data);
+                File.AppendAllText(Path, Data);
                 return true;
             }
             catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования: " + e.Message); }
@@ -1324,7 +1309,7 @@ internal class ToolManager : IToolManager
     {
         try
         {
-            System.IO.File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", DateTime.Now + ": /////////////////// Risks" +
+            File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", DateTime.Now + ": /////////////////// Risks" +
                 "\nBalance " + Balance + "\nRealBalance " + RealBalance +
                 "\nUseShiftBalance " + tool.UseShiftBalance + "\nBaseBalance " + tool.BaseBalance +
                 "\nStopTrading " + StopTrading + "\nNowBidding " + NowBidding + "\nReadyToTrade " + ReadyToTrade +
@@ -1341,7 +1326,7 @@ internal class ToolManager : IToolManager
     {
         try
         {
-            System.IO.File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", DateTime.Now + ": /////////////////// NM" +
+            File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", DateTime.Now + ": /////////////////// NM" +
                 "\nBalance " + Balance + "\nUseShiftBalance " + tool.UseShiftBalance + "\nBaseBalance " + tool.BaseBalance +
                 "\nReserateLong " + tool.Security.ReserateLong + "\nReserateShort " + tool.Security.ReserateShort +
                 "\nInitReqLong " + tool.Security.InitReqLong + "\nInitReqShort " + tool.Security.InitReqShort +

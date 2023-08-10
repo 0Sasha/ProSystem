@@ -26,31 +26,10 @@ internal class PortfolioManager : IPortfolioManager
         var range = Portfolio.AverageEquity / 100 * Settings.ToleranceEquity;
         if (Portfolio.Saldo < Portfolio.AverageEquity - range || Portfolio.Saldo > Portfolio.AverageEquity + range)
         {
-            AddInfo("Стоимость портфеля за пределами допустимого отклонения.");
+            AddInfo("Стоимость портфеля за пределами допустимого отклонения.", notify: true);
             return false;
         }
         return true;
-    }
-
-    public bool CheckShares()
-    {
-        var result = true;
-        if (Portfolio.PotentialShareInitReqs > Settings.MaxShareInitReqsPortfolio)
-        {
-            AddInfo("Portfolio: Потенциальные начальные требования портфеля превышают норму: " +
-               Settings.MaxShareInitReqsPortfolio + "%. PotentialInitReqs: " +
-               Portfolio.PotentialShareInitReqs + "%");
-            result = false;
-        }
-
-        if (Portfolio.ShareBaseAssets > Settings.OptShareBaseAssets + Settings.ToleranceBaseAssets ||
-            Portfolio.ShareBaseAssets < Settings.OptShareBaseAssets - Settings.ToleranceBaseAssets)
-        {
-            AddInfo("Portfolio: Доля базовых активов за пределами допустимого отклонения: " +
-                Portfolio.ShareBaseAssets + "%");
-            result = false;
-        }
-        return result;
     }
 
     public void UpdateEquity()
@@ -67,7 +46,72 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.Notify(nameof(Portfolio.Positions));
     }
 
-    public void UpdateShares()
+    public async Task NormalizePortfolioAsync()
+    {
+        if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
+        if (!CheckEquity()) return;
+
+        if (RequirementsAreNormal())
+        {
+            CheckRequirements();
+            CheckShares();
+            CheckIndependentPositions();
+            return;
+        }
+        else
+        {
+            AddInfo("Требования портфеля выше нормы: " + Settings.MaxShareMinReqsPortfolio + "%/" +
+                Settings.MaxShareInitReqsPortfolio + "% MinReqs/InitReqs: " +
+                Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2) + "%/" +
+                Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2) + "%", notify: true);
+
+            if (Connector.Connection != ConnectionState.Connected)
+            {
+                AddInfo("Соединение отсутствует.");
+                return;
+            }
+        }
+
+        await Connector.OrderPortfolioInfoAsync(Portfolio);
+        await Task.Delay(5000);
+        if (RequirementsAreNormal()) return;
+
+        var tools = TradingSystem.Tools.ToArray();
+        await CloseIndependentPositionsAsync(tools);
+        await Connector.OrderPortfolioInfoAsync(Portfolio);
+        await Task.Delay(5000);
+        if (RequirementsAreNormal()) return;
+
+        await DeactivateLargePositionToolsAsync(tools);
+        await Connector.OrderPortfolioInfoAsync(Portfolio);
+        await Task.Delay(5000);
+        if (RequirementsAreNormal()) return;
+
+        await DeactivateLessPriorityToolsAsync(tools);
+    }
+
+
+    private bool RequirementsAreNormal()
+    {
+        double maxMinReqs = Portfolio.Saldo / 100 * Settings.MaxShareMinReqsPortfolio;
+        double maxInitReqs = Portfolio.Saldo / 100 * Settings.MaxShareInitReqsPortfolio;
+        return Portfolio.MinReqs < maxMinReqs && Portfolio.InitReqs < maxInitReqs;
+    }
+
+    private void CheckRequirements()
+    {
+        double warnMinReqs = Portfolio.Saldo / 100 * (Settings.MaxShareMinReqsPortfolio - 7);
+        double warnInitReqs = Portfolio.Saldo / 100 * (Settings.MaxShareInitReqsPortfolio - 7);
+        if (Portfolio.MinReqs > warnMinReqs || Portfolio.InitReqs > warnInitReqs)
+        {
+            AddInfo("Requirements are close to limits: " + Settings.MaxShareMinReqsPortfolio + "%/" +
+                Settings.MaxShareInitReqsPortfolio + "% MinReqs/InitReqs: " +
+                Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2) + "%/" +
+                Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2) + "%", notify: true);
+        }
+    }
+
+    private bool CheckShares()
     {
         double sumPotInitReqs = 0;
         double sumInitReqsBaseAssets = 0;
@@ -103,72 +147,26 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.ShareBaseAssets = Math.Round(sumReqsBaseAssets / Portfolio.Saldo * 100, 2);
         Portfolio.ShareInitReqsBaseAssets = Math.Round(sumInitReqsBaseAssets / Portfolio.Saldo * 100, 2);
         Portfolio.Notify("Shares");
+
+        var result = true;
+        if (Portfolio.PotentialShareInitReqs > Settings.MaxShareInitReqsPortfolio)
+        {
+            AddInfo("Portfolio: Потенциальные начальные требования портфеля превышают норму: " +
+               Settings.MaxShareInitReqsPortfolio + "%. PotentialInitReqs: " +
+               Portfolio.PotentialShareInitReqs + "%", notify: true);
+            result = false;
+        }
+        if (Portfolio.ShareBaseAssets > Settings.OptShareBaseAssets + Settings.ToleranceBaseAssets ||
+            Portfolio.ShareBaseAssets < Settings.OptShareBaseAssets - Settings.ToleranceBaseAssets)
+        {
+            AddInfo("Portfolio: Доля базовых активов за пределами допустимого отклонения: " +
+                Portfolio.ShareBaseAssets + "%", notify: true);
+            result = false;
+        }
+        return result;
     }
 
-    public async Task NormalizePortfolioAsync()
-    {
-        if (!CheckEquity()) return;
-
-        if (CheckRequirements())
-        {
-            UpdateShares();
-            CheckShares();
-            NotifyIndependentPositions();
-            return;
-        }
-        else
-        {
-            AddInfo("Требования портфеля выше нормы: " + Settings.MaxShareMinReqsPortfolio + "%/" +
-                Settings.MaxShareInitReqsPortfolio + "% MinReqs/InitReqs: " +
-                Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2) + "%/" +
-                Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2) + "%", notify: true);
-
-            if (Connector.Connection != ConnectionState.Connected)
-            {
-                AddInfo("Соединение отсутствует.");
-                return;
-            }
-        }
-
-        await Connector.OrderPortfolioInfoAsync(Portfolio);
-        Thread.Sleep(5000);
-        if (CheckRequirements()) return;
-
-        try
-        {
-            var tools = TradingSystem.Tools.ToArray();
-            await CloseIndependentPositionsAsync(tools);
-            await Connector.OrderPortfolioInfoAsync(Portfolio);
-            Thread.Sleep(5000);
-            if (CheckRequirements()) return;
-
-            await DeactivateLargePositionToolsAsync(tools);
-            await Connector.OrderPortfolioInfoAsync(Portfolio);
-            Thread.Sleep(5000);
-            if (CheckRequirements()) return;
-
-            await DeactivateLessPriorityToolsAsync(tools);
-        }
-        catch (Exception e)
-        {
-            AddInfo("CheckPortfolio исключение: " + e.Message);
-            AddInfo("Трассировка стека: " + e.StackTrace);
-            if (e.InnerException != null)
-            {
-                AddInfo("Внутреннее исключение: " + e.InnerException.Message);
-                AddInfo("Трассировка стека внутреннего исключения: " + e.InnerException.StackTrace);
-            }
-        }
-    }
-
-    private bool CheckRequirements()
-    {
-        double maxMinReqs = Portfolio.Saldo / 100 * Settings.MaxShareMinReqsPortfolio;
-        double maxInitReqs = Portfolio.Saldo / 100 * Settings.MaxShareInitReqsPortfolio;
-        return Portfolio.MinReqs < maxMinReqs && Portfolio.InitReqs < maxInitReqs;
-    }
-
-    private void NotifyIndependentPositions()
+    private void CheckIndependentPositions()
     {
         foreach (var position in Portfolio.Positions.ToArray())
         {
@@ -177,6 +175,7 @@ internal class PortfolioManager : IPortfolioManager
                 AddInfo("Independent position: " + position.Seccode, notify: true);
         }
     }
+
 
     private async Task CloseIndependentPositionsAsync(IEnumerable<Tool> tools)
     {
@@ -248,7 +247,7 @@ internal class PortfolioManager : IPortfolioManager
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
             Thread.Sleep(5000);
-            if (CheckRequirements()) return;
+            if (RequirementsAreNormal()) return;
             if (Connector.Connection != ConnectionState.Connected)
             {
                 AddInfo("Cоединение отсутствует.");

@@ -44,10 +44,10 @@ internal class ScriptManager : IScriptManager
                 if (props.IsOSC)
                 {
                     var plot = ((tabTool.Content as Grid).Children[0] as Grid).Children[0] as PlotView;
-                    if (plot.Visibility == System.Windows.Visibility.Hidden)
+                    if (plot.Visibility == Visibility.Hidden)
                     {
                         Grid.SetRow(((tabTool.Content as Grid).Children[0] as Grid).Children[1] as PlotView, 1);
-                        plot.Visibility = System.Windows.Visibility.Visible;
+                        plot.Visibility = Visibility.Visible;
                     }
                 }
                 var collection = (((tabTool.Content as Grid).Children[1] as Grid).Children[i + 1] as Grid).Children;

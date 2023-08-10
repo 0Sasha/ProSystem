@@ -10,6 +10,7 @@ namespace ProSystem;
 [Serializable]
 public class Tool : INotifyPropertyChanged
 {
+    private bool active;
     private bool showBasicSec;
     private bool stopTrading = true;
     private bool tradeShare = true;
@@ -165,6 +166,6 @@ public class Tool : INotifyPropertyChanged
         Security = security ?? throw new ArgumentNullException(nameof(security));
         BasicSecurity = basicSecurity;
         Scripts = scripts ?? throw new ArgumentNullException(nameof(scripts));
-        Controller = PlotExtensions.GetController();
+        Controller = Plot.GetController();
     }
 }

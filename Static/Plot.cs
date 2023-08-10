@@ -7,7 +7,7 @@ using OxyPlot.Series;
 
 namespace ProSystem;
 
-internal static class PlotExtensions
+internal static class Plot
 {
     public static PlotController GetController()
     {

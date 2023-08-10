@@ -166,7 +166,7 @@ public partial class NewTool : Window
             ScriptsView.Items.Refresh();
         }
     }
-    private async void SaveTool(object sender, RoutedEventArgs e)
+    private void SaveTool(object sender, RoutedEventArgs e)
     {
         if (SelectedTool == null)
         {
@@ -174,8 +174,8 @@ public partial class NewTool : Window
                 Tools.SingleOrDefault(x => x.Security.Seccode == TradedSecurity.Seccode) == null)
             {
                 BasicSecurity = BasicSecurity != null ? Securities.Single(x => x == BasicSecurity) : null;
-                await Window.SaveTool(new Tool(ToolName.Text,
-                    Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray()));
+                Task.Run(() => Window.SaveTool(new Tool(ToolName.Text,
+                    Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray())));
                 Close();
             }
         }
@@ -216,7 +216,7 @@ public partial class NewTool : Window
                     if (SelectedTool.Scripts[i].Name != Scripts[i].Name) SelectedTool.Scripts[i] = Scripts[i];
             }
 
-            await Window.SaveTool(SelectedTool, false);
+            Task.Run(() => Window.SaveTool(SelectedTool, false));
             Close();
         }
     }

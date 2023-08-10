@@ -40,7 +40,7 @@ public class TradingSystem
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
         if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, Window.AddInfo);
-        else throw new ArgumentException("Unknow connector", nameof(connectorType));
+        else throw new ArgumentException("Unknown connector", nameof(connectorType));
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         ScriptManager = new ScriptManager(Window, this, Window.AddInfo);
@@ -57,8 +57,13 @@ public class TradingSystem
 
     public void Start()
     {
-        if (File.Exists("txmlconnector64.dll")) Connector.Initialize(Settings.LogLevelConnector);
-        else Window.AddInfo("Не найден коннектор txmlconnector64.dll");
+        if (Connector.GetType() == typeof(TXmlConnector) && File.Exists("txmlconnector64.dll"))
+            Connector.Initialize(Settings.LogLevelConnector);
+        else
+        {
+            Window.AddInfo("Connector is not found");
+            return;
+        }
 
         IsWorking = true;
         stateChecker = new(CheckStateAsync) { IsBackground = true, Name = "StateChecker" };
@@ -75,22 +80,33 @@ public class TradingSystem
 
     public async Task PrepareForTrading()
     {
-        if (ReadyToTrade)
+        if (!ReadyToTrade)
+        {
+            await RequestInfoAsync(false);
+            await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
+            await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
+            await PrepareToolsAsync();
+
+            if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
+            if (Connector.Connection != ConnectionState.Connected) return;
+            ReadyToTrade = true;
+            Window.AddInfo("System is ready to trade.", false);
+        }
+        else
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
             foreach (var tool in Tools) await ToolManager.RequestBarsAsync(tool);
             Window.AddInfo("PrepareForTrading: bars updated.", false);
-            return;
         }
+    }
 
-        await RequestInfoAsync(false);
-        await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
-        await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
+    private async Task PrepareToolsAsync()
+    {
         foreach (var tool in Tools)
         {
             ScriptManager.BringOrdersInLine(tool);
 
-            if (tool.Security.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
+            if (tool.Security.Bars == null || tool.BasicSecurity?.Bars == null)
             {
                 tool.Active = false;
                 Window.AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
@@ -104,11 +120,6 @@ public class TradingSystem
             await ToolManager.RequestBarsAsync(tool);
             await Connector.OrderSecurityInfoAsync(tool.Security);
         }
-
-        if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
-        if (Connector.Connection != ConnectionState.Connected) return;
-        ReadyToTrade = true;
-        Window.AddInfo("System is ready to trade.", false);
     }
 
     private async void CheckStateAsync()
@@ -118,55 +129,44 @@ public class TradingSystem
             if (DateTime.Now > triggerCheckState)
             {
                 triggerCheckState = DateTime.Now.AddSeconds(1);
-                if (Connector.Connection == ConnectionState.Connected) await UpdateStateAsync();
-                else if (Connector.Connection == ConnectionState.Connecting) await ReconnectAsync();
-                else if (DateTime.Now > DateTime.Today.AddMinutes(400)) await ConnectAsync();
-                else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0)
+                try
                 {
-                    Connector.BackupServer = false;
-                    await Window.RelogAsync();
-                    PortfolioManager.UpdateEquity();
-                    PortfolioManager.CheckEquity();
-                    PortfolioManager.UpdatePositions();
-                    Thread.Sleep(65000);
+                    if (Connector.Connection == ConnectionState.Connected) await UpdateStateAsync();
+                    else if (Connector.Connection == ConnectionState.Connecting) await ReconnectAsync();
+                    else if (DateTime.Now > DateTime.Today.AddMinutes(400)) await ConnectAsync();
+                    else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0) await ResetAsync();
+                }
+                catch (Exception ex)
+                {
+                    Window.AddInfo("CheckState: " + ex.Message, notify: true);
+                    Window.AddInfo("StackTrace: " + ex.StackTrace, false);
                 }
             }
             else Thread.Sleep(10);
         }
     }
 
-    // TODO check catching of all exceptions
     private async Task UpdateStateAsync()
     {
-        if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio) await CheckPortfolioAsync();
-
-        if (ReadyToTrade && DateTime.Now > triggerRecalc)
+        if (ReadyToTrade)
         {
-            triggerRecalc = DateTime.Now.AddSeconds(Settings.RecalcInterval);
-            if (triggerRecalc.Second < 10) triggerRecalc = triggerRecalc.AddSeconds(10);
-            else if (triggerRecalc.Second > 55) triggerRecalc = triggerRecalc.AddSeconds(-4);
-
-            triggerUpdateModels = DateTime.Now.AddSeconds(Settings.ModelUpdateInterval);
-            foreach (Tool MyTool in Tools)
+            if (DateTime.Now > triggerCheckPortfolio)
             {
-                if (MyTool.Active)
-                {
-                    if (DateTime.Now > MyTool.TimeNextRecalc) await ToolManager.CalculateAsync(MyTool);
-                    ToolManager.UpdateView(MyTool, false);
-                }
+                triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
+                await PortfolioManager.NormalizePortfolioAsync();
             }
+            if (DateTime.Now > triggerRecalc) await RecalculateToolsAsync();
         }
         else if (DateTime.Now > triggerUpdateModels)
         {
             triggerUpdateModels = DateTime.Now.AddSeconds(Settings.ModelUpdateInterval);
-            foreach (Tool MyTool in Tools) if (MyTool.Active) ToolManager.UpdateView(MyTool, false);
+            foreach (var tool in Tools) if (tool.Active) ToolManager.UpdateView(tool, false);
         }
 
         if (DateTime.Now > triggerRequestInfo) await RequestInfoAsync();
 
-        if (Settings.ScheduledConnection &&
-            DateTime.Now.Minute == 50 && DateTime.Now < DateTime.Today.AddMinutes(400))
-            await Connector.DisconnectAsync();
+        if (Settings.ScheduledConnection && DateTime.Now.Minute == 50 &&
+            DateTime.Now < DateTime.Today.AddMinutes(400)) await Connector.DisconnectAsync();
     } 
 
     private async Task ConnectAsync()
@@ -186,10 +186,39 @@ public class TradingSystem
     {
         if (DateTime.Now > Connector.TriggerReconnection)
         {
-            Window.AddInfo("Reconnection on timeout");
             await Connector.DisconnectAsync();
             if (!Settings.ScheduledConnection) await Window.Dispatcher.Invoke(async () =>
                 await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword));
+        }
+    }
+
+    private async Task ResetAsync()
+    {
+        Connector.BackupServer = false;
+        Window.RestartLogging();
+        FileManager.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
+            DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
+        FileManager.ArchiveFiles("Data", ".xml", "Data", false);
+        PortfolioManager.UpdateEquity();
+        PortfolioManager.CheckEquity();
+        PortfolioManager.UpdatePositions();
+        await Task.Delay(65000);
+    }
+
+    private async Task RecalculateToolsAsync()
+    {
+        triggerRecalc = DateTime.Now.AddSeconds(Settings.RecalcInterval);
+        if (triggerRecalc.Second < 10) triggerRecalc = triggerRecalc.AddSeconds(10);
+        else if (triggerRecalc.Second > 55) triggerRecalc = triggerRecalc.AddSeconds(-4);
+
+        triggerUpdateModels = DateTime.Now.AddSeconds(Settings.ModelUpdateInterval);
+        foreach (var tool in Tools)
+        {
+            if (tool.Active)
+            {
+                if (DateTime.Now > tool.TimeNextRecalc) await ToolManager.CalculateAsync(tool);
+                ToolManager.UpdateView(tool, false);
+            }
         }
     }
 
@@ -197,18 +226,11 @@ public class TradingSystem
     {
         triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute).AddSeconds(-DateTime.Now.Second);
         await Connector.OrderPortfolioInfoAsync(Portfolio);
-        foreach (Tool tool in Tools)
+        foreach (var tool in Tools)
         {
             await Connector.OrderSecurityInfoAsync(tool.Security);
             if (orderBars && !tool.Active) await ToolManager.RequestBarsAsync(tool);
         }
-    }
-
-    private async Task CheckPortfolioAsync()
-    {
-        triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
-        if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-        await PortfolioManager.NormalizePortfolioAsync();
     }
 
     private void ClearObsoleteData()

@@ -32,7 +32,7 @@ public partial class MainWindow : Window
     {
         Window = this;
         InitializeComponent();
-        Logger.StartLogging(true);
+        Logger.Start(true);
 
         Serializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         RestoreInfo();
@@ -49,13 +49,10 @@ public partial class MainWindow : Window
         TradingSystem.Start();
     }
 
-    public async Task RelogAsync()
+    public void RestartLogging()
     {
-        Logger.StopLogging();
-        Logger.StartLogging();
-        await Logger.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
-            DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
-        await Logger.ArchiveFiles("Data", ".xml", "Data", false);
+        Logger.Stop();
+        Logger.Start();
     }
 
     private Settings GetSettings()
@@ -301,7 +298,13 @@ public partial class MainWindow : Window
 
     public void AddInfo(string data, bool important = true, bool notify = false)
     {
-        Logger.WriteLogSystem(data);
+        if (data == null || data == "")
+        {
+            data = "AddInfo: data was empty";
+            important = true;
+        }
+
+        Logger.WriteLog(data);
         if (important)
         {
             Window.Dispatcher.Invoke(() =>
@@ -443,7 +446,7 @@ public partial class MainWindow : Window
         }
     }
     private void UpdateToolbarContext(object sender, RoutedEventArgs e) => ToolsView.Items.Refresh();
-    private async void ReloadBarsToolContext(object sender, RoutedEventArgs e)
+    private void ReloadBarsToolContext(object sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
@@ -451,7 +454,7 @@ public partial class MainWindow : Window
             MessageBoxResult Res = MessageBox.Show("Are you sure you want to reload bars of " + Tools[i].Name + "?",
                 "Reloading bars", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (Res == MessageBoxResult.No) return;
-            await ToolManager.ReloadBarsAsync(Tools[i]);
+            Task.Run(() => ToolManager.ReloadBarsAsync(Tools[i]));
         }
     }
     private void WriteSourceBarsToolContext(object sender, RoutedEventArgs e)
@@ -668,13 +671,9 @@ public partial class MainWindow : Window
     private void UpdateTool(object sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(Tool.ShowBasicSecurity))
-        {
-            TradingSystem.ToolManager.UpdateView(sender as Tool, true);
-        }
+            Task.Run(() => TradingSystem.ToolManager.UpdateView(sender as Tool, true));
         else if (e.PropertyName is nameof(Tool.TradeShare) or nameof(Tool.UseShiftBalance))
-        {
-            TradingSystem.ToolManager.UpdateControlGrid(sender as Tool);
-        }
+            Task.Run(() => TradingSystem.ToolManager.UpdateControlGrid(sender as Tool));
     }
     private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
     {
@@ -711,7 +710,7 @@ public partial class MainWindow : Window
         }
 
         await TradingSystem.StopAsync();
-        Logger.StopLogging();
+        Logger.Stop();
     }
     internal async void ChangeActivityTool(object sender, RoutedEventArgs e)
     {
@@ -754,10 +753,10 @@ public partial class MainWindow : Window
         DistributionPlot.Model = Tools.GetPlot(Portfolio.Positions, Portfolio.Saldo,
             (string)ComboBoxDistrib.SelectedItem, (bool)OnlyPosCheckBox.IsChecked,
             (bool)ExcludeBaseCheckBox.IsChecked);
-        DistributionPlot.Controller ??= PlotExtensions.GetController();
+        DistributionPlot.Controller ??= Plot.GetController();
 
         PortfolioPlot.Model = Portfolio.GetPlot();
-        PortfolioPlot.Controller ??= PlotExtensions.GetController();
+        PortfolioPlot.Controller ??= Plot.GetController();
     }
 
     private void ResizeInfoPanel(object sender, RoutedEventArgs e)

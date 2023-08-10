@@ -5,15 +5,11 @@ namespace ProSystem.Services;
 
 public interface IPortfolioManager
 {
-    public bool CheckShares();
-
     public bool CheckEquity();
 
     public void UpdateEquity();
 
     public void UpdatePositions();
-
-    public void UpdateShares();
 
     public Task NormalizePortfolioAsync();
 }

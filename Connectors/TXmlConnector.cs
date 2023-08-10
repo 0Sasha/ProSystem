@@ -104,6 +104,8 @@ internal class TXmlConnector : Connector
     #region High level methods
     public override async Task<bool> ConnectAsync(string login, SecureString password)
     {
+        if (string.IsNullOrEmpty(login)) throw new ArgumentNullException(nameof(login));
+        if (password == null) throw new ArgumentNullException(nameof(password));
         if (!Initialized) throw new Exception("Connector is not initialized.");
 
         Securities.Clear(); Markets.Clear();
