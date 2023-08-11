@@ -34,15 +34,27 @@ internal class ToolManager : IToolManager
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
     }
 
+    public TabItem GetToolTab(Tool tool)
+    {
+        return new TabItem()
+        {
+            Header = tool.Name,
+            Width = 54,
+            Height = 24,
+            Content = GetGridToolTab(tool)
+        };
+    }
+
     public void Initialize(Tool tool, TabItem tabTool)
     {
         if (tool.BaseTF < 1) tool.BaseTF = 30;
         tool.Controller ??= Plot.GetController();
-
-        UpdateModel(tool);
+        UpdateControlGrid(tool);
         ScriptManager.InitializeScripts(tool, tabTool);
+
         if (tool.BasicSecurity == null && tool.Security.Bars != null || tool.BasicSecurity?.Bars != null)
         {
+            UpdateModel(tool);
             foreach (var script in tool.Scripts)
             {
                 script.Calculate(tool.BasicSecurity ?? tool.Security);
@@ -64,13 +76,6 @@ internal class ToolManager : IToolManager
             (tabTool.Content as Grid).Children.OfType<Grid>().Last().
                 Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
         }
-    }
-
-    public void CreateTab(Tool tool)
-    {
-        Window.TabsTools.Items.Add(GetToolTab(tool));
-        UpdateControlGrid(tool);
-        Initialize(tool, Window.TabsTools.Items[^1] as TabItem);
     }
 
     public void UpdateControlGrid(Tool tool)
@@ -237,7 +242,7 @@ internal class ToolManager : IToolManager
         while (DateTime.Now.AddSeconds(-3) < tool.TimeLastRecalc)
         {
             AddInfo(tool.Name + ": Calculate: waiting for data from server", false);
-            Thread.Sleep(250);
+            Thread.Sleep(750);
         }
 
         try
@@ -644,18 +649,7 @@ internal class ToolManager : IToolManager
         }
     }
 
-    private TabItem GetToolTab(Tool tool)
-    {
-        return new TabItem()
-        {
-            Header = tool.Name,
-            Width = 54,
-            Height = 24,
-            Content = GetGridTabTool(tool)
-        };
-    }
-
-    private Grid GetGridTabTool(Tool MyTool)
+    private Grid GetGridToolTab(Tool MyTool)
     {
         Grid GlobalGrid = new();
         GlobalGrid.ColumnDefinitions.Add(new());

@@ -24,7 +24,7 @@ internal class TXmlDataProcessor
     private readonly StringComparison SC = StringComparison.Ordinal;
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    private static bool Scheduled { get => DateTime.Now.TimeOfDay.TotalMinutes is 50 or 400; }
+    private static bool Scheduled { get => (int)DateTime.Now.TimeOfDay.TotalMinutes is 50 or 400; }
 
     public TXmlDataProcessor(TXmlConnector connector, TradingSystem tradingSystem, AddInformation addInfo)
     {

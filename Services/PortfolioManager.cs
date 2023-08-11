@@ -21,6 +21,7 @@ internal class PortfolioManager : IPortfolioManager
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
     }
 
+
     public bool CheckEquity()
     {
         var range = Portfolio.AverageEquity / 100 * Settings.ToleranceEquity;
@@ -291,6 +292,7 @@ internal class PortfolioManager : IPortfolioManager
             }
         }
     }
+
 
     private async Task<bool> ClosePositionByMarketAsync(Position position)
     {

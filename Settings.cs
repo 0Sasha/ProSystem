@@ -217,7 +217,7 @@ public class Settings : INotifyPropertyChanged
                 if (MaxShInRePort is < 10 or > 200) MaxShInRePort = 85;
             }
             else MaxShInRePort = value;
-            if (MaxShInRePort > 90) Window.AddInfo("MaxShareInitReqsPortfolio более 90%.");
+            if (MaxShInRePort > 95) Window.AddInfo("MaxShareInitReqsPortfolio более 95%.");
             Notify();
         }
     } // Максимальная доля начальных требований портфеля

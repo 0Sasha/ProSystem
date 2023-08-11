@@ -174,9 +174,10 @@ public partial class NewTool : Window
                 Tools.SingleOrDefault(x => x.Security.Seccode == TradedSecurity.Seccode) == null)
             {
                 BasicSecurity = BasicSecurity != null ? Securities.Single(x => x == BasicSecurity) : null;
-                Task.Run(() => Window.SaveTool(new Tool(ToolName.Text,
-                    Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray())));
+                var name = ToolName.Text;
                 Close();
+                Window.Dispatcher.Invoke(() => Window.SaveTool(new Tool(name,
+                    Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray())));
             }
         }
         else
@@ -216,8 +217,8 @@ public partial class NewTool : Window
                     if (SelectedTool.Scripts[i].Name != Scripts[i].Name) SelectedTool.Scripts[i] = Scripts[i];
             }
 
-            Task.Run(() => Window.SaveTool(SelectedTool, false));
             Close();
+            Window.Dispatcher.Invoke(() => Window.SaveTool(SelectedTool, false));
         }
     }
 }

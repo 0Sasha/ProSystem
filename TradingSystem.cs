@@ -75,14 +75,14 @@ public class TradingSystem
         IsWorking = false;
         Thread.Sleep(50);
         if (Connector.Connection != ConnectionState.Disconnected) await Connector.DisconnectAsync();
-        if (!Connector.Initialized) Connector.Uninitialize();
+        if (Connector.Initialized) Connector.Uninitialize();
     }
 
     public async Task PrepareForTrading()
     {
         if (!ReadyToTrade)
         {
-            await RequestInfoAsync(false);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
             await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
             await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
             await PrepareToolsAsync();
@@ -104,21 +104,25 @@ public class TradingSystem
     {
         foreach (var tool in Tools)
         {
+            if (Connector.Connection != ConnectionState.Connected) return;
             ScriptManager.BringOrdersInLine(tool);
 
-            if (tool.Security.Bars == null || tool.BasicSecurity?.Bars == null)
+            if (tool.Active)
             {
-                tool.Active = false;
-                Window.AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
-            }
-            else if (tool.Active)
-            {
-                await Connector.SubscribeToTradesAsync(tool.Security);
-                if (tool.BasicSecurity != null) await Connector.SubscribeToTradesAsync(tool.BasicSecurity);
+                if (tool.Security.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
+                {
+                    await ToolManager.ChangeActivityAsync(tool);
+                    Window.AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
+                }
+                else
+                {
+                    await Connector.SubscribeToTradesAsync(tool.Security);
+                    if (tool.BasicSecurity != null) await Connector.SubscribeToTradesAsync(tool.BasicSecurity);
+                }
             }
 
-            await ToolManager.RequestBarsAsync(tool);
             await Connector.OrderSecurityInfoAsync(tool.Security);
+            await ToolManager.RequestBarsAsync(tool);
         }
     }
 
@@ -148,15 +152,13 @@ public class TradingSystem
 
     private async Task UpdateStateAsync()
     {
-        if (ReadyToTrade)
+        if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio)
         {
-            if (DateTime.Now > triggerCheckPortfolio)
-            {
-                triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
-                await PortfolioManager.NormalizePortfolioAsync();
-            }
-            if (DateTime.Now > triggerRecalc) await RecalculateToolsAsync();
+            triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
+            await PortfolioManager.NormalizePortfolioAsync();
         }
+
+        if (ReadyToTrade && DateTime.Now > triggerRecalc) await RecalculateToolsAsync();
         else if (DateTime.Now > triggerUpdateModels)
         {
             triggerUpdateModels = DateTime.Now.AddSeconds(Settings.ModelUpdateInterval);
@@ -222,24 +224,17 @@ public class TradingSystem
         }
     }
 
-    private async Task RequestInfoAsync(bool orderBars = true)
+    private async Task RequestInfoAsync()
     {
         triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute).AddSeconds(-DateTime.Now.Second);
         await Connector.OrderPortfolioInfoAsync(Portfolio);
-        foreach (var tool in Tools)
-        {
-            await Connector.OrderSecurityInfoAsync(tool.Security);
-            if (orderBars && !tool.Active) await ToolManager.RequestBarsAsync(tool);
-        }
+        foreach (var tool in Tools) await Connector.OrderSecurityInfoAsync(tool.Security);
     }
 
     private void ClearObsoleteData()
     {
-        var obsolete = Trades.Where(x => x.DateTime.Date < DateTime.Today.AddDays(-Settings.ShelfLifeTrades));
-        Window.Dispatcher.Invoke(() =>
-        {
-            foreach (var trade in obsolete) Trades.Remove(trade);
-        });
+        var old = Trades.ToArray().Where(x => x.DateTime.Date < DateTime.Today.AddDays(-Settings.ShelfLifeTrades));
+        Window.Dispatcher.Invoke(() => { foreach (var trade in old) Trades.Remove(trade); });
         foreach (var tool in Tools) ScriptManager.ClearObsoleteData(tool);
         Window.AddInfo("ClearObsoleteData: data is cleared", false);
     }

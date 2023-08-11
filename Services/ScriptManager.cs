@@ -151,9 +151,9 @@ internal class ScriptManager : IScriptManager
 
         foreach (var script in tool.Scripts)
         {
-            var obsoleteOrders = script.Orders.Where(x => 
+            var obsoleteOrders = script.Orders.ToArray().Where(x => 
                 x.DateTime.Date < DateTime.Today.AddDays(-TradingSystem.Settings.ShelfLifeOrdersScripts));
-            var obsoleteTrades = script.Trades.Where(x => 
+            var obsoleteTrades = script.Trades.ToArray().Where(x => 
                 x.DateTime.Date < DateTime.Today.AddDays(-TradingSystem.Settings.ShelfLifeTradesScripts));
             Window.Dispatcher.Invoke(() =>
             {

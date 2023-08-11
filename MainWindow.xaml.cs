@@ -44,7 +44,7 @@ public partial class MainWindow : Window
             "smtp.gmail.com", Settings.Email, Settings.EmailPassword, (info) => AddInfo(info));
 
         BindData();
-        RestoreToolTabs();
+        RestoreToolTabsAndInitialize();
 
         TradingSystem.Start();
     }
@@ -281,7 +281,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private void RestoreToolTabs()
+    private void RestoreToolTabsAndInitialize()
     {
         for (int i = 0; i < Tools.Count; i++)
         {
@@ -292,7 +292,9 @@ public partial class MainWindow : Window
                 Tools[i] = Tools[x];
                 Tools[x] = initTool;
             }
-            ToolManager.CreateTab(Tools[i]);
+            var tab = ToolManager.GetToolTab(Tools[i]);
+            TabsTools.Items.Add(tab);
+            ToolManager.Initialize(Tools[i], tab);
         }
     }
 
@@ -321,7 +323,9 @@ public partial class MainWindow : Window
         if (newTool)
         {
             Tools.Add(tool);
-            TradingSystem.ToolManager.CreateTab(tool);
+            var tab = ToolManager.GetToolTab(tool);
+            TabsTools.Items.Add(tab);
+            ToolManager.Initialize(tool, tab);
             TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
             ToolsByPriorityView.Items.Refresh();
             tool.PropertyChanged += UpdateTool;
@@ -332,15 +336,16 @@ public partial class MainWindow : Window
             tool.MainModel.Series.Add(new OxyPlot.Series.CandleStickSeries { });
             tool.MainModel.Annotations.Clear();
 
-            int i = Tools.IndexOf(tool);
             TradingSystem.ToolManager.UpdateControlGrid(tool);
+            var tab = TabsTools.Items[Tools.IndexOf(tool)] as TabItem;
             if (tool.Scripts.Length < 2)
             {
-                ((TabsTools.Items[i] as TabItem).Content as Grid)
-                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[1].Children.Clear();
-                ((TabsTools.Items[i] as TabItem).Content as Grid)
-                    .Children.OfType<Grid>().Last().Children.OfType<Grid>().ToList()[2].Children.Clear();
+                (tab.Content as Grid).Children.OfType<Grid>().Last()
+                    .Children.OfType<Grid>().ToList()[1].Children.Clear();
+                (tab.Content as Grid).Children.OfType<Grid>().Last()
+                    .Children.OfType<Grid>().ToList()[2].Children.Clear();
             }
+            TradingSystem.ScriptManager.InitializeScripts(tool, tab);
         }
 
         if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)

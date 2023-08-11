@@ -6,9 +6,9 @@ namespace ProSystem.Services;
 
 public interface IToolManager
 {
-    public void Initialize(Tool tool, TabItem tabTool);
+    public TabItem GetToolTab(Tool tool);
 
-    public void CreateTab(Tool tool);
+    public void Initialize(Tool tool, TabItem tabTool);
 
     public void UpdateControlGrid(Tool tool);
 

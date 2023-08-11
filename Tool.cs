@@ -10,7 +10,6 @@ namespace ProSystem;
 [Serializable]
 public class Tool : INotifyPropertyChanged
 {
-    private bool active;
     private bool showBasicSec;
     private bool stopTrading = true;
     private bool tradeShare = true;
@@ -56,48 +55,48 @@ public class Tool : INotifyPropertyChanged
     public PlotModel MainModel
     {
         get => plot;
-        set { plot = value; Notify(nameof(MainModel)); }
+        set { plot = value; Notify(); }
     }
     public PlotModel Model
     {
         get => miniPlot;
-        set { miniPlot = value; Notify(nameof(Model)); }
+        set { miniPlot = value; Notify(); }
     }
     public PlotController Controller
     {
         get => controller;
-        set { controller = value; Notify(nameof(Controller)); }
+        set { controller = value; Notify(); }
     }
 
     public int WaitingLimit
     {
         get => waitingLimit;
-        set { waitingLimit = value; Notify(nameof(WaitingLimit)); }
+        set { waitingLimit = value; Notify(); }
     }
     public double ShareOfFunds
     {
         get => shareOfFunds;
-        set { shareOfFunds = value > 15 ? 5 : value; Notify(nameof(ShareOfFunds)); }
+        set { shareOfFunds = value > 15 ? 5 : value; Notify(); }
     }
     public int MinNumberOfLots
     {
         get => minNumberLots;
-        set { minNumberLots = value; Notify(nameof(MinNumberOfLots)); }
+        set { minNumberLots = value; Notify(); }
     }
     public int MaxNumberOfLots
     {
         get => maxNumberLots;
-        set { maxNumberLots = value; Notify(nameof(MaxNumberOfLots)); }
+        set { maxNumberLots = value; Notify(); }
     }
     public int NumberOfLots
     {
         get => numberLots;
-        set { numberLots = value; Notify(nameof(NumberOfLots)); }
+        set { numberLots = value; Notify(); }
     }
     public int BaseBalance
     {
         get => baseBalance;
-        set { baseBalance = value; Notify(nameof(BaseBalance)); }
+        set { baseBalance = value; Notify(); }
     }
 
     public bool StopTrading
@@ -107,7 +106,7 @@ public class Tool : INotifyPropertyChanged
         {
             stopTrading = value;
             if (Active) BrushState = stopTrading ? Theme.Orange : Theme.Green;
-            Notify(nameof(StopTrading));
+            Notify();
         }
     }
     public bool TradeShare
@@ -122,7 +121,7 @@ public class Tool : INotifyPropertyChanged
     public bool UseNormalization
     {
         get => useNormalization;
-        set { useNormalization = value; Notify(nameof(UseNormalization)); }
+        set { useNormalization = value; Notify(); }
     }
     public bool UseShiftBalance
     {
@@ -130,24 +129,24 @@ public class Tool : INotifyPropertyChanged
         set
         {
             useShiftBalance = value;
-            Notify(nameof(UseShiftBalance));
+            Notify();
         }
     }
 
     public Border BorderState
     {
         get => borderState;
-        set { borderState = value; Notify(nameof(BorderState)); }
+        set { borderState = value; Notify(); }
     }
     public TextBlock BlockInfo
     {
         get => blockInfo;
-        set { blockInfo = value; Notify(nameof(BlockInfo)); }
+        set { blockInfo = value; Notify(); }
     }
     public TextBlock MainBlockInfo
     {
         get => mainBlockInfo;
-        set { mainBlockInfo = value; Notify(nameof(MainBlockInfo)); }
+        set { mainBlockInfo = value; Notify(); }
     }
 
     [field: NonSerialized] public Brush BrushState { get; set; } = Theme.Red;
