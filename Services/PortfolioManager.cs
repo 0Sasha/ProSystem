@@ -12,7 +12,9 @@ internal class PortfolioManager : IPortfolioManager
     private readonly TradingSystem TradingSystem;
 
     private Settings Settings { get => TradingSystem.Settings; }
+
     private Connector Connector { get => TradingSystem.Connector; }
+
     private UnitedPortfolio Portfolio { get => TradingSystem.Portfolio; }
 
     public PortfolioManager(TradingSystem tradingSystem, AddInformation addInfo)
@@ -27,7 +29,7 @@ internal class PortfolioManager : IPortfolioManager
         var range = Portfolio.AverageEquity / 100 * Settings.ToleranceEquity;
         if (Portfolio.Saldo < Portfolio.AverageEquity - range || Portfolio.Saldo > Portfolio.AverageEquity + range)
         {
-            AddInfo("Стоимость портфеля за пределами допустимого отклонения.", notify: true);
+            AddInfo("Portfolio saldo is out of scope", notify: true);
             return false;
         }
         return true;
@@ -36,7 +38,7 @@ internal class PortfolioManager : IPortfolioManager
     public void UpdateEquity()
     {
         Portfolio.Equity[DateTime.Today.AddDays(-1)] = (int)Portfolio.Saldo;
-        Portfolio.Notify(nameof(Portfolio.Equity));
+        Portfolio.NotifyChange(nameof(Portfolio.Equity));
     }
 
     public void UpdatePositions()
@@ -44,51 +46,28 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.Positions.RemoveAll(x => x.Saldo == 0);
         Portfolio.AllPositions =
             new(Portfolio.MoneyPositions.Concat(Portfolio.Positions.OrderBy(x => x.ShortName))) { Portfolio };
-        Portfolio.Notify(nameof(Portfolio.Positions));
+        Portfolio.NotifyChange(nameof(Portfolio.Positions));
     }
 
-    public async Task NormalizePortfolioAsync()
+    public async Task CheckPortfolioAsync()
     {
-        if (DateTime.Now > DateTime.Today.AddMinutes(840) && DateTime.Now < DateTime.Today.AddMinutes(845)) return;
-        if (!CheckEquity()) return;
+        if (DateTime.Now > DateTime.Today.AddMinutes(840) &&
+            DateTime.Now < DateTime.Today.AddMinutes(845) || !CheckEquity()) return;
 
         if (RequirementsAreNormal())
         {
             CheckRequirements();
             CheckShares();
             CheckIndependentPositions();
-            return;
         }
         else
         {
-            AddInfo("Требования портфеля выше нормы: " + Settings.MaxShareMinReqsPortfolio + "%/" +
+            AddInfo("Requirements are above the norm: " + Settings.MaxShareMinReqsPortfolio + "%/" +
                 Settings.MaxShareInitReqsPortfolio + "% MinReqs/InitReqs: " +
                 Math.Round(Portfolio.MinReqs / Portfolio.Saldo * 100, 2) + "%/" +
                 Math.Round(Portfolio.InitReqs / Portfolio.Saldo * 100, 2) + "%", notify: true);
-
-            if (Connector.Connection != ConnectionState.Connected)
-            {
-                AddInfo("Соединение отсутствует.");
-                return;
-            }
+            await NormalizePortfolioAsync();
         }
-
-        await Connector.OrderPortfolioInfoAsync(Portfolio);
-        await Task.Delay(5000);
-        if (RequirementsAreNormal()) return;
-
-        var tools = TradingSystem.Tools.ToArray();
-        await CloseIndependentPositionsAsync(tools);
-        await Connector.OrderPortfolioInfoAsync(Portfolio);
-        await Task.Delay(5000);
-        if (RequirementsAreNormal()) return;
-
-        await DeactivateLargePositionToolsAsync(tools);
-        await Connector.OrderPortfolioInfoAsync(Portfolio);
-        await Task.Delay(5000);
-        if (RequirementsAreNormal()) return;
-
-        await DeactivateLessPriorityToolsAsync(tools);
     }
 
 
@@ -101,9 +80,9 @@ internal class PortfolioManager : IPortfolioManager
 
     private void CheckRequirements()
     {
-        double warnMinReqs = Portfolio.Saldo / 100 * (Settings.MaxShareMinReqsPortfolio - 7);
-        double warnInitReqs = Portfolio.Saldo / 100 * (Settings.MaxShareInitReqsPortfolio - 7);
-        if (Portfolio.MinReqs > warnMinReqs || Portfolio.InitReqs > warnInitReqs)
+        double closeMinReqs = Portfolio.Saldo / 100 * (Settings.MaxShareMinReqsPortfolio - 7);
+        double closeInitReqs = Portfolio.Saldo / 100 * (Settings.MaxShareInitReqsPortfolio - 7);
+        if (Portfolio.MinReqs > closeMinReqs || Portfolio.InitReqs > closeInitReqs)
         {
             AddInfo("Requirements are close to limits: " + Settings.MaxShareMinReqsPortfolio + "%/" +
                 Settings.MaxShareInitReqsPortfolio + "% MinReqs/InitReqs: " +
@@ -112,7 +91,7 @@ internal class PortfolioManager : IPortfolioManager
         }
     }
 
-    private bool CheckShares()
+    private void CheckShares()
     {
         double sumPotInitReqs = 0;
         double sumInitReqsBaseAssets = 0;
@@ -147,24 +126,19 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.PotentialShareInitReqs = Math.Round(sumPotInitReqs / Portfolio.Saldo * 100, 2);
         Portfolio.ShareBaseAssets = Math.Round(sumReqsBaseAssets / Portfolio.Saldo * 100, 2);
         Portfolio.ShareInitReqsBaseAssets = Math.Round(sumInitReqsBaseAssets / Portfolio.Saldo * 100, 2);
-        Portfolio.Notify("Shares");
+        Portfolio.NotifyChange("Shares");
 
-        var result = true;
         if (Portfolio.PotentialShareInitReqs > Settings.MaxShareInitReqsPortfolio)
         {
-            AddInfo("Portfolio: Потенциальные начальные требования портфеля превышают норму: " +
+            AddInfo("Potential share of InitReqs are above the norm: " +
                Settings.MaxShareInitReqsPortfolio + "%. PotentialInitReqs: " +
                Portfolio.PotentialShareInitReqs + "%", notify: true);
-            result = false;
         }
         if (Portfolio.ShareBaseAssets > Settings.OptShareBaseAssets + Settings.ToleranceBaseAssets ||
             Portfolio.ShareBaseAssets < Settings.OptShareBaseAssets - Settings.ToleranceBaseAssets)
         {
-            AddInfo("Portfolio: Доля базовых активов за пределами допустимого отклонения: " +
-                Portfolio.ShareBaseAssets + "%", notify: true);
-            result = false;
+            AddInfo("Share of base assets is out of scope: " + Portfolio.ShareBaseAssets + "%", notify: true);
         }
-        return result;
     }
 
     private void CheckIndependentPositions()
@@ -177,6 +151,30 @@ internal class PortfolioManager : IPortfolioManager
         }
     }
 
+    private async Task NormalizePortfolioAsync()
+    {
+        if (Connector.Connection == ConnectionState.Connected)
+        {
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
+            await Task.Delay(5000);
+            if (RequirementsAreNormal()) return;
+
+            var tools = TradingSystem.Tools.ToArray();
+            await CloseIndependentPositionsAsync(tools);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
+            await Task.Delay(5000);
+            if (RequirementsAreNormal()) return;
+
+            await DeactivateLargePositionToolsAsync(tools);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
+            await Task.Delay(5000);
+            if (RequirementsAreNormal()) return;
+
+            await DeactivateLessPriorityToolsAsync(tools);
+        }
+        else AddInfo("NormalizePortfolio: there is no connection");
+    }
+
 
     private async Task CloseIndependentPositionsAsync(IEnumerable<Tool> tools)
     {
@@ -185,18 +183,16 @@ internal class PortfolioManager : IPortfolioManager
             if ((int)position.Saldo != 0 &&
                 tools.SingleOrDefault(x => x.Active && x.Security.Seccode == position.Seccode) == null)
             {
-                if (!await CancelActiveOrdersAsync(position.Seccode))
+                if (await CancelActiveOrdersAsync(position.Seccode))
                 {
-                    AddInfo("Не удалось отменить заявки перед закрытием позиции: " + position.Seccode);
-                    continue;
+                    if (await ClosePositionByMarketAsync(position))
+                    {
+                        await CancelActiveOrdersAsync(position.Seccode);
+                        AddInfo("Unknown position is closed: " + position.Seccode);
+                    }
+                    else AddInfo("Failed to close the unknown position: " + position.Seccode);
                 }
-
-                if (await ClosePositionByMarketAsync(position))
-                {
-                    await CancelActiveOrdersAsync(position.Seccode);
-                    AddInfo("Закрыта неизвестная позиция: " + position.Seccode);
-                }
-                else AddInfo("Не удалось закрыть неизвестную позицию: " + position.Seccode);
+                else AddInfo("Failed to cancel orders before closing the position: " + position.Seccode);
             }
         }
     }
@@ -214,29 +210,27 @@ internal class PortfolioManager : IPortfolioManager
             if (isLong && vol * tool.Security.InitReqLong > maxShare ||
                 !isLong && vol * tool.Security.InitReqShort > maxShare)
             {
-                AddInfo("Позиция превышает MaxShareInitReqsTool: " + position.Seccode);
-                if (!await CancelActiveOrdersAsync(position.Seccode))
-                {
-                    AddInfo("Не удалось отменить заявки перед закрытием позиции.");
-                    continue;
-                }
-
+                AddInfo("Position is large. It is above MaxShareInitReqsTool: " + position.Seccode);
                 bool initStopTrading = tool.StopTrading;
                 tool.StopTrading = true;
-                if (await ClosePositionByMarketAsync(position))
+                if (await CancelActiveOrdersAsync(position.Seccode))
                 {
-                    if (!await CancelActiveOrdersAsync(position.Seccode))
+                    if (await ClosePositionByMarketAsync(position))
                     {
-                        AddInfo("Позиция закрыта, но не удалось отменить заявки. Инструмент не отключен.");
-                        continue;
+                        await CancelActiveOrdersAsync(position.Seccode);
+                        if (tool.Active) await TradingSystem.ToolManager.ChangeActivityAsync(tool);
+                        AddInfo("Position is closed. Tool is deactivated: " + tool.Name);
                     }
-                    if (tool.Active) await TradingSystem.ToolManager.ChangeActivityAsync(tool);
-                    AddInfo("Позиция закрыта. Инструмент отключен: " + tool.Name);
+                    else
+                    {
+                        tool.StopTrading = initStopTrading;
+                        AddInfo("Failed to close position. Tool is not deactivated.");
+                    }
                 }
                 else
                 {
                     tool.StopTrading = initStopTrading;
-                    AddInfo("Не удалось закрыть позицию по рынку.");
+                    AddInfo("Failed to cancel orders before closing the large position. Tool is not deactivated.");
                 }
             }
         }
@@ -244,51 +238,46 @@ internal class PortfolioManager : IPortfolioManager
 
     private async Task DeactivateLessPriorityToolsAsync(IEnumerable<Tool> tools)
     {
-        for (int i = Settings.ToolsByPriority.Count - 1; i > 0; i--)
+        for (int i = Settings.ToolsByPriority.Count - 1; i >= 0; i--)
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
             Thread.Sleep(5000);
             if (RequirementsAreNormal()) return;
             if (Connector.Connection != ConnectionState.Connected)
             {
-                AddInfo("Cоединение отсутствует.");
+                AddInfo("DeactivateLessPriorityTools: there is no connection.");
                 return;
             }
 
             var tool = tools.SingleOrDefault(x => x.Active && x.Name == Settings.ToolsByPriority[i]);
             if (tool != null)
             {
-                AddInfo("Отключение наименее приоритетного инструмента: " + tool.Name);
-                if (!await CancelActiveOrdersAsync(tool.Security.Seccode))
-                {
-                    AddInfo("Не удалось отменить заявки наименее приоритетного активного инструмента.");
-                    continue;
-                }
-
-                var initStopTrading = tool.StopTrading;
+                AddInfo("Disabling the least priority tool: " + tool.Name);
+                bool initStopTrading = tool.StopTrading;
                 tool.StopTrading = true;
-                var position = Portfolio.Positions.ToArray()
-                    .SingleOrDefault(x => x.Seccode == tool.Security.Seccode);
-                if (position != null && (int)position.Saldo != 0)
+                if (await CancelActiveOrdersAsync(tool.Security.Seccode))
                 {
-                    if (await ClosePositionByMarketAsync(position))
+                    var position = Portfolio.Positions.ToArray()
+                        .SingleOrDefault(x => x.Seccode == tool.Security.Seccode);
+                    if (position != null && (int)position.Saldo != 0)
                     {
-                        if (!await CancelActiveOrdersAsync(position.Seccode))
+                        if (!await ClosePositionByMarketAsync(position))
                         {
-                            AddInfo("Позиция закрыта, но не удалось отменить заявки. Инструмент активен.");
+                            tool.StopTrading = initStopTrading;
+                            AddInfo("Failed to close the position of the least priority tool. The tool is active.");
                             continue;
                         }
                     }
-                    else
-                    {
-                        AddInfo("Не удалось закрыть позицию инструмента. Инструмент активен.");
-                        tool.StopTrading = initStopTrading;
-                        continue;
-                    }
-                }
 
-                if (tool.Active) await TradingSystem.ToolManager.ChangeActivityAsync(tool);
-                AddInfo("Наименее приоритетный инструмент отключен: " + tool.Name);
+                    await CancelActiveOrdersAsync(tool.Security.Seccode);
+                    if (tool.Active) await TradingSystem.ToolManager.ChangeActivityAsync(tool);
+                    AddInfo("The least priority tool is deactivated: " + tool.Name);
+                }
+                else
+                {
+                    tool.StopTrading = initStopTrading;
+                    AddInfo("Failed to cancel orders of the least priority tool.");
+                }
             }
         }
     }
@@ -298,14 +287,14 @@ internal class PortfolioManager : IPortfolioManager
     {
         var symbol = Connector.Securities.Single(x => x.Seccode == position.Seccode && x.Market == position.Market);
         if (await Connector.SendOrderAsync(symbol, OrderType.Market,
-            (int)position.Saldo < 0, 100, (int)Math.Abs(position.Saldo), "ClosingPositionByMarket"))
+            (int)position.Saldo < 0, 100, (int)Math.Abs(position.Saldo), "ClosePositionByMarket"))
         {
             for (int i = 0; i < 10; i++)
             {
-                Thread.Sleep(500);
                 if ((int)position.Saldo == 0) return true;
+                Thread.Sleep(500);
             }
-            AddInfo("Заявка отправлена, но позиция всё ещё не закрыта: " + symbol.Seccode);
+            AddInfo("Order is sent, but position is not closed yet: " + symbol.Seccode);
         }
         return false;
     }

@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 
 namespace ProSystem;
 
@@ -39,7 +37,9 @@ public class Security
     public Bars SourceBars { get; set; } // Бары с исходным ТФ, полученные с сервера
 
     public Security() { }
+
     public Security(string seccode) => Seccode = seccode;
+
     public Security(string board, string seccode)
     {
         Board = board;

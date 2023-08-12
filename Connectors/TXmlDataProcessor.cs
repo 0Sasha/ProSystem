@@ -682,7 +682,7 @@ internal class TXmlDataProcessor
             }
             else
             {
-                Connector.TriggerReconnection = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
+                Connector.ReconnectionTrigger = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
                 Connector.Connection = ConnectionState.Connecting;
                 AddInfo("Recover connection");
             }

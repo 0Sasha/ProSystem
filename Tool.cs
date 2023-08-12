@@ -41,7 +41,7 @@ public class Tool : INotifyPropertyChanged
             if (value == false || BasicSecurity != null)
             {
                 showBasicSec = value;
-                Notify(nameof(ShowBasicSecurity));
+                NotifyChange(nameof(ShowBasicSecurity));
             }
         }
     }
@@ -55,48 +55,48 @@ public class Tool : INotifyPropertyChanged
     public PlotModel MainModel
     {
         get => plot;
-        set { plot = value; Notify(); }
+        set { plot = value; NotifyChange(); }
     }
     public PlotModel Model
     {
         get => miniPlot;
-        set { miniPlot = value; Notify(); }
+        set { miniPlot = value; NotifyChange(); }
     }
     public PlotController Controller
     {
         get => controller;
-        set { controller = value; Notify(); }
+        set { controller = value; NotifyChange(); }
     }
 
     public int WaitingLimit
     {
         get => waitingLimit;
-        set { waitingLimit = value; Notify(); }
+        set { waitingLimit = value; NotifyChange(); }
     }
     public double ShareOfFunds
     {
         get => shareOfFunds;
-        set { shareOfFunds = value > 15 ? 5 : value; Notify(); }
+        set { shareOfFunds = value > 15 ? 5 : value; NotifyChange(); }
     }
     public int MinNumberOfLots
     {
         get => minNumberLots;
-        set { minNumberLots = value; Notify(); }
+        set { minNumberLots = value; NotifyChange(); }
     }
     public int MaxNumberOfLots
     {
         get => maxNumberLots;
-        set { maxNumberLots = value; Notify(); }
+        set { maxNumberLots = value; NotifyChange(); }
     }
     public int NumberOfLots
     {
         get => numberLots;
-        set { numberLots = value; Notify(); }
+        set { numberLots = value; NotifyChange(); }
     }
     public int BaseBalance
     {
         get => baseBalance;
-        set { baseBalance = value; Notify(); }
+        set { baseBalance = value; NotifyChange(); }
     }
 
     public bool StopTrading
@@ -106,7 +106,7 @@ public class Tool : INotifyPropertyChanged
         {
             stopTrading = value;
             if (Active) BrushState = stopTrading ? Theme.Orange : Theme.Green;
-            Notify();
+            NotifyChange();
         }
     }
     public bool TradeShare
@@ -115,13 +115,13 @@ public class Tool : INotifyPropertyChanged
         set
         {
             tradeShare = value;
-            Notify(nameof(TradeShare));
+            NotifyChange(nameof(TradeShare));
         }
     }
     public bool UseNormalization
     {
         get => useNormalization;
-        set { useNormalization = value; Notify(); }
+        set { useNormalization = value; NotifyChange(); }
     }
     public bool UseShiftBalance
     {
@@ -129,24 +129,24 @@ public class Tool : INotifyPropertyChanged
         set
         {
             useShiftBalance = value;
-            Notify();
+            NotifyChange();
         }
     }
 
     public Border BorderState
     {
         get => borderState;
-        set { borderState = value; Notify(); }
+        set { borderState = value; NotifyChange(); }
     }
     public TextBlock BlockInfo
     {
         get => blockInfo;
-        set { blockInfo = value; Notify(); }
+        set { blockInfo = value; NotifyChange(); }
     }
     public TextBlock MainBlockInfo
     {
         get => mainBlockInfo;
-        set { mainBlockInfo = value; Notify(); }
+        set { mainBlockInfo = value; NotifyChange(); }
     }
 
     [field: NonSerialized] public Brush BrushState { get; set; } = Theme.Red;
@@ -155,10 +155,11 @@ public class Tool : INotifyPropertyChanged
 
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
 
-    internal void Notify(string propertyName = "") =>
+    internal void NotifyChange(string propertyName = "") =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     public Tool() { }
+
     public Tool(string name, Security security, Security basicSecurity, Script[] scripts)
     {
         Name = string.IsNullOrEmpty(name) ? throw new ArgumentNullException(nameof(name)) : name;

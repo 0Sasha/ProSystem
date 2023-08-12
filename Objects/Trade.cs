@@ -18,7 +18,10 @@ public class Trade
     public string NoteOrder { get; set; } // Примечание заявки
 
     public Trade() { }
-    public Trade(long TradeNo) { this.TradeNo = TradeNo; }
-    public Trade(DateTime DateTime) { this.DateTime = DateTime; }
+
+    public Trade(long tradeNo) { TradeNo = tradeNo; }
+
+    public Trade(DateTime dateTime) { DateTime = dateTime; }
+
     public Trade GetCopy() => (Trade)MemberwiseClone();
 }

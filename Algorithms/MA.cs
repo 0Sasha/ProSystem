@@ -14,31 +14,31 @@ internal class MA : Script
     public int Period
     {
         get => period;
-        set { period = value; Notify(); }
+        set { period = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public bool OnlyLimit
     {
         get => onlyLimit;
-        set { onlyLimit = value; Notify(); }
+        set { onlyLimit = value; NotifyChange(); }
     }
 
     public bool IsTrend
     {
         get => isTrend;
-        set { isTrend = value; Notify(); }
+        set { isTrend = value; NotifyChange(); }
     }
 
     public NameMA NameMA
     {
         get => nameMA;
-        set { nameMA = value; Notify(); }
+        set { nameMA = value; NotifyChange(); }
     }
 
     public MA(string name) : base(name)

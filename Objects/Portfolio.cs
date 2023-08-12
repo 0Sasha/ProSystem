@@ -24,7 +24,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
             if (value < 0) throw new ArgumentException("InitReqs is < 0");
             inReqs = value;
             ShareInitReqs = Math.Round(inReqs / Saldo * 100, 2);
-            Notify(nameof(InitReqs));
+            NotifyChange(nameof(InitReqs));
         }
     } // Начальные требования
     public double MinReqs
@@ -35,7 +35,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
             if (value < 0) throw new ArgumentException("MinReqs is < 0");
             minReqs = value;
             ShareMinReqs = Math.Round(minReqs / Saldo * 100, 2);
-            Notify(nameof(MinReqs));
+            NotifyChange(nameof(MinReqs));
         }
     } // Минимальные требования
     public double Free { get; set; } // Свободные средства
@@ -69,6 +69,6 @@ public class UnitedPortfolio : INotifyPropertyChanged
 
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
 
-    public void Notify(string propertyName = null) =>
+    public void NotifyChange(string propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

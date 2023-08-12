@@ -13,7 +13,14 @@ public class Order
     public string Status
     {
         get => State;
-        set { if (State != value) { State = value; DateTime = DateTime.Now; } }
+        set
+        {
+            if (State != value)
+            {
+                State = value;
+                DateTime = DateTime.Now;
+            }
+        }
     } // Статус заявки
     public DateTime DateTime { get; set; } // Дата последнего изменения статуса заявки
     public string BuySell { get; set; } // B - покупка, S - продажа
@@ -34,12 +41,12 @@ public class Order
     public string Note { get; set; } // Примечание заявки
 
     public Order() { }
-    public Order(int TrID) { this.TrID = TrID; }
-    public Order(int TrID, string Sender, string Signal, string Note)
+    public Order(int trID) { TrID = trID; }
+    public Order(int trID, string sender, string signal, string note)
     {
-        this.TrID = TrID;
-        this.Sender = Sender;
-        this.Signal = Signal;
-        this.Note = Note;
+        TrID = trID;
+        Sender = sender;
+        Signal = signal;
+        Note = note;
     }
 }

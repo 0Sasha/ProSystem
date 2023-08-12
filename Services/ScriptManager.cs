@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using HarfBuzzSharp;
 using OxyPlot;
 using OxyPlot.Annotations;
 using OxyPlot.Series;

@@ -155,7 +155,7 @@ public class TradingSystem
         if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio)
         {
             triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
-            await PortfolioManager.NormalizePortfolioAsync();
+            await PortfolioManager.CheckPortfolioAsync();
         }
 
         if (ReadyToTrade && DateTime.Now > triggerRecalc) await RecalculateToolsAsync();
@@ -165,7 +165,12 @@ public class TradingSystem
             foreach (var tool in Tools) if (tool.Active) ToolManager.UpdateView(tool, false);
         }
 
-        if (DateTime.Now > triggerRequestInfo) await RequestInfoAsync();
+        if (DateTime.Now > triggerRequestInfo)
+        {
+            triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute);
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
+            foreach (var tool in Tools) await Connector.OrderSecurityInfoAsync(tool.Security);
+        }
 
         if (Settings.ScheduledConnection && DateTime.Now.Minute == 50 &&
             DateTime.Now < DateTime.Today.AddMinutes(400)) await Connector.DisconnectAsync();
@@ -174,7 +179,7 @@ public class TradingSystem
     private async Task ConnectAsync()
     {
         if (Settings.ScheduledConnection &&
-            (Connector.ServerAvailable || DateTime.Now > Connector.TriggerReconnection) &&
+            (Connector.ServerAvailable || DateTime.Now > Connector.ReconnectionTrigger) &&
             Window.Dispatcher.Invoke(() => Window.TxtLog.Text.Length > 0 && Window.TxtPas.SecurePassword.Length > 0))
         {
             await Window.Dispatcher.Invoke(async () =>
@@ -186,7 +191,7 @@ public class TradingSystem
 
     private async Task ReconnectAsync()
     {
-        if (DateTime.Now > Connector.TriggerReconnection)
+        if (DateTime.Now > Connector.ReconnectionTrigger)
         {
             await Connector.DisconnectAsync();
             if (!Settings.ScheduledConnection) await Window.Dispatcher.Invoke(async () =>
@@ -222,13 +227,6 @@ public class TradingSystem
                 ToolManager.UpdateView(tool, false);
             }
         }
-    }
-
-    private async Task RequestInfoAsync()
-    {
-        triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute).AddSeconds(-DateTime.Now.Second);
-        await Connector.OrderPortfolioInfoAsync(Portfolio);
-        foreach (var tool in Tools) await Connector.OrderSecurityInfoAsync(tool.Security);
     }
 
     private void ClearObsoleteData()

@@ -15,30 +15,22 @@ public class ScriptResult
     public bool OnlyLimit { get; set; }
 
     public ScriptResult() { }
-    public ScriptResult(ScriptType Type, bool[] IsGrow, double[][] Indicators, DateTime iLastDT)
+
+    public ScriptResult(ScriptType type, bool[] isGrow, double[][] indicators, DateTime inLastDT)
     {
-        this.Type = Type;
-        this.IsGrow = IsGrow;
-        this.Indicators = Indicators;
-        this.iLastDT = iLastDT;
+        Type = type;
+        IsGrow = isGrow;
+        Indicators = indicators;
+        iLastDT = inLastDT;
     }
-    public ScriptResult(ScriptType Type, bool[] IsGrow, double[][] Indicators, DateTime iLastDT, bool OnlyLimit)
+
+    public ScriptResult(ScriptType type, bool[] isGrow, double[][] indicators, DateTime inLastDT,
+        bool onlyLimit) : this(type, isGrow, indicators, inLastDT) => OnlyLimit = onlyLimit;
+
+    public ScriptResult(ScriptType type, bool[] isGrow, double[][] indicators, DateTime inLastDT,
+        int centre, int level, bool onlyLimit) : this(type, isGrow, indicators, inLastDT, onlyLimit)
     {
-        this.Type = Type;
-        this.IsGrow = IsGrow;
-        this.Indicators = Indicators;
-        this.iLastDT = iLastDT;
-        this.OnlyLimit = OnlyLimit;
-    }
-    public ScriptResult(ScriptType Type, bool[] IsGrow,
-        double[][] Indicators, DateTime iLastDT, int Centre, int Level, bool OnlyLimit)
-    {
-        this.Type = Type;
-        this.IsGrow = IsGrow;
-        this.Indicators = Indicators;
-        this.iLastDT = iLastDT;
-        this.Centre = Centre;
-        this.Level = Level;
-        this.OnlyLimit = OnlyLimit;
+        Centre = centre;
+        Level = level;
     }
 }

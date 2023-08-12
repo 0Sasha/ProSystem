@@ -14,31 +14,31 @@ internal class ATRS : Script
     public int Period
     {
         get => period;
-        set { period = value; Notify(); }
+        set { period = value; NotifyChange(); }
     }
 
     public int Mult
     {
         get => mult;
-        set { mult = value; Notify(); }
+        set { mult = value; NotifyChange(); }
     }
 
     public int PeriodEx
     {
         get => periodEx;
-        set { periodEx = value; Notify(); }
+        set { periodEx = value; NotifyChange(); }
     }
 
     public double Correction
     {
         get => correction;
-        set { correction = value; Notify(); }
+        set { correction = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public ATRS(string name) : base(name)

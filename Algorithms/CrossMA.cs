@@ -15,37 +15,37 @@ internal class CrossMA : Script
     public int Period
     {
         get => period;
-        set { period = value; Notify(); }
+        set { period = value; NotifyChange(); }
     }
 
     public int Mult
     {
         get => mult;
-        set { mult = value; Notify(); }
+        set { mult = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public bool OnlyLimit
     {
         get => onlyLimit;
-        set { onlyLimit = value; Notify(); }
+        set { onlyLimit = value; NotifyChange(); }
     }
 
     public bool IsCrossMALim
     {
         get => isCrossMALimit;
-        set { isCrossMALimit = value; Notify(); }
+        set { isCrossMALimit = value; NotifyChange(); }
     }
 
     public NameMA NameMA
     {
         get => nameMA;
-        set { nameMA = value; Notify(); }
+        set { nameMA = value; NotifyChange(); }
     }
 
     public CrossMA(string name) : base(name)

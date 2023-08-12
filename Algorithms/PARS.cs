@@ -12,19 +12,19 @@ internal class PARS : Script
     public double CoefAccel
     {
         get => coefAccel;
-        set { coefAccel = value; Notify(); }
+        set { coefAccel = value; NotifyChange(); }
     }
 
     public double MaxCoef
     {
         get => maxCoef;
-        set { maxCoef = value; Notify(); }
+        set { maxCoef = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public PARS(string name) : base(name)

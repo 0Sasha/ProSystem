@@ -12,7 +12,7 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual bool BackupServer { get; set; }
     public virtual bool ServerAvailable { get; set; }
     public virtual ConnectionState Connection { get; set; }
-    public virtual DateTime TriggerReconnection { get; set; } = DateTime.Now.AddMinutes(5);
+    public virtual DateTime ReconnectionTrigger { get; set; } = DateTime.Now.AddMinutes(5);
 
     public virtual List<Security> Securities { get; protected set; } = new();
     public virtual List<Market> Markets { get; protected set; } = new();
@@ -21,8 +21,10 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual double USDRUB { get; set; }
     public virtual double EURRUB { get; set; }
 
+    public event PropertyChangedEventHandler PropertyChanged;
 
-    public abstract event PropertyChangedEventHandler PropertyChanged;
+    protected void NotifyChange(string propertyName = "") =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     public abstract bool Initialize(int logLevel);
 

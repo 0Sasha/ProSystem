@@ -228,7 +228,7 @@ internal class ToolManager : IToolManager
             ((Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)] as TabItem).Content as Grid).Children.OfType<Grid>()
                 .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool");
         }
-        tool.Notify();
+        tool.NotifyChange();
     }
 
     public async Task CalculateAsync(Tool tool)

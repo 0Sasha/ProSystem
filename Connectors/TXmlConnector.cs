@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -24,8 +23,8 @@ internal class TXmlConnector : Connector
     private Thread mainThread;
     private bool isWorking;
 
-    private delegate bool CallBackDel(IntPtr Data);
-    private readonly CallBackDel CallbackDel;
+    private delegate bool CallBackTXmlConnector(IntPtr Data);
+    private readonly CallBackTXmlConnector CallBackTXml;
 
     private readonly ConcurrentQueue<string> DataQueue = new();
     private readonly XmlReaderSettings XS = new()
@@ -47,7 +46,7 @@ internal class TXmlConnector : Connector
             if (connection != value)
             {
                 connection = value;
-                Notify(nameof(Connection));
+                NotifyChange(nameof(Connection));
             }
         }
     }
@@ -57,14 +56,8 @@ internal class TXmlConnector : Connector
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
         DataProcessor = new(this, tradingSystem, addInfo);
-        CallbackDel = CallBack;
+        CallBackTXml = CallBack;
     }
-
-
-    public override event PropertyChangedEventHandler PropertyChanged;
-
-    private void Notify(string propertyName = "") =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     private bool CallBack(IntPtr data)
     {
@@ -73,7 +66,7 @@ internal class TXmlConnector : Connector
         return true;
     }
 
-    private void ProcessDataQueue()
+    private void ProcessData()
     {
         while (isWorking)
         {
@@ -115,7 +108,7 @@ internal class TXmlConnector : Connector
         var settings = TradingSystem.Settings;
         waitingTime = settings.RequestTM * 1000 + 3000;
         Connection = ConnectionState.Connecting;
-        TriggerReconnection = DateTime.Now.AddSeconds(settings.SessionTM);
+        ReconnectionTrigger = DateTime.Now.AddSeconds(settings.SessionTM);
 
         // Частота обращений коннектора к серверу Transaq в миллисекундах. Минимум 10.
         var delay = "20";
@@ -372,10 +365,10 @@ internal class TXmlConnector : Connector
         if (result.Equals(IntPtr.Zero))
         {
             FreeMemory(result);
-            if (SetCallback(CallbackDel))
+            if (SetCallback(CallBackTXml))
             {
                 isWorking = true;
-                mainThread = new(ProcessDataQueue) { IsBackground = true, Name = "DataProcessor" };
+                mainThread = new(ProcessData) { IsBackground = true, Name = "DataProcessor" };
                 mainThread.Start();
                 Initialized = true;
                 return true;
@@ -474,7 +467,7 @@ internal class TXmlConnector : Connector
                         if (Connection == ConnectionState.Connected)
                         {
                             Connection = ConnectionState.Connecting;
-                            TriggerReconnection = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
+                            ReconnectionTrigger = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
                         }
                         AddInfo("Server is not responding. Command: " + strCommand, false);
 
@@ -498,7 +491,7 @@ internal class TXmlConnector : Connector
 
     #region Import external methods
     [DllImport("txmlconnector64.dll", CallingConvention = CallingConvention.StdCall)]
-    private static extern bool SetCallback(CallBackDel callBack);
+    private static extern bool SetCallback(CallBackTXmlConnector callBack);
 
     [DllImport("txmlconnector64.dll", CallingConvention = CallingConvention.StdCall)]
     private static extern IntPtr SendCommand(IntPtr Data);

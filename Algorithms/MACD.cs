@@ -14,31 +14,31 @@ internal class MACD : Script
     public int Period
     {
         get => period;
-        set { period = value; Notify(); }
+        set { period = value; NotifyChange(); }
     }
 
     public int Mult
     {
         get => mult;
-        set { mult = value; Notify(); }
+        set { mult = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public bool OnlyLimit
     {
         get => onlyLimit;
-        set { onlyLimit = value; Notify(); }
+        set { onlyLimit = value; NotifyChange(); }
     }
 
     public bool IsTrend
     {
         get => isTrend;
-        set { isTrend = value; Notify(); }
+        set { isTrend = value; NotifyChange(); }
     }
 
     public MACD(string name) : base(name)

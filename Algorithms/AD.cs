@@ -15,37 +15,37 @@ internal class AD : Script
     public int Period
     {
         get => period;
-        set { period = value; Notify(); }
+        set { period = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public bool OnlyLimit
     {
         get => onlyLimit;
-        set { onlyLimit = value; Notify(); }
+        set { onlyLimit = value; NotifyChange(); }
     }
 
     public bool IsTrend
     {
         get => isTrend;
-        set { isTrend = value; Notify(); }
+        set { isTrend = value; NotifyChange(); }
     }
 
     public bool UseChannel
     {
         get => useChannel;
-        set { useChannel = value; Notify(); }
+        set { useChannel = value; NotifyChange(); }
     }
 
     public bool ChannelBands
     {
         get => channelBands;
-        set { channelBands = value; Notify(); }
+        set { channelBands = value; NotifyChange(); }
     }
 
     public AD(string name) : base(name)

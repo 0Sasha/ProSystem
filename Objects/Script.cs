@@ -1,6 +1,6 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows.Controls;
 
 namespace ProSystem;
@@ -33,7 +33,7 @@ public abstract class Script : INotifyPropertyChanged
     public virtual PositionType CurrentPosition
     {
         get => curPosition;
-        set { curPosition = value; Notify(); }
+        set { curPosition = value; NotifyChange(); }
     }
 
     public virtual ScriptResult Result { get; set; }
@@ -41,7 +41,7 @@ public abstract class Script : INotifyPropertyChanged
     public virtual TextBlock BlockInfo
     {
         get => infoBlock;
-        set { infoBlock = value; Notify(); }
+        set { infoBlock = value; NotifyChange(); }
     }
 
     public virtual ObservableCollection<Order> Orders { get; set; } = new();
@@ -56,6 +56,6 @@ public abstract class Script : INotifyPropertyChanged
 
     public override string ToString() => GetType().Name;
 
-    protected virtual void Notify(string propertyName = "") =>
+    protected virtual void NotifyChange(string propertyName = "") =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

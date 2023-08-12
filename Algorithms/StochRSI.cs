@@ -14,31 +14,31 @@ internal class StochRSI : Script
     public int Period
     {
         get => period;
-        set { period = value; Notify(); }
+        set { period = value; NotifyChange(); }
     }
 
     public int Level
     {
         get => level;
-        set { level = value; Notify(); }
+        set { level = value; NotifyChange(); }
     }
 
     public int IndicatorTF
     {
         get => tf;
-        set { tf = value; Notify(); }
+        set { tf = value; NotifyChange(); }
     }
 
     public bool OnlyLimit
     {
         get => onlyLimit;
-        set { onlyLimit = value; Notify(); }
+        set { onlyLimit = value; NotifyChange(); }
     }
 
     public bool IsTrend
     {
         get => isTrend;
-        set { isTrend = value; Notify(); }
+        set { isTrend = value; NotifyChange(); }
     }
 
     public StochRSI(string name) : base(name)
