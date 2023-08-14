@@ -129,7 +129,7 @@ public class Tool : INotifyPropertyChanged
         set
         {
             useShiftBalance = value;
-            NotifyChange();
+            NotifyChange(nameof(UseShiftBalance));
         }
     }
 

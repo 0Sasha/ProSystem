@@ -5,13 +5,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Series;
-using static ProSystem.Controls;
 
 namespace ProSystem.Services;
 
@@ -34,23 +31,21 @@ internal class ToolManager : IToolManager
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
     }
 
-    public TabItem GetToolTab(Tool tool)
+    public TabItem Initialize(Tool tool)
     {
-        return new TabItem()
+        if (tool.BaseTF < 1) tool.BaseTF = 30;
+        tool.Controller ??= Plot.GetController();
+        tool.BrushState = tool.Active ? Theme.Green : Theme.Red;
+
+        var tab = new TabItem()
         {
             Header = tool.Name,
             Width = 54,
             Height = 24,
-            Content = GetGridToolTab(tool)
+            Content = Controls.GetGridForToolTab(tool)
         };
-    }
-
-    public void Initialize(Tool tool, TabItem tabTool)
-    {
-        if (tool.BaseTF < 1) tool.BaseTF = 30;
-        tool.Controller ??= Plot.GetController();
-        UpdateControlGrid(tool);
-        ScriptManager.InitializeScripts(tool, tabTool);
+        UpdateControlGrid(tool, tab);
+        ScriptManager.InitializeScripts(tool, tab);
 
         if (tool.BasicSecurity == null && tool.Security.Bars != null || tool.BasicSecurity?.Bars != null)
         {
@@ -63,118 +58,17 @@ internal class ToolManager : IToolManager
         }
         UpdateModel(tool);
         UpdateMiniModel(tool);
-
-        if (tool.Active)
-        {
-            tool.BrushState = Theme.Green;
-            (tabTool.Content as Grid).Children.OfType<Grid>().Last().
-                Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Deactivate tool";
-        }
-        else
-        {
-            tool.BrushState = Theme.Red;
-            (tabTool.Content as Grid).Children.OfType<Grid>().Last().
-                Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = "Activate tool";
-        }
+        return tab;
     }
 
-    public void UpdateControlGrid(Tool tool)
+    public void UpdateControlGrid(Tool tool, TabItem tabTool = null)
     {
-        Button ActiveButton = new()
-        {
-            Content = tool.Active ? "Deactivate tool" : "Activate tool",
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
-            Margin = new Thickness(5, 5, 0, 0),
-            Width = 90,
-            Height = 20
-        };
-        ActiveButton.Click += new RoutedEventHandler(Window.ChangeActivityTool);
-
-        ComboBox BaseTFBox = new()
-        {
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
-            Margin = new Thickness(45, 30, 0, 0),
-            Width = 50,
-            ItemsSource = new int[] { 1, 5, 15, 30, 60, 120, 240, 360, 720 }
-        };
-        BaseTFBox.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedValueProperty,
-            new Binding() { Source = tool, Path = new PropertyPath("BaseTF"), Mode = BindingMode.TwoWay });
-
-        List<string> MyScripts = new();
-        foreach (Script Script in tool.Scripts) MyScripts.Add(Script.Name);
-        MyScripts.Add("AllScripts");
-        MyScripts.Add("Nothing");
-        ComboBox ScriptsBox = new()
-        {
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
-            Margin = new Thickness(105, 30, 0, 0),
-            Width = 90,
-            ItemsSource = MyScripts,
-            SelectedValue = "AllScripts",
-            DataContext = tool
-        };
-        ScriptsBox.SelectionChanged += UpdateViewTool;
-
-        Border BorderState = new()
-        {
-            Margin = new Thickness(0, 55, 0, 0),
-            Height = 10,
-            BorderThickness = new Thickness(0),
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            Background = Theme.Orange
-        };
-        tool.BorderState = BorderState;
-
-        var ControlGrid = (((Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
+        var controlGrid = tabTool != null ?
+            ((tabTool.Content as Grid).Children[1] as Grid).Children[0] as Grid :
+            (((Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
             as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
-        ControlGrid.Children.Clear();
-        ControlGrid.Children.Add(ActiveButton);
-        ControlGrid.Children.Add(GetTextBlock("BaseTF", 5, 33));
-        ControlGrid.Children.Add(BaseTFBox);
-        ControlGrid.Children.Add(ScriptsBox);
-
-        ControlGrid.Children.Add(BorderState);
-        ControlGrid.Children.Add(GetCheckBox(tool, "Stop trading", "StopTrading", 5, 70));
-        ControlGrid.Children.Add(GetCheckBox(tool, "Normalization", "UseNormalization", 5, 110));
-        ControlGrid.Children.Add(GetCheckBox(tool, "Trade share", "TradeShare", 5, 130));
-
-        ControlGrid.Children.Add(GetCheckBox(tool, "Basic security", "ShowBasicSecurity", 105, 70));
-        ControlGrid.Children.Add(GetTextBlock("Wait limit", 105, 110));
-        ControlGrid.Children.Add(GetTextBox(tool, "WaitingLimit", 165, 110));
-        ControlGrid.Children.Add(GetCheckBox(tool, "Shift balance", "UseShiftBalance", 105, 130));
-
-        if (tool.TradeShare)
-        {
-            ControlGrid.Children.Add(GetTextBlock("Share fund", 5, 150));
-            ControlGrid.Children.Add(GetTextBox(tool, "ShareOfFunds", 65, 150));
-
-            ControlGrid.Children.Add(GetTextBlock("Min lots", 5, 170));
-            ControlGrid.Children.Add(GetTextBox(tool, "MinNumberOfLots", 65, 170));
-
-            ControlGrid.Children.Add(GetTextBlock("Max lots", 105, 170));
-            ControlGrid.Children.Add(GetTextBox(tool, "MaxNumberOfLots", 165, 170));
-        }
-        else
-        {
-            ControlGrid.Children.Add(GetTextBlock("Num lots", 5, 150));
-            ControlGrid.Children.Add(GetTextBox(tool, "NumberOfLots", 65, 150));
-        }
-        if (tool.UseShiftBalance)
-        {
-            ControlGrid.Children.Add(GetTextBlock("Base balance", 105, 150));
-            ControlGrid.Children.Add(GetTextBox(tool, "BaseBalance", 165, 150));
-        }
-
-        TextBlock MainBlInfo = GetTextBlock("Main info", 5, 190);
-        tool.MainBlockInfo = MainBlInfo;
-        ControlGrid.Children.Add(MainBlInfo);
-
-        TextBlock BlInfo = GetTextBlock("Info", 105, 190);
-        tool.BlockInfo = BlInfo;
-        ControlGrid.Children.Add(BlInfo);
+        controlGrid.Children.Clear();
+        Controls.FillControlGrid(tool, controlGrid, Window.ChangeActivityTool, UpdateViewTool);
     }
 
     public async Task ChangeActivityAsync(Tool tool)
@@ -647,61 +541,6 @@ internal class ToolManager : IToolManager
                 await RequestBarsAsync(tool);
             });
         }
-    }
-
-    private Grid GetGridToolTab(Tool MyTool)
-    {
-        Grid GlobalGrid = new();
-        GlobalGrid.ColumnDefinitions.Add(new());
-        GlobalGrid.ColumnDefinitions.Add(new() { Width = new GridLength(200), MinWidth = 100 });
-
-
-        Grid PlotGrid = new();
-        PlotGrid.RowDefinitions.Add(new() { MinHeight = 50, MaxHeight = 120 });
-        PlotGrid.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star) });
-
-        OxyPlot.SkiaSharp.Wpf.PlotView PlotView = new() { Visibility = Visibility.Hidden };
-        PlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Model") });
-        PlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
-
-        OxyPlot.SkiaSharp.Wpf.PlotView MainPlotView = new();
-        MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ModelProperty, new Binding() { Source = MyTool, Path = new PropertyPath("MainModel") });
-        MainPlotView.SetBinding(OxyPlot.Wpf.PlotViewBase.ControllerProperty, new Binding() { Source = MyTool, Path = new PropertyPath("Controller") });
-        Grid.SetRowSpan(MainPlotView, 2);
-
-        PlotGrid.Children.Add(PlotView);
-        PlotGrid.Children.Add(MainPlotView);
-
-
-        Grid ControlGrid = new();
-        Grid.SetColumn(ControlGrid, 1);
-        ControlGrid.RowDefinitions.Add(new() { Height = new GridLength(1.2, GridUnitType.Star) });
-        ControlGrid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
-        ControlGrid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
-
-        Grid ControlGrid1 = new();
-        Grid ControlGrid2 = new();
-        Grid.SetRow(ControlGrid2, 1);
-        Grid ControlGrid3 = new();
-        Grid.SetRow(ControlGrid3, 2);
-
-        Border Border = new() { BorderBrush = MainDictionary.Dictionary.txtBorder, BorderThickness = new Thickness(1) };
-        Border Border1 = new() { BorderBrush = MainDictionary.Dictionary.txtBorder, BorderThickness = new Thickness(1) };
-        Grid.SetRow(Border1, 1);
-        Border Border2 = new() { BorderBrush = MainDictionary.Dictionary.txtBorder, BorderThickness = new Thickness(1) };
-        Grid.SetRow(Border2, 2);
-
-        ControlGrid.Children.Add(ControlGrid1);
-        ControlGrid.Children.Add(ControlGrid2);
-        ControlGrid.Children.Add(ControlGrid3);
-        ControlGrid.Children.Add(Border);
-        ControlGrid.Children.Add(Border1);
-        ControlGrid.Children.Add(Border2);
-
-
-        GlobalGrid.Children.Add(PlotGrid);
-        GlobalGrid.Children.Add(ControlGrid);
-        return GlobalGrid;
     }
 
     private void UpdateViewTool(object sender, SelectionChangedEventArgs e)

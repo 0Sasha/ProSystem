@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using ProSystem;
+
 namespace NUnitTest;
 
 public class Tests
@@ -17,4 +18,13 @@ public class Tests
     {
         return Indicators.SMA(inputs, period, 2);
     }
+
+    /*[Test]
+    [Timeout(1000)]
+    public void TestProcessTrades()
+    {
+        var dataProcessor = new TXmlDataProcessor();
+        var trades = System.IO.File.ReadAllText("trades.txt");
+        for (int i = 0; i < 100000; i++) dataProcessor.ProcessData(trades);
+    }*/
 }

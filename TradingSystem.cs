@@ -55,6 +55,7 @@ public class TradingSystem
         Trades = new(trades);
     }
 
+
     public void Start()
     {
         if (Connector.GetType() == typeof(TXmlConnector) && File.Exists("txmlconnector64.dll"))
@@ -125,6 +126,7 @@ public class TradingSystem
             await ToolManager.RequestBarsAsync(tool);
         }
     }
+
 
     private async void CheckStateAsync()
     {
@@ -203,9 +205,9 @@ public class TradingSystem
     {
         Connector.BackupServer = false;
         Window.RestartLogging();
-        FileManager.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
+        await FileManager.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
             DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
-        FileManager.ArchiveFiles("Data", ".xml", "Data", false);
+        await FileManager.ArchiveFiles("Data", ".xml", "Data", false);
         PortfolioManager.UpdateEquity();
         PortfolioManager.CheckEquity();
         PortfolioManager.UpdatePositions();

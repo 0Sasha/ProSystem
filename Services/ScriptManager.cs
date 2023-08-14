@@ -500,17 +500,20 @@ internal class ScriptManager : IScriptManager
         if (tool == null) throw new ArgumentNullException(nameof(tool));
         if (script == null) throw new ArgumentNullException(nameof(script));
 
-        string selectedScript = null;
+        string selectedScript = "AllScripts";
         var mainModel = tool.MainModel;
-        Window.Dispatcher.Invoke(() =>
+        if (TradingSystem.Tools.IndexOf(tool) < TradingSystem.Window.TabsTools.Items.Count)
         {
-            var grid = (((TradingSystem.Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
-                as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
-            selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
+            Window.Dispatcher.Invoke(() =>
+            {
+                var grid = (((TradingSystem.Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
+                    as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
+                selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
 
-            script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
-            "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
-        });
+                script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
+                "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
+            });
+        }
 
         foreach (var ann in mainModel.Annotations.ToArray())
             if (ann.ToolTip == script.Name || ann.ToolTip is "System" or null) mainModel.Annotations.Remove(ann);

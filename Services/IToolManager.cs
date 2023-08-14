@@ -6,21 +6,19 @@ namespace ProSystem.Services;
 
 public interface IToolManager
 {
-    public TabItem GetToolTab(Tool tool);
+    public TabItem Initialize(Tool tool);
 
-    public void Initialize(Tool tool, TabItem tabTool);
-
-    public void UpdateControlGrid(Tool tool);
+    public void UpdateControlGrid(Tool tool, TabItem tabTool = null);
 
     public Task ChangeActivityAsync(Tool tool);
 
     public Task CalculateAsync(Tool tool);
 
-    public void UpdateBars(Tool tool, bool updateBasicSecurity);
-
     public Task RequestBarsAsync(Tool tool);
 
     public Task ReloadBarsAsync(Tool tool);
+
+    public void UpdateBars(Tool tool, bool updateBasicSecurity);
 
     public void UpdateView(Tool tool, bool updateScriptView);
 

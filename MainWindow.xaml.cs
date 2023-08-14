@@ -292,9 +292,7 @@ public partial class MainWindow : Window
                 Tools[i] = Tools[x];
                 Tools[x] = initTool;
             }
-            var tab = ToolManager.GetToolTab(Tools[i]);
-            TabsTools.Items.Add(tab);
-            ToolManager.Initialize(Tools[i], tab);
+            TabsTools.Items.Add(ToolManager.Initialize(Tools[i]));
         }
     }
 
@@ -323,9 +321,7 @@ public partial class MainWindow : Window
         if (newTool)
         {
             Tools.Add(tool);
-            var tab = ToolManager.GetToolTab(tool);
-            TabsTools.Items.Add(tab);
-            ToolManager.Initialize(tool, tab);
+            TabsTools.Items.Add(ToolManager.Initialize(tool));
             TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
             ToolsByPriorityView.Items.Refresh();
             tool.PropertyChanged += UpdateTool;
@@ -340,10 +336,10 @@ public partial class MainWindow : Window
             var tab = TabsTools.Items[Tools.IndexOf(tool)] as TabItem;
             if (tool.Scripts.Length < 2)
             {
-                (tab.Content as Grid).Children.OfType<Grid>().Last()
-                    .Children.OfType<Grid>().ToList()[1].Children.Clear();
-                (tab.Content as Grid).Children.OfType<Grid>().Last()
-                    .Children.OfType<Grid>().ToList()[2].Children.Clear();
+                var grids = (tab.Content as Grid).Children
+                    .OfType<Grid>().Last().Children.OfType<Grid>().ToArray();
+                grids[1].Children.Clear();
+                grids[2].Children.Clear();
             }
             TradingSystem.ScriptManager.InitializeScripts(tool, tab);
         }
@@ -678,7 +674,7 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(Tool.ShowBasicSecurity))
             Task.Run(() => TradingSystem.ToolManager.UpdateView(sender as Tool, true));
         else if (e.PropertyName is nameof(Tool.TradeShare) or nameof(Tool.UseShiftBalance))
-            Task.Run(() => TradingSystem.ToolManager.UpdateControlGrid(sender as Tool));
+            TradingSystem.ToolManager.UpdateControlGrid(sender as Tool);
     }
     private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
     {

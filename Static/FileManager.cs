@@ -2,12 +2,14 @@
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace ProSystem;
 
 internal static class FileManager
 {
-    public static void ArchiveFiles(string directory, string partFileName, string archName, bool deleteSourceFiles)
+    public static async Task ArchiveFiles(string directory,
+        string partFileName, string archName, bool deleteSourceFiles)
     {
         if (string.IsNullOrEmpty(directory)) throw new ArgumentNullException(nameof(directory));
         if (string.IsNullOrEmpty(partFileName)) throw new ArgumentNullException(nameof(partFileName));
@@ -24,6 +26,8 @@ internal static class FileManager
 
         if (File.Exists(newDir + ".zip")) File.Delete(newDir + ".zip");
         ZipFile.CreateFromDirectory(newDir, newDir + ".zip", CompressionLevel.SmallestSize, false);
+
+        await Task.Delay(1000);
         Directory.Delete(newDir, true);
         if (deleteSourceFiles) foreach (var path in paths) File.Delete(path);
     }
