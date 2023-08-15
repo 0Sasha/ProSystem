@@ -7,23 +7,72 @@ using System.Linq;
 namespace ProSystem;
 
 [Serializable]
-public class UnitedPortfolio : INotifyPropertyChanged
+public class Portfolio : INotifyPropertyChanged
 {
-    private double inReqs;
+    private string union;
+    private double saldoIn;
+    private double saldo;
+    private double pl;
+    private double initReqs;
     private double minReqs;
+    private double free;
+    private double unrealPL;
+    private double go;
+    private double varMargin;
+    private double finRes;
 
-    public string Union { get; set; } // Код юниона
-    public double SaldoIn { get; set; } // Входящая оценка стоимости единого портфеля
-    public double Saldo { get; set; } // Текущая оценка стоимости единого портфеля
-    public double PL { get; set; } // Прибыль/убыток общий
-    public double InitReqs
+    private double shareBaseAssets;
+    private double shareInitReqsBaseAssets;
+    private double shareInitReqs;
+    private double shareMinReqs;
+    private double potentialShareInitReqs;
+
+    public string Union
     {
-        get => inReqs;
+        get => union;
         set
         {
-            if (value < 0) throw new ArgumentException("InitReqs is < 0");
-            inReqs = value;
-            ShareInitReqs = Math.Round(inReqs / Saldo * 100, 2);
+            union = value;
+            NotifyChange(nameof(Union));
+        }
+    } // Код юниона
+    public double SaldoIn
+    {
+        get => saldoIn;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(SaldoIn));
+            saldoIn = value;
+            NotifyChange(nameof(SaldoIn));
+        }
+    } // Входящая оценка стоимости единого портфеля
+    public double Saldo
+    {
+        get => saldo;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(Saldo));
+            saldo = value;
+            NotifyChange(nameof(Saldo));
+        }
+    } // Текущая оценка стоимости единого портфеля
+    public double PL
+    {
+        get => pl;
+        set
+        {
+            pl = value;
+            NotifyChange(nameof(PL));
+        }
+    } // Прибыль/убыток общий
+    public double InitReqs
+    {
+        get => initReqs;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(InitReqs));
+            initReqs = value;
+            ShareInitReqs = Math.Round(initReqs / Saldo * 100, 2);
             NotifyChange(nameof(InitReqs));
         }
     } // Начальные требования
@@ -32,23 +81,110 @@ public class UnitedPortfolio : INotifyPropertyChanged
         get => minReqs;
         set
         {
-            if (value < 0) throw new ArgumentException("MinReqs is < 0");
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(MinReqs));
             minReqs = value;
             ShareMinReqs = Math.Round(minReqs / Saldo * 100, 2);
             NotifyChange(nameof(MinReqs));
         }
     } // Минимальные требования
-    public double Free { get; set; } // Свободные средства
-    public double UnrealPL { get; set; } // Нереализованная прибыль/убыток
-    public double GO { get; set; } // Размер требуемого ГО FORTS
-    public double VarMargin { get; set; } // Вариационная маржа FORTS
-    public double FinRes { get; set; } // Финансовый результат последнего клиринга FORTS
+    public double Free
+    {
+        get => free;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(Free));
+            free = value;
+            NotifyChange(nameof(Free));
+        }
+    } // Свободные средства
+    public double UnrealPL
+    {
+        get => unrealPL;
+        set
+        {
+            unrealPL = value;
+            NotifyChange(nameof(UnrealPL));
+        }
+    } // Нереализованная прибыль/убыток
+    public double GO
+    {
+        get => go;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(GO));
+            go = value;
+            NotifyChange(nameof(GO));
+        }
+    } // Размер требуемого ГО FORTS
+    public double VarMargin
+    {
+        get => varMargin;
+        set
+        {
+            varMargin = value;
+            NotifyChange(nameof(VarMargin));
+        }
+    } // Вариационная маржа FORTS
+    public double FinRes
+    {
+        get => finRes;
+        set
+        {
+            finRes = value;
+            NotifyChange(nameof(FinRes));
+        }
+    } // Финансовый результат последнего клиринга FORTS
 
-    public double ShareBaseAssets { get; set; } // Доля базовых активов
-    public double ShareInitReqsBaseAssets { get; set; } // Доля начальных требований базовых активов
-    public double ShareInitReqs { get; set; } // Доля начальных требований
-    public double ShareMinReqs { get; set; } // Доля минимальных требования
-    public double PotentialShareInitReqs { get; set; } // Потенциальная доля начальных требований
+    public double ShareBaseAssets
+    {
+        get => shareBaseAssets;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareBaseAssets));
+            shareBaseAssets = value;
+            NotifyChange(nameof(ShareBaseAssets));
+        }
+    } // Доля базовых активов
+    public double ShareInitReqsBaseAssets
+    {
+        get => shareInitReqsBaseAssets;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareInitReqsBaseAssets));
+            shareInitReqsBaseAssets = value;
+            NotifyChange(nameof(ShareInitReqsBaseAssets));
+        }
+    } // Доля начальных требований базовых активов
+    public double ShareInitReqs
+    {
+        get => shareInitReqs;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareInitReqs));
+            shareInitReqs = value;
+            NotifyChange(nameof(ShareInitReqs));
+        }
+    } // Доля начальных требований
+    public double ShareMinReqs
+    {
+        get => shareMinReqs;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareMinReqs));
+            shareMinReqs = value;
+            NotifyChange(nameof(ShareMinReqs));
+        }
+    } // Доля минимальных требования
+    public double PotentialShareInitReqs
+    {
+        get => potentialShareInitReqs;
+        set
+        {
+            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(PotentialShareInitReqs));
+            potentialShareInitReqs = value;
+            NotifyChange(nameof(PotentialShareInitReqs));
+        }
+    } // Потенциальная доля начальных требований
 
     public Dictionary<DateTime, int> Equity { get; set; } = new();
     public int AverageEquity
@@ -65,7 +201,7 @@ public class UnitedPortfolio : INotifyPropertyChanged
     public List<Position> MoneyPositions { get; set; } = new();
     public ObservableCollection<object> AllPositions { get; set; } = new();
 
-    public UnitedPortfolio() { }
+    public Portfolio() { }
 
     [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
 

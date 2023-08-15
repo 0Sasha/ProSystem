@@ -270,7 +270,6 @@ internal class TXmlDataProcessor
             order.Seccode = xr.Value;
 
             if (!GoToTheValue(xr, "status")) continue;
-            xr.Read();
             order.Status = xr.Value;
 
             if (!GoToTheValue(xr, "buysell")) continue;
@@ -349,7 +348,7 @@ internal class TXmlDataProcessor
         {
             if (subsection is "sec_position" or "forts_position")
             {
-                if (!GoToTheValue(xr, "seccode")) return;
+                if (!GoToTheValue(xr, "seccode", false)) return;
 
                 var pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
                 if (pos == null)

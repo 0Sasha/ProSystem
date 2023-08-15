@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -24,7 +25,7 @@ public partial class MainWindow : Window
     public TradingSystem TradingSystem { get; private set; }
     public Connector Connector { get => TradingSystem.Connector; }
     public Settings Settings { get => TradingSystem.Settings; }
-    public UnitedPortfolio Portfolio { get => TradingSystem.Portfolio; }
+    public Portfolio Portfolio { get => TradingSystem.Portfolio; }
     public ObservableCollection<Tool> Tools { get => TradingSystem.Tools; }
     public IToolManager ToolManager { get => TradingSystem.ToolManager; }
 
@@ -81,11 +82,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private UnitedPortfolio GetPortfolio()
+    private Portfolio GetPortfolio()
     {
         try
         {
-            return (UnitedPortfolio)Serializer.Deserialize("Portfolio", typeof(UnitedPortfolio));
+            return (Portfolio)Serializer.Deserialize("Portfolio", typeof(Portfolio));
         }
         catch (Exception ex)
         {
@@ -235,7 +236,7 @@ public partial class MainWindow : Window
             new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeTradesScripts"), Mode = BindingMode.TwoWay });
     }
 
-    private void BindData(UnitedPortfolio portfolio)
+    private void BindData(Portfolio portfolio)
     {
         AverageEquityTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {

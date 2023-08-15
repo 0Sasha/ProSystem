@@ -17,7 +17,7 @@ internal static class Plot
         return controller;
     }
 
-    public static PlotModel GetPlot(this UnitedPortfolio portfolio)
+    public static PlotModel GetPlot(this Portfolio portfolio)
     {
         var AssetsPorfolio = new CategoryAxis { Position = AxisPosition.Left };
         var FactVolPorfolio = new BarSeries { BarWidth = 4, FillColor = Theme.ShortPosition, StrokeThickness = 0 };

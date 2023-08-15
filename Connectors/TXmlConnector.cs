@@ -103,6 +103,8 @@ internal class TXmlConnector : Connector
 
         Securities.Clear(); Markets.Clear();
         TimeFrames.Clear(); Clients.Clear();
+        TradingSystem.Portfolio.Positions.Clear();
+        TradingSystem.Portfolio.MoneyPositions.Clear();
         TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Orders.Clear());
 
         var settings = TradingSystem.Settings;
@@ -342,9 +344,10 @@ internal class TXmlConnector : Connector
         return false;
     }
 
-    public override async Task<bool> OrderPortfolioInfoAsync(UnitedPortfolio portfolio)
+    public override async Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio)
     {
-        var command = "<command id=\"get_mc_portfolio\" union=\"" + portfolio.Union +
+        var union = portfolio.Union == null || portfolio.Union == "" ? Clients[0].Union : portfolio.Union;
+        var command = "<command id=\"get_mc_portfolio\" union=\"" + union +
             "\" currency=\"false\" asset=\"false\" money=\"false\" depo=\"true\" registers=\"false\"/>";
         var result = await SendCommand(command);
         if (result == "<result success=\"true\"/>") return true;

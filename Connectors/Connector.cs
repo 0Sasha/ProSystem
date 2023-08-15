@@ -50,5 +50,5 @@ public abstract class Connector : INotifyPropertyChanged
 
     public abstract Task<bool> OrderSecurityInfoAsync(Security security);
 
-    public abstract Task<bool> OrderPortfolioInfoAsync(UnitedPortfolio portfolio);
+    public abstract Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio);
 }

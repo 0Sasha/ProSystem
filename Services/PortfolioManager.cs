@@ -15,7 +15,7 @@ internal class PortfolioManager : IPortfolioManager
 
     private Connector Connector { get => TradingSystem.Connector; }
 
-    private UnitedPortfolio Portfolio { get => TradingSystem.Portfolio; }
+    private Portfolio Portfolio { get => TradingSystem.Portfolio; }
 
     public PortfolioManager(TradingSystem tradingSystem, AddInformation addInfo)
     {
@@ -126,7 +126,6 @@ internal class PortfolioManager : IPortfolioManager
         Portfolio.PotentialShareInitReqs = Math.Round(sumPotInitReqs / Portfolio.Saldo * 100, 2);
         Portfolio.ShareBaseAssets = Math.Round(sumReqsBaseAssets / Portfolio.Saldo * 100, 2);
         Portfolio.ShareInitReqsBaseAssets = Math.Round(sumInitReqsBaseAssets / Portfolio.Saldo * 100, 2);
-        Portfolio.NotifyChange("Shares");
 
         if (Portfolio.PotentialShareInitReqs > Settings.MaxShareInitReqsPortfolio)
         {
@@ -241,7 +240,7 @@ internal class PortfolioManager : IPortfolioManager
         for (int i = Settings.ToolsByPriority.Count - 1; i >= 0; i--)
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
-            Thread.Sleep(5000);
+            await Task.Delay(5000);
             if (RequirementsAreNormal()) return;
             if (Connector.Connection != ConnectionState.Connected)
             {
@@ -292,7 +291,7 @@ internal class PortfolioManager : IPortfolioManager
             for (int i = 0; i < 10; i++)
             {
                 if ((int)position.Saldo == 0) return true;
-                Thread.Sleep(500);
+                await Task.Delay(500);
             }
             AddInfo("Order is sent, but position is not closed yet: " + symbol.Seccode);
         }
@@ -309,7 +308,7 @@ internal class PortfolioManager : IPortfolioManager
         for (int i = 0; i < 10; i++)
         {
             if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
-            Thread.Sleep(500);
+            await Task.Delay(500);
         }
         return false;
     }

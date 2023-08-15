@@ -18,8 +18,7 @@ public interface IScriptManager
 
     public Task<bool> CalculateAsync(Script script, Security security);
 
-    public Task ProcessOrdersAsync(Tool tool, Script script,
-        int volume, bool normalPrice, bool nowBidding, double atr);
+    public Task ProcessOrdersAsync(Tool tool, ToolState toolState, Script script);
 
     public bool AlignData(Tool tool, Script script);
 

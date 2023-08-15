@@ -197,20 +197,22 @@ internal class ScriptManager : IScriptManager
         return true;
     }
 
-    public async Task ProcessOrdersAsync(Tool tool, Script script,
-        int volume, bool normalPrice, bool nowBidding, double atr)
+    public async Task ProcessOrdersAsync(Tool tool, ToolState toolState, Script script)
     {
         if (tool == null) throw new ArgumentNullException(nameof(tool));
+        if (toolState == null) throw new ArgumentNullException(nameof(toolState));
         if (script == null) throw new ArgumentNullException(nameof(script));
-        if (volume < 1) throw new ArgumentOutOfRangeException(nameof(volume), "volume must be >= 1");
-        if (atr < double.Epsilon) throw new ArgumentOutOfRangeException(nameof(atr), "atr must be > 0");
+
+        var volume = script.CurrentPosition == PositionType.Long ?
+            toolState.ShortRoundedVolume : toolState.LongRoundedVolume;
 
         if (script.Result.Type is ScriptType.OSC or ScriptType.Line)
-            await ProcessOSCAsync(tool, script, volume, normalPrice);
+            await ProcessOSCAsync(tool, script, volume, toolState.IsNormalPrice);
         else if (script.Result.Type is ScriptType.LimitLine)
             await ProcessLimitLineAsync(tool, script, volume);
         else if (script.Result.Type is ScriptType.StopLine)
-            await ProcessStopLineAsync(tool, script, volume, normalPrice, nowBidding, atr);
+            await ProcessStopLineAsync(tool, script, volume,
+                toolState.IsNormalPrice, toolState.IsBidding, toolState.ATR);
         else AddInfo(script.Name + ": Неизвестный тип скрипта: " + script.Result.Type, notify: true);
     }
 

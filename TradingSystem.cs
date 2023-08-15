@@ -22,7 +22,7 @@ public class TradingSystem
 
     public MainWindow Window { get; init; }
     public Connector Connector { get; init; }
-    public UnitedPortfolio Portfolio { get; init; }
+    public Portfolio Portfolio { get; init; }
     public Settings Settings { get; init; }
     public IToolManager ToolManager { get; init; }
     public IScriptManager ScriptManager { get; init; }
@@ -36,7 +36,7 @@ public class TradingSystem
     public ObservableCollection<Order> SystemOrders { get; init; } = new();
     public ObservableCollection<Trade> SystemTrades { get; init; } = new();
 
-    public TradingSystem(MainWindow window, Type connectorType, UnitedPortfolio portfolio, Settings settings)
+    public TradingSystem(MainWindow window, Type connectorType, Portfolio portfolio, Settings settings)
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
         if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, Window.AddInfo);
@@ -48,7 +48,7 @@ public class TradingSystem
         PortfolioManager = new PortfolioManager(this, Window.AddInfo);
     }
 
-    public TradingSystem(MainWindow window, Type connectorType, UnitedPortfolio portfolio, Settings settings,
+    public TradingSystem(MainWindow window, Type connectorType, Portfolio portfolio, Settings settings,
         IEnumerable<Tool> tools, IEnumerable<Trade> trades) : this(window, connectorType, portfolio, settings)
     {
         Tools = new(tools);
