@@ -18,8 +18,8 @@ public class ToolState
     public double LongReqs { get; set; }
     public double ShortReqs { get; set; }
 
-    public int LongRoundedVolume { get; set; }
-    public int ShortRoundedVolume { get; set; }
+    public int LongVolume { get; set; }
+    public int ShortVolume { get; set; }
 
     public double LongRealVolume { get; set; }
     public double ShortRealVolume { get; set; }

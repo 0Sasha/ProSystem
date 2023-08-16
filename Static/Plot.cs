@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Series;
@@ -114,5 +115,46 @@ internal static class Plot
 
         Theme.Color(Model);
         return Model;
+    }
+
+    public static void ScaleModel(CandleStickSeries candles, DateTimeAxis xAxis, LinearAxis yAxis)
+    {
+        int i = candles.FindByX(xAxis.ActualMinimum);
+        int xEnd = candles.FindByX(xAxis.ActualMaximum, i);
+
+        double yMin = double.MaxValue;
+        double yMax = double.MinValue;
+        for (; i <= xEnd; i++)
+        {
+            yMin = Math.Min(yMin, candles.Items[i].Low);
+            yMax = Math.Max(yMax, candles.Items[i].High);
+        }
+
+        double margin = (yMax - yMin) * 0.05;
+        yAxis.Zoom(yMin - margin, yMax + margin);
+    }
+
+    public static void ScaleMiniModel(DataPoint[] points, Axis mainAxis,
+        LinearAxis xAxis, LinearAxis yAxis, Window window, PlotModel miniModel)
+    {
+        int dif = points.Length + 4 - (int)mainAxis.Maximum;
+        xAxis.Minimum = mainAxis.ActualMinimum + dif;
+        xAxis.Maximum = mainAxis.ActualMaximum + dif;
+
+        int i = Math.Max((int)xAxis.Minimum, 0);
+        int xEnd = Math.Min((int)xAxis.Maximum, points.Length - 1);
+
+        double yMin = double.MaxValue;
+        double yMax = double.MinValue;
+        for (; i <= xEnd; i++)
+        {
+            yMin = Math.Min(yMin, points[i].Y);
+            yMax = Math.Max(yMax, points[i].Y);
+        }
+
+        double margin = (yMax - yMin) * 0.05;
+        yAxis.Zoom(yMin - margin, yMax + margin);
+
+        window.Dispatcher.Invoke(() => miniModel.InvalidatePlot(false));
     }
 }

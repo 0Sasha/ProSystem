@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
+using System.Xml.Linq;
 using HarfBuzzSharp;
 using OxyPlot;
 using OxyPlot.Axes;
@@ -49,17 +50,7 @@ internal class ToolManager : IToolManager
         UpdateControlGrid(tool, tab);
         ScriptManager.InitializeScripts(tool, tab);
 
-        if (tool.BasicSecurity == null && tool.Security.Bars != null || tool.BasicSecurity?.Bars != null)
-        {
-            UpdateModel(tool);
-            foreach (var script in tool.Scripts)
-            {
-                script.Calculate(tool.BasicSecurity ?? tool.Security);
-                ScriptManager.UpdateView(tool, script);
-            }
-        }
-        UpdateModel(tool);
-        UpdateMiniModel(tool);
+        UpdateView(tool, true);
         return tab;
     }
 
@@ -163,79 +154,18 @@ internal class ToolManager : IToolManager
         }
     }
 
-    private async Task Calculate(Tool tool)
-    {
-        await WaitCertainty(tool);
-        var security = tool.Security;
-        var basicSecurity = tool.BasicSecurity ?? security;
-
-        var toolState = GetToolState(tool);
-        UpdateControlPanel(tool, toolState);
-        if (toolState.IsLogging) WriteLogRisks(tool, toolState);
-
-        ScriptManager.IdentifyOrdersAndTrades(tool);
-        IdentifySystemOrdersAndTrades(tool);
-
-        if (!tool.StopTrading)
-        {
-            if (!await CancelUnknownsOrders(tool)) return;
-            if (toolState.ReadyToTrade)
-            {
-                foreach (var script in tool.Scripts) await ScriptManager.UpdateOrdersAndPositionAsync(script);
-                if (!await CheckPositionMatching(tool, toolState)) return;
-                await NormalizePosition(tool, toolState);
-            }
-        }
-        else if (!await CancelActiveOrders(tool)) return;
-
-        foreach (var script in tool.Scripts)
-        {
-            // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
-            if (!await ScriptManager.CalculateAsync(script, basicSecurity)) continue;
-
-            // Обновление моделей, информационной панели скрипта и логирование
-            ScriptManager.UpdateView(tool, script);
-            if (toolState.IsLogging) ScriptManager.WriteLog(script, tool.Name);
-
-            // Выравнивание данных и проверка условий для выхода
-            if (basicSecurity != security && !ScriptManager.AlignData(tool, script)) continue;
-            if (!toolState.ReadyToTrade ||
-                script.Result.Type != ScriptType.StopLine && !toolState.IsBidding) continue;
-
-            // Работа с заявками
-            await ScriptManager.ProcessOrdersAsync(tool, toolState, script);
-        }
-    }
-
-    private ToolState GetToolState(Tool tool)
-    {
-        var average = Math.Round(tool.Security.Bars.Close.TakeLast(30).Average(), tool.Security.Decimals);
-        var atr = Indicators.ATR(tool.Security.Bars.High, tool.Security.Bars.Low, tool.Security.Bars.Close, 50);
-
-        var toolState = new ToolState(!tool.StopTrading, IsLogging(tool), IsBidding(tool))
-        {
-            IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 10,
-            AveragePrice = average,
-            ATR = atr[^2]
-        };
-        if (!toolState.IsNormalPrice) AddInfo(tool.Name + ": the price is out of range", notify: true);
-        if (!TradingSystem.PortfolioManager.CheckEquity()) toolState.ReadyToTrade = false;
-
-        SetRubReqs(tool, toolState);
-        SetPositionVolumes(tool, toolState);
-        SetBalance(tool, toolState);
-        SetOrdersVolumes(tool, toolState);
-        return toolState;
-    }
-
     public async Task RequestBarsAsync(Tool tool)
     {
-        TimeFrame tf;
-        if (Connector.TimeFrames.Count > 0)
-            tf = Connector.TimeFrames.Last(x => x.Period / 60 <= tool.BaseTF);
-        else { AddInfo("RequestBars: пустой массив таймфреймов."); return; }
+        if (tool == null) throw new ArgumentNullException(nameof(tool));
+        if (Connector.TimeFrames == null || Connector.TimeFrames.Count == 0)
+        {
+            AddInfo("RequestBars: Connector.TimeFrames is empty");
+            return;
+        }
 
+        var tf = Connector.TimeFrames.Last(x => x.Period / 60 <= tool.BaseTF);
         int count = 25;
+
         var security = tool.Security;
         var basicSecurity = tool.BasicSecurity;
         if (basicSecurity != null)
@@ -348,7 +278,7 @@ internal class ToolManager : IToolManager
             ExtraGridlines = gridLines.ToArray()
         };
         LinearAxis yAxis = new() { Position = AxisPosition.Right };
-        CandleStickSeries Candles = new()
+        CandleStickSeries candles = new()
         {
             ItemsSource = items,
             TrackerFormatString = "High: {3:0.0000}\nLow: {4:0.0000}\nOpen: {5:0.0000}\nClose: {6:0.0000}"
@@ -356,7 +286,7 @@ internal class ToolManager : IToolManager
 
         Theme.Color(xAxis);
         Theme.Color(yAxis);
-        Theme.Color(Candles);
+        Theme.Color(candles);
 
         double yMin = double.MaxValue;
         double yMax = double.MinValue;
@@ -365,15 +295,15 @@ internal class ToolManager : IToolManager
             yMin = Math.Min(yMin, items[i].Low);
             yMax = Math.Max(yMax, items[i].High);
         }
-        double Margin = (yMax - yMin) * 0.05;
-        yAxis.Zoom(yMin - Margin, yMax + Margin);
+        double margin = (yMax - yMin) * 0.05;
+        yAxis.Zoom(yMin - margin, yMax + margin);
 
         if (model != null)
         {
             model.Axes[0].AxisChanged -= tool.Handler;
             model.Axes[0].AxisChanged -= tool.MiniHandler;
         }
-        tool.Handler = (s, a) => ScaleModel(Candles, xAxis, yAxis);
+        tool.Handler = (s, a) => Plot.ScaleModel(candles, xAxis, yAxis);
         xAxis.AxisChanged += tool.Handler;
 
         if (model == null)
@@ -383,13 +313,13 @@ internal class ToolManager : IToolManager
             Theme.Color(model);
             model.Axes.Add(xAxis);
             model.Axes.Add(yAxis);
-            model.Series.Add(Candles);
+            model.Series.Add(candles);
         }
         else
         {
             model.Axes[0] = xAxis;
             model.Axes[1] = yAxis;
-            model.Series[0] = Candles;
+            model.Series[0] = candles;
         }
         model.InvalidatePlot(true);
     }
@@ -399,66 +329,75 @@ internal class ToolManager : IToolManager
         var model = tool.Model;
         var mainModel = tool.MainModel;
 
-        double[] Gridlines = null;
-        List<DataPoint> Points = new();
-        List<Series> ListSeries = new();
+        double[] gridlines = null;
+        List<DataPoint> points = new();
+        List<Series> listSeries = new();
         if (script != null)
         {
-            if (script.Result.Centre != -1)
-                Gridlines = new double[] { script.Result.Centre + script.Result.Level, script.Result.Centre - script.Result.Level };
+            if (script.Result.Centre != -1) gridlines = new double[]
+            {
+                script.Result.Centre + script.Result.Level,
+                script.Result.Centre - script.Result.Level
+            };
 
             List<OxyColor> colors = Theme.Indicators.ToList();
-            foreach (double[] Indicator in script.Result.Indicators)
+            foreach (var indicator in script.Result.Indicators)
             {
-                if (Indicator != null)
+                if (indicator != null)
                 {
-                    Points = new();
-                    for (int i = 0; i < Indicator.Length; i++) Points.Add(new DataPoint(i, Indicator[i]));
-                    ListSeries.Add(new LineSeries() { ItemsSource = Points, Title = script.Name, Color = colors[0] });
+                    points = new();
+                    for (int i = 0; i < indicator.Length; i++) points.Add(new DataPoint(i, indicator[i]));
+                    listSeries.Add(new LineSeries()
+                    {
+                        ItemsSource = points,
+                        Title = script.Name,
+                        Color = colors[0]
+                    });
                     if (colors.Count > 1) colors.RemoveAt(0);
                 }
             }
-            if (ListSeries.Count > 1) Points = (ListSeries[0] as LineSeries).ItemsSource as List<DataPoint>;
+            if (listSeries.Count > 1) points = (listSeries[0] as LineSeries).ItemsSource as List<DataPoint>;
         }
         else if (model?.Series.Count > 0)
         {
-            Points = (model.Series[0] as LineSeries).ItemsSource as List<DataPoint>;
-            Gridlines = model.Axes[1].ExtraGridlines;
+            points = (model.Series[0] as LineSeries).ItemsSource as List<DataPoint>;
+            gridlines = model.Axes[1].ExtraGridlines;
         }
         else return;
 
-        int Range = mainModel.Axes[0].Maximum > 5 ? (int)(mainModel.Axes[0].Maximum - mainModel.Axes[0].Minimum) : 250;
+        int range = mainModel.Axes[0].Maximum > 5 ?
+            (int)(mainModel.Axes[0].Maximum - mainModel.Axes[0].Minimum) : 250;
         LinearAxis xAxis = new()
         {
             Position = AxisPosition.Bottom,
             IsZoomEnabled = false,
             IsPanEnabled = false,
             IsAxisVisible = false,
-            Maximum = Points.Count + 4,
-            Minimum = Points.Count + 4 - Range > 1 ? Points.Count + 4 - Range : 1
+            Maximum = points.Count + 4,
+            Minimum = points.Count + 4 - range > 1 ? points.Count + 4 - range : 1
         };
         LinearAxis yAxis = new()
         {
             Position = AxisPosition.Right,
             IsPanEnabled = false,
-            ExtraGridlines = Gridlines
+            ExtraGridlines = gridlines
         };
         Theme.Color(xAxis, false);
         Theme.Color(yAxis, false);
 
         double yMin = double.MaxValue;
         double yMax = double.MinValue;
-        for (int i = (int)xAxis.Minimum; i < Points.Count; i++)
+        for (int i = (int)xAxis.Minimum; i < points.Count; i++)
         {
-            yMin = Math.Min(yMin, Points[i].Y);
-            yMax = Math.Max(yMax, Points[i].Y);
+            yMin = Math.Min(yMin, points[i].Y);
+            yMax = Math.Max(yMax, points[i].Y);
         }
-        double Margin = (yMax - yMin) * 0.05;
-        yAxis.Zoom(yMin - Margin, yMax + Margin);
+        double margin = (yMax - yMin) * 0.05;
+        yAxis.Zoom(yMin - margin, yMax + margin);
 
         mainModel.Axes[0].AxisChanged -= tool.MiniHandler;
         tool.MiniHandler =
-            (s, a) => ScaleMiniModel(Points.ToArray(), mainModel.Axes[0], xAxis, yAxis, Window, tool.Model);
+            (s, a) => Plot.ScaleMiniModel(points.ToArray(), mainModel.Axes[0], xAxis, yAxis, Window, tool.Model);
         mainModel.Axes[0].AxisChanged += tool.MiniHandler;
 
         if (model == null)
@@ -471,12 +410,12 @@ internal class ToolManager : IToolManager
         }
         else
         {
-            if (ListSeries.Count > 0) model.Series.Clear();
+            if (listSeries.Count > 0) model.Series.Clear();
             model.Axes[0] = xAxis;
             model.Axes[1] = yAxis;
         }
 
-        foreach (Series MySeries in ListSeries) model.Series.Add(MySeries);
+        foreach (var series in listSeries) model.Series.Add(series);
         model.InvalidatePlot(true);
     }
 
@@ -537,43 +476,6 @@ internal class ToolManager : IToolManager
         }
     }
 
-    private void UpdateViewTool(object sender, SelectionChangedEventArgs e)
-    {
-        Tool MyTool = (sender as ComboBox).DataContext as Tool;
-        Task.Run(() => UpdateView(MyTool, true));
-    }
-
-    private void IdentifySystemOrdersAndTrades(Tool tool)
-    {
-        var systemOrders = TradingSystem.SystemOrders;
-        var unknownsOrders = TradingSystem.Orders.ToArray()
-            .Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode);
-        foreach (Order UnknowOrder in unknownsOrders)
-        {
-            int i = Array.FindIndex(systemOrders.ToArray(), x => x.TrID == UnknowOrder.TrID);
-            if (i > -1)
-            {
-                UnknowOrder.Sender = systemOrders[i].Sender;
-                UnknowOrder.Signal = systemOrders[i].Signal;
-                UnknowOrder.Note = systemOrders[i].Note;
-                Window.Dispatcher.Invoke(() => systemOrders[i] = UnknowOrder);
-            }
-        }
-
-        var UnknownsTrades = TradingSystem.Trades.ToArray()
-            .Where(x => x.SenderOrder == null && x.Seccode == tool.Security.Seccode);
-        foreach (Trade UnknowTrade in UnknownsTrades)
-        {
-            int i = Array.FindIndex(systemOrders.ToArray(), x => x.OrderNo == UnknowTrade.OrderNo);
-            if (i > -1)
-            {
-                UnknowTrade.SenderOrder = systemOrders[i].Sender;
-                UnknowTrade.SignalOrder = systemOrders[i].Signal;
-                UnknowTrade.NoteOrder = systemOrders[i].Note;
-                Window.Dispatcher.Invoke(() => TradingSystem.SystemTrades.Add(UnknowTrade));
-            }
-        }
-    }
 
     private async Task<bool> CheckTool(Tool tool)
     {
@@ -609,19 +511,136 @@ internal class ToolManager : IToolManager
         return true;
     }
 
+    private async Task Calculate(Tool tool)
+    {
+        await WaitCertainty(tool);
+
+        var toolState = CalculateToolState(tool);
+        UpdateControlPanel(tool, toolState);
+        UpdateBarsColor(tool, toolState);
+        if (toolState.IsLogging) WriteStateLog(tool, toolState);
+
+        ScriptManager.IdentifyOrdersAndTrades(tool);
+        IdentifySystemOrdersAndTrades(tool);
+
+        if (!tool.StopTrading)
+        {
+            if (!await CancelUnknownOrders(tool)) return;
+            if (toolState.ReadyToTrade)
+            {
+                foreach (var script in tool.Scripts) await ScriptManager.UpdateOrdersAndPositionAsync(script);
+                if (!await CheckPositionMatching(tool, toolState)) return;
+                await NormalizePosition(tool, toolState);
+            }
+        }
+        else if (!await CancelActiveOrders(tool)) return;
+
+        var security = tool.Security;
+        var basicSecurity = tool.BasicSecurity ?? security;
+        foreach (var script in tool.Scripts)
+        {
+            // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
+            if (!await ScriptManager.CalculateAsync(script, basicSecurity)) continue;
+
+            // Обновление моделей, информационной панели скрипта и логирование
+            ScriptManager.UpdateView(tool, script);
+            if (toolState.IsLogging) ScriptManager.WriteLog(script, tool.Name);
+
+            // Выравнивание данных и проверка условий для выхода
+            if (basicSecurity != security && !ScriptManager.AlignData(tool, script)) continue;
+            if (!toolState.ReadyToTrade ||
+                script.Result.Type != ScriptType.StopLine && !toolState.IsBidding) continue;
+
+            // Работа с заявками
+            await ScriptManager.ProcessOrdersAsync(tool, toolState, script);
+        }
+    }
+
+    private async Task WaitCertainty(Tool tool)
+    {
+        var undefined = TradingSystem.Orders.ToArray()
+            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "forwarding" or "inactive"));
+        if (undefined.Any())
+        {
+            AddInfo(tool.Name + ": uncertain order status: " + undefined.First().Status);
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(300);
+                if (!undefined.Where(x => x.Status is "forwarding" or "inactive").Any()) return;
+            }
+            AddInfo(tool.Name + ": failed to get certain order status");
+        }
+
+        var lastTrade = TradingSystem.Trades.ToArray().LastOrDefault(x => x.Seccode == tool.Security.Seccode);
+        if (lastTrade != null && lastTrade.DateTime.AddSeconds(2) > DateTime.Now) await Task.Delay(1500);
+    }
+
+    private void IdentifySystemOrdersAndTrades(Tool tool)
+    {
+        var systemOrders = TradingSystem.SystemOrders;
+        var unknownOrders = TradingSystem.Orders.ToArray()
+            .Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode);
+        foreach (var unknownOrder in unknownOrders)
+        {
+            int i = Array.FindIndex(systemOrders.ToArray(), x => x.TrID == unknownOrder.TrID);
+            if (i > -1)
+            {
+                unknownOrder.Sender = systemOrders[i].Sender;
+                unknownOrder.Signal = systemOrders[i].Signal;
+                unknownOrder.Note = systemOrders[i].Note;
+                Window.Dispatcher.Invoke(() => systemOrders[i] = unknownOrder);
+            }
+        }
+
+        var unknownTrades = TradingSystem.Trades.ToArray()
+            .Where(x => x.SenderOrder == null && x.Seccode == tool.Security.Seccode);
+        foreach (var unknownTrade in unknownTrades)
+        {
+            int i = Array.FindIndex(systemOrders.ToArray(), x => x.OrderNo == unknownTrade.OrderNo);
+            if (i > -1)
+            {
+                unknownTrade.SenderOrder = systemOrders[i].Sender;
+                unknownTrade.SignalOrder = systemOrders[i].Signal;
+                unknownTrade.NoteOrder = systemOrders[i].Note;
+                Window.Dispatcher.Invoke(() => TradingSystem.SystemTrades.Add(unknownTrade));
+            }
+        }
+    }
+
+
+    private ToolState CalculateToolState(Tool tool)
+    {
+        var readyToTrade = !tool.StopTrading && TradingSystem.PortfolioManager.CheckEquity();
+        var average = Math.Round(tool.Security.Bars.Close.TakeLast(30).Average(), tool.Security.Decimals);
+        var atr = Indicators.ATR(tool.Security.Bars.High, tool.Security.Bars.Low, tool.Security.Bars.Close, 50);
+        var toolState = new ToolState(readyToTrade, IsLogging(tool), IsBidding(tool))
+        {
+            IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 10,
+            AveragePrice = average,
+            ATR = atr[^2]
+        };
+        if (!toolState.IsNormalPrice) AddInfo(tool.Name + ": the price is out of range", notify: true);
+
+        SetRubReqs(tool, toolState);
+        SetPositionVolumes(tool, toolState);
+        SetBalance(tool, toolState);
+        SetOrdersVolumes(tool, toolState);
+        return toolState;
+    }
+
     private bool IsBidding(Tool tool)
     {
         if (DateTime.Now < DateTime.Today.AddHours(1)) return false;
 
         if (DateTime.Now > DateTime.Today.AddMinutes(839).AddSeconds(55) &&
             DateTime.Now < DateTime.Today.AddMinutes(845)) return false;
-        
+
         if (DateTime.Now > DateTime.Today.AddMinutes(1129).AddSeconds(55) &&
             DateTime.Now < DateTime.Today.AddMinutes(1145))
         {
             return tool.Security.LastTrade.DateTime > DateTime.Today.AddMinutes(1130);
         }
-        
+
         if (tool.Security.LastTrade.DateTime.AddHours(1) > DateTime.Now) return true;
         return false;
     }
@@ -660,25 +679,6 @@ internal class ToolManager : IToolManager
             catch (Exception e) { AddInfo(tool.Name + ": logging exception: " + e.Message); }
         }
         return false;
-    }
-
-    private async Task WaitCertainty(Tool tool)
-    {
-        var undefined = TradingSystem.Orders.ToArray()
-            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "forwarding" or "inactive"));
-        if (undefined.Any())
-        {
-            AddInfo(tool.Name + ": uncertain order status: " + undefined.First().Status);
-            for (int i = 0; i < 10; i++)
-            {
-                await Task.Delay(300);
-                if (!undefined.Where(x => x.Status is "forwarding" or "inactive").Any()) return;
-            }
-            AddInfo(tool.Name + ": failed to get certain order status");
-        }
-
-        var lastTrade = TradingSystem.Trades.ToArray().LastOrDefault(x => x.Seccode == tool.Security.Seccode);
-        if (lastTrade != null && lastTrade.DateTime.AddSeconds(2) > DateTime.Now) await Task.Delay(1500);
     }
 
     private void SetRubReqs(Tool tool, ToolState toolState)
@@ -721,14 +721,12 @@ internal class ToolManager : IToolManager
 
     private void SetPositionVolumes(Tool tool, ToolState toolState)
     {
-        var settings = TradingSystem.Settings;
-        var portfolio = TradingSystem.Portfolio;
-        var maxShare = portfolio.Saldo / 100 * settings.MaxShareInitReqsPosition;
-
-        int roundedLongVolume, roundedShortVolume;
+        var saldo = TradingSystem.Portfolio.Saldo;
+        var maxShare = saldo / 100 * TradingSystem.Settings.MaxShareInitReqsPosition;
         if (tool.TradeShare)
         {
-            var optShare = portfolio.Saldo / 100 * tool.ShareOfFunds;
+            var settings = TradingSystem.Settings;
+            var optShare = saldo / 100 * tool.ShareOfFunds;
             if (optShare > maxShare)
             {
                 AddInfo(tool.Name + ": ShareOfFunds превышает допустимый объём риска: " +
@@ -736,43 +734,48 @@ internal class ToolManager : IToolManager
                 optShare = maxShare;
             }
 
-            roundedLongVolume = (int)Math.Floor(optShare / toolState.LongReqs);
-            if (roundedLongVolume < tool.MinNumberOfLots) roundedLongVolume = tool.MinNumberOfLots;
-            if (roundedLongVolume > tool.MaxNumberOfLots) roundedLongVolume = tool.MaxNumberOfLots;
-            if (roundedLongVolume * toolState.LongReqs > maxShare)
+            int longVol = (int)Math.Floor(optShare / toolState.LongReqs);
+            if (longVol < tool.MinNumberOfLots) longVol = tool.MinNumberOfLots;
+            if (longVol > tool.MaxNumberOfLots) longVol = tool.MaxNumberOfLots;
+            if (longVol * toolState.LongReqs > maxShare)
             {
                 AddInfo(tool.Name + ": LongVolume превышает допустимый объём риска: " +
                     settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
-                roundedLongVolume = (int)Math.Floor(optShare / toolState.LongReqs);
+                longVol = (int)Math.Floor(optShare / toolState.LongReqs);
             }
 
-            roundedShortVolume = (int)Math.Floor(optShare / toolState.ShortReqs);
-            if (roundedShortVolume < tool.MinNumberOfLots) roundedShortVolume = tool.MinNumberOfLots;
-            if (roundedShortVolume > tool.MaxNumberOfLots) roundedShortVolume = tool.MaxNumberOfLots;
-            if (roundedShortVolume * toolState.ShortReqs > maxShare)
+            int shortVol = (int)Math.Floor(optShare / toolState.ShortReqs);
+            if (shortVol < tool.MinNumberOfLots) shortVol = tool.MinNumberOfLots;
+            if (shortVol > tool.MaxNumberOfLots) shortVol = tool.MaxNumberOfLots;
+            if (shortVol * toolState.ShortReqs > maxShare)
             {
                 AddInfo(tool.Name + ": ShortVolume превышает допустимый объём риска: " +
                     settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
-                roundedShortVolume = (int)Math.Floor(optShare / toolState.ShortReqs);
+                shortVol = (int)Math.Floor(optShare / toolState.ShortReqs);
             }
-        }
-        else if (tool.NumberOfLots * Math.Max(toolState.LongReqs, toolState.ShortReqs) > maxShare)
-        {
-            AddInfo(tool.Name + ": NumberOfLots превышает допустимый объём риска.", notify: true);
-            roundedLongVolume = (int)Math.Floor(maxShare / toolState.LongReqs);
-            roundedShortVolume = (int)Math.Floor(maxShare / toolState.ShortReqs);
+
+            toolState.LongVolume = longVol;
+            toolState.ShortVolume = shortVol;
+
+            toolState.LongRealVolume = Math.Round(saldo * 0.01 * tool.ShareOfFunds / toolState.LongReqs, 2);
+            toolState.ShortRealVolume = Math.Round(saldo * 0.01 * tool.ShareOfFunds / toolState.ShortReqs, 2);
         }
         else
         {
-            roundedLongVolume = tool.NumberOfLots;
-            roundedShortVolume = tool.NumberOfLots;
+            if (tool.NumberOfLots * Math.Max(toolState.LongReqs, toolState.ShortReqs) > maxShare)
+            {
+                AddInfo(tool.Name + ": NumberOfLots превышает допустимый объём риска.", notify: true);
+                toolState.LongVolume = (int)Math.Floor(maxShare / toolState.LongReqs);
+                toolState.ShortVolume = (int)Math.Floor(maxShare / toolState.ShortReqs);
+            }
+            else
+            {
+                toolState.LongVolume = tool.NumberOfLots;
+                toolState.ShortVolume = tool.NumberOfLots;
+            }
+            toolState.LongRealVolume = toolState.LongVolume;
+            toolState.ShortRealVolume = toolState.ShortVolume;
         }
-
-        toolState.LongRoundedVolume = roundedLongVolume;
-        toolState.ShortRoundedVolume = roundedShortVolume;
-
-        toolState.LongRealVolume = Math.Round(portfolio.Saldo * 0.01 * tool.ShareOfFunds / toolState.LongReqs, 2);
-        toolState.ShortRealVolume = Math.Round(portfolio.Saldo * 0.01 * tool.ShareOfFunds / toolState.ShortReqs, 2);
     }
 
     private void SetBalance(Tool tool, ToolState toolState)
@@ -786,7 +789,7 @@ internal class ToolManager : IToolManager
         if (tool.UseShiftBalance) toolState.Balance -= tool.BaseBalance;
 
         if (Math.Abs(toolState.Balance) >
-            Math.Max(Math.Max(toolState.LongRoundedVolume, toolState.ShortRoundedVolume), 1) *
+            Math.Max(Math.Max(toolState.LongVolume, toolState.ShortVolume), 1) *
             TradingSystem.Settings.TolerancePosition)
         {
             if (DateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
@@ -824,112 +827,126 @@ internal class ToolManager : IToolManager
         toolState.ShortOrderVolume = balance;
         if (tool.Scripts.Length == 1 || toolState.Balance == 0)
         {
-            toolState.LongOrderVolume += toolState.LongRoundedVolume;
-            toolState.ShortOrderVolume += toolState.ShortRoundedVolume;
+            toolState.LongOrderVolume += toolState.LongVolume;
+            toolState.ShortOrderVolume += toolState.ShortVolume;
         }
     }
 
+
     private async Task NormalizePosition(Tool tool, ToolState toolState)
     {
-        var security = tool.Security;
-        var cancelOrder = Connector.CancelOrderAsync;
-        var sendOrder = Connector.SendOrderAsync;
-        var replaceOrder = Connector.ReplaceOrderAsync;
-        var balance = toolState.Balance;
-        var realVolumes = (toolState.LongRealVolume, toolState.ShortRealVolume);
-        var volumes = (toolState.LongRoundedVolume, toolState.ShortRoundedVolume);
-
         var activeOrders = TradingSystem.Orders.ToArray().Where(x => x.Sender == "System" &&
-        x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
-        if (activeOrders.Length == 0 && !tool.UseNormalization || !toolState.IsBidding) return;
-        if (activeOrders.Length > 1)
+            x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
+        if (!activeOrders.Any() && !tool.UseNormalization || !toolState.IsBidding) return;
+        if (activeOrders.Count() > 1)
         {
-            AddInfo(tool.Name + ": Отмена нескольких активных заявок System: " + activeOrders.Length);
-            foreach (Order MyOrder in activeOrders) await cancelOrder(MyOrder);
+            AddInfo(tool.Name + ": cancellation of several active system orders: " + activeOrders.Count());
+            foreach (var order in activeOrders) await Connector.CancelOrderAsync(order);
             return;
         }
 
-        if (TradingSystem.Orders.ToArray().Any(x => x.Sender != "System" && x.Seccode == security.Seccode &&
-        x.Status is "active" && (x.Quantity - x.Balance > 0.00001 || x.Note == "PartEx"))) return;
+        if (TradingSystem.Orders.ToArray().Any(x => 
+            x.Sender != "System" && x.Seccode == tool.Security.Seccode && x.Status is "active" &&
+            (x.Quantity - x.Balance > 0.00001 || x.Note == "PartEx"))) return;
+
+        var security = tool.Security;
+        var balance = toolState.Balance;
 
         double gap = Math.Abs(balance) / 14D;
         bool needToNormalizeUp =
-            balance > 0 && balance + Math.Ceiling(balance * 0.04) + (gap < 0.5 ? gap : 0.5) < realVolumes.Item1 ||
-            balance < 0 && -balance + Math.Ceiling(-balance * 0.04) + (gap < 0.5 ? gap : 0.5) < realVolumes.Item2;
+            balance > 0 && 
+            balance + Math.Ceiling(balance * 0.04) + (gap < 0.5 ? gap : 0.5) < toolState.LongRealVolume ||
+            balance < 0 &&
+            -balance + Math.Ceiling(-balance * 0.04) + (gap < 0.5 ? gap : 0.5) < toolState.ShortRealVolume;
 
         var activeOrder = activeOrders.SingleOrDefault();
         if (activeOrder != null)
         {
-            if ((activeOrder.BuySell == "B") == balance < 0 && (balance > volumes.Item1 || -balance > volumes.Item2))
+            if ((activeOrder.BuySell == "B") == balance < 0 &&
+                (balance > toolState.LongVolume || -balance > toolState.ShortVolume))
             {
-                foreach (Script MyScript in tool.Scripts)
-                    if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)
-                    {
-                        AddInfo(tool.Name +
-                            ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
-                        await cancelOrder(activeOrder);
-                        return;
-                    }
+                if (!await PrepareForNormalization(tool, activeOrder)) return;
 
-                int Volume = balance > volumes.Item1 ? balance - volumes.Item1 : -balance - volumes.Item2;
+                int volume = balance > toolState.LongVolume ?
+                    balance - toolState.LongVolume : -balance - toolState.ShortVolume;
+
                 if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.00001 &&
-                    DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != Volume)
-                    await replaceOrder(activeOrder, security, OrderType.Limit,
-                        security.Bars.Close[^2], Volume, "Normalization", null, "NM");
+                    DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != volume)
+                {
+                    await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit,
+                        security.Bars.Close[^2], volume, "Normalization", null, "NM");
+                }
             }
             else if ((activeOrder.BuySell == "B") == balance > 0 && needToNormalizeUp)
             {
-                foreach (Script MyScript in tool.Scripts)
-                    if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)
-                    {
-                        AddInfo(tool.Name +
-                            ": Отмена заявки для нормализации, скрипт уже выставил заявку с ценой закрытия прошлого бара.");
-                        await cancelOrder(activeOrder);
-                        return;
-                    }
+                if (!await PrepareForNormalization(tool, activeOrder)) return;
 
-                int Volume = balance > 0 ? volumes.Item1 - balance : volumes.Item2 + balance;
+                int volume = balance > 0 ?
+                    toolState.LongVolume - balance : toolState.ShortVolume + balance;
+
                 if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.00001 &&
-                    DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != Volume)
-                    await replaceOrder(activeOrder, security,
-                        OrderType.Limit, security.Bars.Close[^2], Volume, "NormalizationUp", null, "NM");
-            }
-            else await cancelOrder(activeOrder);
-        }
-        else if (balance > volumes.Item1 || -balance > volumes.Item2)
-        {
-            foreach (Script MyScript in tool.Scripts)
-                if (MyScript.ActiveOrder != null && Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)
+                    DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != volume)
                 {
-                    AddInfo(tool.Name + ": Требуется нормализация, но скрипт уже выставил заявку с ценой закрытия прошлого бара.", false);
-                    return;
+                    await Connector.ReplaceOrderAsync(activeOrder, security,
+                        OrderType.Limit, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
                 }
+            }
+            else await Connector.CancelOrderAsync(activeOrder);
+        }
+        else if (balance > toolState.LongVolume || -balance > toolState.ShortVolume)
+        {
+            if (!await PrepareForNormalization(tool)) return;
 
-            int Volume = balance > volumes.Item1 ? balance - volumes.Item1 : -balance - volumes.Item2;
-            await sendOrder(security, OrderType.Limit, balance < 0, security.Bars.Close[^2], Volume, "Normalization", null, "NM");
-            WriteLogNM(tool, balance, volumes);
+            int volume = balance > toolState.LongVolume ?
+                balance - toolState.LongVolume : -balance - toolState.ShortVolume;
+
+            await Connector.SendOrderAsync(security, OrderType.Limit, balance < 0,
+                security.Bars.Close[^2], volume, "Normalization", null, "NM");
+            
+            WriteStateLog(tool, toolState, "NM");
         }
         else if (needToNormalizeUp)
         {
-            foreach (Script MyScript in tool.Scripts)
-                if (MyScript.ActiveOrder != null &&
-                    (MyScript.ActiveOrder.Quantity - MyScript.ActiveOrder.Balance > 0.00001 || MyScript.ActiveOrder.Note == "PartEx" ||
-                    Math.Abs(MyScript.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)) return;
+            foreach (var script in tool.Scripts)
+                if (script.ActiveOrder != null &&
+                    (script.ActiveOrder.Quantity - script.ActiveOrder.Balance > 0.00001 ||
+                    script.ActiveOrder.Note == "PartEx" ||
+                    Math.Abs(script.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)) return;
 
-            foreach (Script MyScript in tool.Scripts)
+            foreach (var script in tool.Scripts)
             {
-                Order LastExecuted = MyScript.Orders.LastOrDefault(x => x.Status == "matched");
-                if (LastExecuted != null &&
-                    (LastExecuted.DateTime.AddDays(4) > DateTime.Now || balance > 0 == security.Bars.Close[^2] < LastExecuted.Price))
+                var lastExecuted = script.Orders.LastOrDefault(x => x.Status == "matched");
+                if (lastExecuted != null &&
+                    (lastExecuted.DateTime.AddDays(4) > DateTime.Now ||
+                    balance > 0 == security.Bars.Close[^2] < lastExecuted.Price))
                 {
-                    int Volume = balance > 0 ? volumes.Item1 - balance : volumes.Item2 + balance;
-                    await sendOrder(security, OrderType.Limit,
-                        balance > 0, security.Bars.Close[^2], Volume, "NormalizationUp", null, "NM");
-                    WriteLogNM(tool, balance, volumes);
+                    int volume = balance > 0 ?
+                        toolState.LongVolume - balance : toolState.ShortVolume + balance;
+
+                    await Connector.SendOrderAsync(security, OrderType.Limit,
+                        balance > 0, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
+
+                    WriteStateLog(tool, toolState, "NM");
                     return;
                 }
             }
         }
+    }
+
+    private async Task<bool> PrepareForNormalization(Tool tool, Order activeOrderNM = null)
+    {
+        foreach (var script in tool.Scripts)
+        {
+            if (script.ActiveOrder != null &&
+                Math.Abs(script.ActiveOrder.Price - tool.Security.Bars.Close[^2]) < 0.00001)
+            {
+                AddInfo(tool.Name +
+                    ": NM: script has already sent an order with the closing price of the previous bar");
+                if (activeOrderNM != null) await Connector.CancelOrderAsync(activeOrderNM);
+                return false;
+            }
+        }
+        return true;
     }
 
     private async Task<bool> CheckPositionMatching(Tool tool, ToolState toolState)
@@ -940,8 +957,6 @@ internal class ToolManager : IToolManager
 
         var security = tool.Security;
         var scripts = tool.Scripts;
-        var name = tool.Name;
-        var settings = TradingSystem.Settings;
         var balance = toolState.Balance;
 
         if (scripts.Length == 1)
@@ -956,23 +971,12 @@ internal class ToolManager : IToolManager
             if (position == Neutral && balance != 0 ||
                 position == Long && balance <= 0 || position == Short && balance >= 0)
             {
-                if (!toolState.IsBidding || !toolState.IsNormalPrice)
-                {
-                    AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
-                        settings.DisplaySpecialInfo, true);
-                    return true;
-                }
-                AddInfo(name + 
-                    ": Позиция скрипта не соответствует позиции в портфеле. Нормализация по рынку.", notify: true);
-
-                var active = TradingSystem.Orders.ToArray()
-                    .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching"));
-                foreach (var order in active) await Connector.CancelOrderAsync(order);
+                if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
 
                 int volume;
                 bool isBuy = position == Neutral ? balance < 0 : position == Long;
-                if (position == Long) volume = Math.Abs(balance) + toolState.LongRoundedVolume;
-                else if (position == Short) volume = Math.Abs(balance) + toolState.ShortRoundedVolume;
+                if (position == Long) volume = Math.Abs(balance) + toolState.LongVolume;
+                else if (position == Short) volume = Math.Abs(balance) + toolState.ShortVolume;
                 else volume = Math.Abs(balance);
 
                 await Connector.SendOrderAsync(security, OrderType.Market,
@@ -996,27 +1000,16 @@ internal class ToolManager : IToolManager
                 if (position1 == Neutral && balance != 0 ||
                     position1 == Long && balance <= 0 || position1 == Short && balance >= 0)
                 {
-                    if (!toolState.IsBidding || !toolState.IsNormalPrice)
-                    {
-                        AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
-                            settings.DisplaySpecialInfo, true);
-                        return true;
-                    }
-                    AddInfo(name +  ": Текущие позиции скриптов не соответствуют позиции в портфеле." +
-                        " Нормализация по рынку.", notify: true);
+                    if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
 
-                    var active = TradingSystem.Orders.ToArray()
-                        .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching"));
-                    foreach (var order in active) await Connector.CancelOrderAsync(order);
-
-                    int VolumeOrder;
-                    bool IsBuy = position1 == Neutral ? balance < 0 : position1 == Long;
-                    if (position1 == Long) VolumeOrder = Math.Abs(balance) + toolState.LongRoundedVolume;
-                    else if (position1 == Short) VolumeOrder = Math.Abs(balance) + toolState.ShortRoundedVolume;
-                    else VolumeOrder = Math.Abs(balance);
+                    int volume;
+                    bool isBuy = position1 == Neutral ? balance < 0 : position1 == Long;
+                    if (position1 == Long) volume = Math.Abs(balance) + toolState.LongVolume;
+                    else if (position1 == Short) volume = Math.Abs(balance) + toolState.ShortVolume;
+                    else volume = Math.Abs(balance);
 
                     await Connector.SendOrderAsync(security, OrderType.Market,
-                        IsBuy, security.Bars.Close[^2], VolumeOrder, "BringingIntoLine", null, "NM");
+                        isBuy, security.Bars.Close[^2], volume, "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
@@ -1024,19 +1017,7 @@ internal class ToolManager : IToolManager
             {
                 if (balance != 0)
                 {
-                    if (!toolState.IsBidding || !toolState.IsNormalPrice)
-                    {
-                        AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
-                            settings.DisplaySpecialInfo, true);
-                        return true;
-                    }
-                    AddInfo(name + ": Текущие позиции скриптов не соответствуют позиции в портфеле." +
-                        " Нормализация по рынку.", notify: true);
-
-                    var active = TradingSystem.Orders.ToArray()
-                        .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching"));
-                    foreach (var order in active) await Connector.CancelOrderAsync(order);
-
+                    if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
                     await Connector.SendOrderAsync(security, OrderType.Market,
                         balance < 0, security.Bars.Close[^2], Math.Abs(balance), "BringingIntoLine", null, "NM");
                     return false;
@@ -1047,176 +1028,127 @@ internal class ToolManager : IToolManager
                 var position = position1 == Neutral ? position2 : position1;
                 if (position == Long && balance <= 0 || position == Short && balance >= 0)
                 {
-                    if (!toolState.IsBidding || !toolState.IsNormalPrice)
-                    {
-                        AddInfo(name + ": Несоответствие позиции, но торги не ведутся или цена за пределами нормы.",
-                            settings.DisplaySpecialInfo, true);
-                        return true;
-                    }
-                    AddInfo(name + ": Текущие позиции скриптов не соответствуют позиции в портфеле." +
-                        " Нормализация по рынку.", notify: true);
-
-                    var active = TradingSystem.Orders.ToArray()
-                        .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching"));
-                    foreach (var order in active) await Connector.CancelOrderAsync(order);
-
-                    int vol = position == Long ? Math.Abs(balance) + toolState.LongRoundedVolume : 
-                        Math.Abs(balance) + toolState.ShortRoundedVolume;
+                    if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
+                    int vol = position == Long ?
+                        Math.Abs(balance) + toolState.LongVolume : 
+                        Math.Abs(balance) + toolState.ShortVolume;
                     await Connector.SendOrderAsync(security, OrderType.Market,
                         position == Long, security.Bars.Close[^2], vol, "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
         }
+        else throw new ArgumentException("Unexpected number of scripts", nameof(tool));
         return true;
     }
 
+    private async Task<bool> PrepareForBringingIntoLine(Tool tool, ToolState toolState)
+    {
+        if (!toolState.IsBidding || !toolState.IsNormalPrice)
+        {
+            AddInfo(tool.Name + ": position mismatch, but it is not bidding or normal price.",
+                TradingSystem.Settings.DisplaySpecialInfo, true);
+            return false;
+        }
+        AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+        await CancelActiveOrders(tool);
+        return true;
+    }
+
+
     private async Task<bool> CancelActiveOrders(Tool tool)
     {
-        Order[] active = TradingSystem.Orders.ToArray()
-            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching")).ToArray();
-        if (active.Length == 0) return true;
+        var active = TradingSystem.Orders.ToArray()
+            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
+        if (!active.Any()) return true;
 
-        AddInfo(tool.Name + ": Отмена всех активных заявок: " + active.Length);
-        foreach (Order MyOrder in active) await Connector.CancelOrderAsync(MyOrder);
+        AddInfo(tool.Name + ": cancellation of all active orders: " + active.Count());
+        foreach (var order in active) await Connector.CancelOrderAsync(order);
 
-        Thread.Sleep(500);
-        if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
+        for (int i = 0; i < 20; i++)
+        {
+            if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
+            await Task.Delay(250);
+        }
 
-        Thread.Sleep(1000);
-        if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-        Thread.Sleep(1500);
-        if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-        Thread.Sleep(2000);
-        if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-        AddInfo(tool.Name + ": Не удалось вовремя отменить все активные заявки");
+        AddInfo(tool.Name + ": failed to cancel all active orders in time");
         return false;
     }
 
-    private async Task<bool> CancelUnknownsOrders(Tool tool)
+    private async Task<bool> CancelUnknownOrders(Tool tool)
     {
-        Order[] Unknowns = TradingSystem.Orders.ToArray()
-            .Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching")).ToArray();
-        if (Unknowns.Length == 0) return true;
+        var unknown = TradingSystem.Orders.ToArray().Where(x => x.Sender == null &&
+            x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
+        if (!unknown.Any()) return true;
 
-        AddInfo(tool.Name + ": Отмена неизвестных активных заявок: " + Unknowns.Length);
-        foreach (Order MyOrder in Unknowns) await Connector.CancelOrderAsync(MyOrder);
+        AddInfo(tool.Name + ": cancellation of unknown orders: " + unknown.Count());
+        foreach (var order in unknown) await Connector.CancelOrderAsync(order);
 
-        Thread.Sleep(500);
-        if (!Unknowns.Where(x => x.Status is "active" or "watching").Any()) return true;
+        for (int i = 0; i < 20; i++)
+        {
+            if (!unknown.Where(x => x.Status is "active" or "watching").Any()) return true;
+            await Task.Delay(250);
+        }
 
-        Thread.Sleep(1000);
-        if (!Unknowns.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-        Thread.Sleep(1500);
-        if (!Unknowns.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-        Thread.Sleep(2000);
-        if (!Unknowns.Where(x => x.Status is "active" or "watching").Any()) return true;
-
-        AddInfo(tool.Name + ": Не удалось вовремя отменить неизвестные активные заявки");
+        AddInfo(tool.Name + ": failed to cancel unknown orders in time");
         return false;
     }
+
 
     private void UpdateControlPanel(Tool tool, ToolState toolState)
+    {
+        Window.Dispatcher.Invoke(() =>
+        {
+            tool.BorderState.Background = toolState.ReadyToTrade ? Theme.Green : Theme.Orange;
+
+            tool.MainBlockInfo.Text =
+            "\nReq " + Math.Round(toolState.LongReqs) + "/" + Math.Round(toolState.ShortReqs) +
+            "\nVols " + toolState.LongVolume + "/" + toolState.ShortVolume +
+            "\nOrderVols " + toolState.LongOrderVolume + "/" + toolState.ShortOrderVolume +
+            "\nLastTr " + tool.Security.LastTrade.DateTime.TimeOfDay.ToString();
+
+            tool.BlockInfo.Text = "\nBal/Real " + toolState.Balance + "/" + toolState.RealBalance +
+            "\nRealV " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
+            "\nSMA " + toolState.AveragePrice + "\n10ATR " + Math.Round(toolState.ATR * 10, tool.Security.Decimals);
+        });
+    }
+
+    private void UpdateBarsColor(Tool tool, ToolState toolState)
     {
         (tool.MainModel.Series[0] as CandleStickSeries).DecreasingColor = toolState.IsBidding &&
             (!tool.ShowBasicSecurity ||
             tool.ShowBasicSecurity && tool.BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
             Theme.RedBar : Theme.FadedBar;
         tool.MainModel.InvalidatePlot(false);
-
-        Window.Dispatcher.Invoke(() =>
-        {
-            tool.BorderState.Background = toolState.ReadyToTrade ? Theme.Green : Theme.Orange;
-
-            tool.MainBlockInfo.Text = 
-            "\nReq " + Math.Round(toolState.LongReqs) + "/" + Math.Round(toolState.ShortReqs) +
-            "\nVols " + toolState.LongRoundedVolume + "/" + toolState.ShortRoundedVolume +
-            "\nOrderVols " + toolState.LongOrderVolume + "/" + toolState.ShortOrderVolume +
-            "\nLastTr " + tool.Security.LastTrade.DateTime.TimeOfDay.ToString();
-
-            tool.BlockInfo.Text = "\nBal/Real " + toolState.Balance + "/" + toolState.RealBalance +
-            "\nClearV " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
-            "\nSMA " + toolState.AveragePrice + "\n10ATR " + Math.Round(toolState.ATR * 10, tool.Security.Decimals);
-        });
     }
 
-    private void WriteLogRisks(Tool tool, ToolState toolState)
+    private void WriteStateLog(Tool tool, ToolState toolState, string type = "Risks")
     {
+        var data = DateTime.Now + ": /////////////// " + type +
+            "\nStopTrading " + tool.StopTrading + "\nIsBidding " + toolState.IsBidding +
+            "\nReadyToTrade " + toolState.ReadyToTrade + "\nPortfolio.Saldo " + TradingSystem.Portfolio.Saldo +
+            "\nBalance " + toolState.Balance + "\nRealBalance " + toolState.RealBalance +
+            "\nUseShiftBalance " + tool.UseShiftBalance + "\nBaseBalance " + tool.BaseBalance +
+            "\nReserate " + tool.Security.ReserateLong + "/" + tool.Security.ReserateShort +
+            "\nInitReq " + tool.Security.InitReqLong + "/" + tool.Security.InitReqShort +
+            "\nShareOfFunds " + tool.ShareOfFunds + "\nRubReqs " + toolState.LongReqs + "/" + toolState.ShortReqs +
+            "\nVols " + toolState.LongVolume + "/" + toolState.ShortVolume +
+            "\nRealVols " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
+            "\nOrderVol " + toolState.LongOrderVolume + "/" + toolState.ShortOrderVolume +
+            "\nMin/Max lots " + tool.MinNumberOfLots + "/" + tool.MaxNumberOfLots + "\n";
         try
         {
-            File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", DateTime.Now + ": /////////////////// Risks" +
-                "\nBalance " + toolState.Balance + "\nRealBalance " + toolState.RealBalance +
-                "\nUseShiftBalance " + tool.UseShiftBalance + "\nBaseBalance " + tool.BaseBalance +
-                "\nStopTrading " + tool.StopTrading + "\nNowBidding " + toolState.IsBidding +
-                "\nReadyToTrade " + toolState.ReadyToTrade + "\nPortfolio.Saldo " + TradingSystem.Portfolio.Saldo +
-                "\nShareOfFunds " + tool.ShareOfFunds +
-                "\nRubReqs " + toolState.LongReqs + "/" + toolState.ShortReqs +
-                "\nRealVols " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
-                "\nPosVols " + toolState.LongRoundedVolume + "/" + toolState.ShortRoundedVolume +
-                "\nOrderVol " + toolState.LongOrderVolume + "/" + toolState.ShortOrderVolume +
-                "\nMinLots " + tool.MinNumberOfLots + "\nMaxLots " + tool.MaxNumberOfLots + "\n");
+            File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", data);
         }
-        catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования рисков: " + e.Message); }
+        catch (Exception e)
+        {
+            AddInfo(tool.Name + ": logging exception: " + type + ": " + e.Message);
+        }
     }
 
-    private void WriteLogNM(Tool tool, int Balance, (int, int) PosVolumes)
+    private void UpdateViewTool(object sender, SelectionChangedEventArgs e)
     {
-        try
-        {
-            File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", DateTime.Now + ": /////////////////// NM" +
-                "\nBalance " + Balance + "\nUseShiftBalance " + tool.UseShiftBalance + "\nBaseBalance " + tool.BaseBalance +
-                "\nReserateLong " + tool.Security.ReserateLong + "\nReserateShort " + tool.Security.ReserateShort +
-                "\nInitReqLong " + tool.Security.InitReqLong + "\nInitReqShort " + tool.Security.InitReqShort +
-                "\nPortfolio.Saldo " + TradingSystem.Portfolio.Saldo + "\nShareOfFunds " + tool.ShareOfFunds +
-                "\nPosVols " + PosVolumes.Item1 + "/" + PosVolumes.Item2 +
-                "\nMinLots " + tool.MinNumberOfLots + "\nMaxLots " + tool.MaxNumberOfLots + "\n");
-        }
-        catch (Exception e) { AddInfo(tool.Name + ": Исключение логирования NM: " + e.Message); }
-    }
-
-    private static void ScaleModel(CandleStickSeries candles, DateTimeAxis xAxis, LinearAxis yAxis)
-    {
-        int i = candles.FindByX(xAxis.ActualMinimum);
-        int xEnd = candles.FindByX(xAxis.ActualMaximum, i);
-
-        double yMin = double.MaxValue;
-        double yMax = double.MinValue;
-        for (; i <= xEnd; i++)
-        {
-            yMin = Math.Min(yMin, candles.Items[i].Low);
-            yMax = Math.Max(yMax, candles.Items[i].High);
-        }
-
-        double Margin = (yMax - yMin) * 0.05;
-        yAxis.Zoom(yMin - Margin, yMax + Margin);
-    }
-
-    private static void ScaleMiniModel(DataPoint[] Points, Axis MainAxis,
-        LinearAxis xAxis, LinearAxis yAxis, MainWindow window, PlotModel model)
-    {
-        int Difference = Points.Length + 4 - (int)MainAxis.Maximum;
-        xAxis.Minimum = MainAxis.ActualMinimum + Difference;
-        xAxis.Maximum = MainAxis.ActualMaximum + Difference;
-
-        int i = Math.Max((int)xAxis.Minimum, 0);
-        int xEnd = Math.Min((int)xAxis.Maximum, Points.Length - 1);
-
-        double yMin = double.MaxValue;
-        double yMax = double.MinValue;
-        for (; i <= xEnd; i++)
-        {
-            yMin = Math.Min(yMin, Points[i].Y);
-            yMax = Math.Max(yMax, Points[i].Y);
-        }
-
-        double Margin = (yMax - yMin) * 0.05;
-        yAxis.Zoom(yMin - Margin, yMax + Margin);
-
-        window.Dispatcher.Invoke(() => model.InvalidatePlot(false));
+        var tool = (sender as ComboBox).DataContext as Tool;
+        Task.Run(() => UpdateView(tool, true));
     }
 }

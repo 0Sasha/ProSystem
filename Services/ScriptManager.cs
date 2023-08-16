@@ -204,7 +204,7 @@ internal class ScriptManager : IScriptManager
         if (script == null) throw new ArgumentNullException(nameof(script));
 
         var volume = script.CurrentPosition == PositionType.Long ?
-            toolState.ShortRoundedVolume : toolState.LongRoundedVolume;
+            toolState.ShortVolume : toolState.LongVolume;
 
         if (script.Result.Type is ScriptType.OSC or ScriptType.Line)
             await ProcessOSCAsync(tool, script, volume, toolState.IsNormalPrice);
