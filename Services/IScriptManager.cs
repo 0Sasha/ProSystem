@@ -6,8 +6,6 @@ namespace ProSystem.Services;
 
 public interface IScriptManager
 {
-    public void InitializeScripts(Tool tool, TabItem tab);
-
     public void IdentifyOrdersAndTrades(Tool tool);
 
     public void BringOrdersInLine(Tool tool);

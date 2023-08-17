@@ -1,16 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
-using System.Xml.Linq;
-using HarfBuzzSharp;
-using OxyPlot;
-using OxyPlot.Axes;
-using OxyPlot.Series;
 
 namespace ProSystem.Services;
 
@@ -33,36 +27,18 @@ internal class ToolManager : IToolManager
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
     }
 
-    public TabItem Initialize(Tool tool)
+    public void Initialize(Tool tool)
     {
         if (tool.BaseTF < 1) tool.BaseTF = 30;
         tool.Controller ??= Plot.GetController();
         tool.BrushState = tool.Active ? Theme.Green : Theme.Red;
-
-        var tab = new TabItem()
-        {
-            Name = tool.Name,
-            Header = tool.Name,
-            Width = 54,
-            Height = 24,
-            Content = Controls.GetGridForToolTab(tool)
-        };
-        UpdateControlGrid(tool, tab);
-        ScriptManager.InitializeScripts(tool, tab);
-
+        tool.Tab = Controls.GetTabForTool(tool);
+        UpdateControlPanel(tool, true);
         UpdateView(tool, true);
-        return tab;
     }
 
-    public void UpdateControlGrid(Tool tool, TabItem tabTool = null)
-    {
-        var controlGrid = tabTool != null ?
-            ((tabTool.Content as Grid).Children[1] as Grid).Children[0] as Grid :
-            (((Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
-            as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
-        controlGrid.Children.Clear();
-        Controls.FillControlGrid(tool, controlGrid, Window.ChangeActivityTool, UpdateViewTool);
-    }
+    public void UpdateControlPanel(Tool tool, bool updateScriptPanel) => 
+        Controls.UpdateControlPanel(tool, updateScriptPanel, Window.ChangeActivityTool, UpdateViewTool);
 
     public async Task ChangeActivityAsync(Tool tool)
     {
@@ -111,15 +87,14 @@ internal class ToolManager : IToolManager
         tool.BrushState = tool.Active ? (tool.StopTrading ? Theme.Orange : Theme.Green) : Theme.Red;
         var btnContent = tool.Active ? "Deactivate tool" : "Activate tool";
 
-        Window.Dispatcher.Invoke(() => ((Window.TabsTools.Items.OfType<TabItem>().Single(i => i.Name == tool.Name)
-            .Content as Grid).Children.OfType<Grid>().Last().Children.OfType<Grid>().First()
-            .Children.OfType<Button>().First().Content = btnContent));
+        Window.Dispatcher.Invoke(() => tool.ControlPanel.Children
+            .OfType<Grid>().First().Children.OfType<Button>().First().Content = btnContent);
         tool.NotifyChange();
     }
 
     public async Task CalculateAsync(Tool tool)
     {
-        while (Interlocked.Exchange(ref tool.IsBusy, 1) != 0)
+        while (Interlocked.Exchange(ref tool.IsOccupied, 1) != 0)
         {
             AddInfo(tool.Name + ": Calculate: method is occupied by another thread", false);
             await Task.Delay(500);
@@ -133,8 +108,8 @@ internal class ToolManager : IToolManager
 
         try
         {
-            if (await CheckTool(tool)) await Calculate(tool);
-            AddInfo("Calculate: scripts executed: " + tool.Name, false);
+            if (await CheckToolAsync(tool)) await CalculateToolAsync(tool);
+            AddInfo("Scripts executed: " + tool.Name, false);
         }
         catch (Exception e)
         {
@@ -150,16 +125,15 @@ internal class ToolManager : IToolManager
         {
             tool.TimeLastRecalc = DateTime.Now;
             tool.TimeNextRecalc = DateTime.Now.AddSeconds(TradingSystem.Settings.RecalcInterval / 2);
-            Interlocked.Exchange(ref tool.IsBusy, 0);
+            Interlocked.Exchange(ref tool.IsOccupied, 0);
         }
     }
 
     public async Task RequestBarsAsync(Tool tool)
     {
-        if (tool == null) throw new ArgumentNullException(nameof(tool));
         if (Connector.TimeFrames == null || Connector.TimeFrames.Count == 0)
         {
-            AddInfo("RequestBars: Connector.TimeFrames is empty");
+            AddInfo("RequestBars: Connector.TimeFrames is empty", notify: true);
             return;
         }
 
@@ -167,21 +141,19 @@ internal class ToolManager : IToolManager
         int count = 25;
 
         var security = tool.Security;
-        var basicSecurity = tool.BasicSecurity;
-        if (basicSecurity != null)
+        var basicSec = tool.BasicSecurity;
+        if (basicSec != null)
         {
-            if (basicSecurity.SourceBars == null || basicSecurity.SourceBars.Close.Length < 500 ||
-                basicSecurity.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-            tool.BaseTF != basicSecurity.SourceBars.TF && tool.BaseTF != basicSecurity.Bars.TF) count = 10000;
-
-            await Connector.OrderHistoricalDataAsync(basicSecurity, tf, count);
+            if (basicSec.SourceBars == null || basicSec.SourceBars.Close.Length < 500 ||
+                basicSec.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
+                tool.BaseTF != basicSec.SourceBars.TF && tool.BaseTF != basicSec.Bars.TF) count = 10000;
+            await Connector.OrderHistoricalDataAsync(basicSec, tf, count);
         }
 
         count = 25;
         if (security.SourceBars == null || security.SourceBars.Close.Length < 500 ||
             security.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-        tool.BaseTF != security.SourceBars.TF && tool.BaseTF != security.Bars.TF) count = 10000;
-
+            tool.BaseTF != security.SourceBars.TF && tool.BaseTF != security.Bars.TF) count = 10000;
         await Connector.OrderHistoricalDataAsync(security, tf, count);
     }
 
@@ -191,8 +163,8 @@ internal class ToolManager : IToolManager
         var basicSecurity = tool.BasicSecurity;
         if (tool.Active)
         {
-            while (Connector.Connection == ConnectionState.Connected &&
-                !TradingSystem.ReadyToTrade) await Task.Delay(100);
+            while (Connector.Connection == ConnectionState.Connected && !TradingSystem.ReadyToTrade)
+                await Task.Delay(100);
             await ChangeActivityAsync(tool);
             await Task.Delay(250);
         }
@@ -232,191 +204,15 @@ internal class ToolManager : IToolManager
     {
         if (updateScriptView)
         {
-            if (tool.MainModel == null) UpdateModel(tool);
+            if (tool.MainModel == null) Plot.UpdateModel(tool);
             foreach (var script in tool.Scripts)
             {
                 script.Calculate(tool.BasicSecurity ?? tool.Security);
                 ScriptManager.UpdateView(tool, script);
             }
         }
-        UpdateModel(tool);
-        if (tool.Model != null) UpdateMiniModel(tool);
-    }
-
-    public void UpdateModel(Tool tool)
-    {
-        if (tool.Security.Bars == null || tool.ShowBasicSecurity && tool.BasicSecurity.Bars == null) return;
-        Bars bars = tool.ShowBasicSecurity ? tool.BasicSecurity.Bars.GetCopy() : tool.Security.Bars.GetCopy();
-
-        List<double> gridLines = new();
-        HighLowItem[] items = new HighLowItem[bars.Close.Length];
-        items[0] = new HighLowItem(0, bars.High[0], bars.Low[0], bars.Open[0], bars.Close[0]);
-        for (int i = 1; i < bars.Close.Length; i++)
-        {
-            items[i] = new HighLowItem(i, bars.High[i], bars.Low[i], bars.Open[i], bars.Close[i]);
-            if (bars.DateTime[i].Date != bars.DateTime[i - 1].Date) gridLines.Add(i);
-        }
-
-        var model = tool.MainModel;
-        int range = model?.Axes[0].ActualMaximum > 10 ?
-            (int)(model.Axes[0].ActualMaximum - model.Axes[0].ActualMinimum) : 100;
-        DateTimeAxis xAxis = new()
-        {
-            Position = AxisPosition.Bottom,
-            LabelFormatter = (value) =>
-            {
-                if (value > 1 && value < bars.Close.Length)
-                {
-                    if (bars.DateTime[(int)value].Date == bars.DateTime[(int)value - 1].Date)
-                        return bars.DateTime[(int)value].ToString("HH:mm", IC);
-                    else return bars.DateTime[(int)value].ToString("dd.MM.yy HH:mm", IC);
-                }
-                else return "";
-            },
-            Maximum = items[^1].X + 5,
-            Minimum = items[^1].X + 5 - range > 1 ? items[^1].X + 5 - range : 1,
-            ExtraGridlines = gridLines.ToArray()
-        };
-        LinearAxis yAxis = new() { Position = AxisPosition.Right };
-        CandleStickSeries candles = new()
-        {
-            ItemsSource = items,
-            TrackerFormatString = "High: {3:0.0000}\nLow: {4:0.0000}\nOpen: {5:0.0000}\nClose: {6:0.0000}"
-        };
-
-        Theme.Color(xAxis);
-        Theme.Color(yAxis);
-        Theme.Color(candles);
-
-        double yMin = double.MaxValue;
-        double yMax = double.MinValue;
-        for (int i = Math.Max((int)xAxis.Minimum, 0); i < items.Length; i++)
-        {
-            yMin = Math.Min(yMin, items[i].Low);
-            yMax = Math.Max(yMax, items[i].High);
-        }
-        double margin = (yMax - yMin) * 0.05;
-        yAxis.Zoom(yMin - margin, yMax + margin);
-
-        if (model != null)
-        {
-            model.Axes[0].AxisChanged -= tool.Handler;
-            model.Axes[0].AxisChanged -= tool.MiniHandler;
-        }
-        tool.Handler = (s, a) => Plot.ScaleModel(candles, xAxis, yAxis);
-        xAxis.AxisChanged += tool.Handler;
-
-        if (model == null)
-        {
-            tool.MainModel = new() { PlotMargins = new OxyThickness(0, 0, 50, 20) };
-            model = tool.MainModel;
-            Theme.Color(model);
-            model.Axes.Add(xAxis);
-            model.Axes.Add(yAxis);
-            model.Series.Add(candles);
-        }
-        else
-        {
-            model.Axes[0] = xAxis;
-            model.Axes[1] = yAxis;
-            model.Series[0] = candles;
-        }
-        model.InvalidatePlot(true);
-    }
-
-    public void UpdateMiniModel(Tool tool, Script script = null)
-    {
-        var model = tool.Model;
-        var mainModel = tool.MainModel;
-
-        double[] gridlines = null;
-        List<DataPoint> points = new();
-        List<Series> listSeries = new();
-        if (script != null)
-        {
-            if (script.Result.Centre != -1) gridlines = new double[]
-            {
-                script.Result.Centre + script.Result.Level,
-                script.Result.Centre - script.Result.Level
-            };
-
-            List<OxyColor> colors = Theme.Indicators.ToList();
-            foreach (var indicator in script.Result.Indicators)
-            {
-                if (indicator != null)
-                {
-                    points = new();
-                    for (int i = 0; i < indicator.Length; i++) points.Add(new DataPoint(i, indicator[i]));
-                    listSeries.Add(new LineSeries()
-                    {
-                        ItemsSource = points,
-                        Title = script.Name,
-                        Color = colors[0]
-                    });
-                    if (colors.Count > 1) colors.RemoveAt(0);
-                }
-            }
-            if (listSeries.Count > 1) points = (listSeries[0] as LineSeries).ItemsSource as List<DataPoint>;
-        }
-        else if (model?.Series.Count > 0)
-        {
-            points = (model.Series[0] as LineSeries).ItemsSource as List<DataPoint>;
-            gridlines = model.Axes[1].ExtraGridlines;
-        }
-        else return;
-
-        int range = mainModel.Axes[0].Maximum > 5 ?
-            (int)(mainModel.Axes[0].Maximum - mainModel.Axes[0].Minimum) : 250;
-        LinearAxis xAxis = new()
-        {
-            Position = AxisPosition.Bottom,
-            IsZoomEnabled = false,
-            IsPanEnabled = false,
-            IsAxisVisible = false,
-            Maximum = points.Count + 4,
-            Minimum = points.Count + 4 - range > 1 ? points.Count + 4 - range : 1
-        };
-        LinearAxis yAxis = new()
-        {
-            Position = AxisPosition.Right,
-            IsPanEnabled = false,
-            ExtraGridlines = gridlines
-        };
-        Theme.Color(xAxis, false);
-        Theme.Color(yAxis, false);
-
-        double yMin = double.MaxValue;
-        double yMax = double.MinValue;
-        for (int i = (int)xAxis.Minimum; i < points.Count; i++)
-        {
-            yMin = Math.Min(yMin, points[i].Y);
-            yMax = Math.Max(yMax, points[i].Y);
-        }
-        double margin = (yMax - yMin) * 0.05;
-        yAxis.Zoom(yMin - margin, yMax + margin);
-
-        mainModel.Axes[0].AxisChanged -= tool.MiniHandler;
-        tool.MiniHandler =
-            (s, a) => Plot.ScaleMiniModel(points.ToArray(), mainModel.Axes[0], xAxis, yAxis, Window, tool.Model);
-        mainModel.Axes[0].AxisChanged += tool.MiniHandler;
-
-        if (model == null)
-        {
-            tool.Model = new() { PlotMargins = new OxyThickness(0, 0, 50, 0) };
-            model = tool.Model;
-            model.Axes.Add(xAxis);
-            model.Axes.Add(yAxis);
-            Theme.Color(model);
-        }
-        else
-        {
-            if (listSeries.Count > 0) model.Series.Clear();
-            model.Axes[0] = xAxis;
-            model.Axes[1] = yAxis;
-        }
-
-        foreach (var series in listSeries) model.Series.Add(series);
-        model.InvalidatePlot(true);
+        Plot.UpdateModel(tool);
+        if (tool.Model != null) Plot.UpdateMiniModel(tool, Window);
     }
 
     public void UpdateLastTrade(Tool tool, Trade lastTrade)
@@ -477,7 +273,7 @@ internal class ToolManager : IToolManager
     }
 
 
-    private async Task<bool> CheckTool(Tool tool)
+    private async Task<bool> CheckToolAsync(Tool tool)
     {
         var security = tool.Security;
         var basicSecurity = tool.BasicSecurity;
@@ -511,9 +307,9 @@ internal class ToolManager : IToolManager
         return true;
     }
 
-    private async Task Calculate(Tool tool)
+    private async Task CalculateToolAsync(Tool tool)
     {
-        await WaitCertainty(tool);
+        await WaitCertaintyAsync(tool);
 
         var toolState = CalculateToolState(tool);
         UpdateControlPanel(tool, toolState);
@@ -525,38 +321,34 @@ internal class ToolManager : IToolManager
 
         if (!tool.StopTrading)
         {
-            if (!await CancelUnknownOrders(tool)) return;
+            if (!await CancelUnknownOrdersAsync(tool)) return;
             if (toolState.ReadyToTrade)
             {
                 foreach (var script in tool.Scripts) await ScriptManager.UpdateOrdersAndPositionAsync(script);
-                if (!await CheckPositionMatching(tool, toolState)) return;
-                await NormalizePosition(tool, toolState);
+                if (!await CheckPositionMatchingAsync(tool, toolState)) return;
+                await NormalizePositionAsync(tool, toolState);
             }
         }
-        else if (!await CancelActiveOrders(tool)) return;
+        else if (!await CancelActiveOrdersAsync(tool)) return;
 
         var security = tool.Security;
         var basicSecurity = tool.BasicSecurity ?? security;
         foreach (var script in tool.Scripts)
         {
-            // Обновление заявок и позиции скрипта, вычисление индикаторов на основе базисного актива
             if (!await ScriptManager.CalculateAsync(script, basicSecurity)) continue;
 
-            // Обновление моделей, информационной панели скрипта и логирование
             ScriptManager.UpdateView(tool, script);
             if (toolState.IsLogging) ScriptManager.WriteLog(script, tool.Name);
 
-            // Выравнивание данных и проверка условий для выхода
             if (basicSecurity != security && !ScriptManager.AlignData(tool, script)) continue;
             if (!toolState.ReadyToTrade ||
                 script.Result.Type != ScriptType.StopLine && !toolState.IsBidding) continue;
 
-            // Работа с заявками
             await ScriptManager.ProcessOrdersAsync(tool, toolState, script);
         }
     }
 
-    private async Task WaitCertainty(Tool tool)
+    private async Task WaitCertaintyAsync(Tool tool)
     {
         var undefined = TradingSystem.Orders.ToArray()
             .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "forwarding" or "inactive"));
@@ -833,7 +625,7 @@ internal class ToolManager : IToolManager
     }
 
 
-    private async Task NormalizePosition(Tool tool, ToolState toolState)
+    private async Task NormalizePositionAsync(Tool tool, ToolState toolState)
     {
         var activeOrders = TradingSystem.Orders.ToArray().Where(x => x.Sender == "System" &&
             x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
@@ -865,7 +657,7 @@ internal class ToolManager : IToolManager
             if ((activeOrder.BuySell == "B") == balance < 0 &&
                 (balance > toolState.LongVolume || -balance > toolState.ShortVolume))
             {
-                if (!await PrepareForNormalization(tool, activeOrder)) return;
+                if (!await PrepareForNMAsync(tool, activeOrder)) return;
 
                 int volume = balance > toolState.LongVolume ?
                     balance - toolState.LongVolume : -balance - toolState.ShortVolume;
@@ -879,7 +671,7 @@ internal class ToolManager : IToolManager
             }
             else if ((activeOrder.BuySell == "B") == balance > 0 && needToNormalizeUp)
             {
-                if (!await PrepareForNormalization(tool, activeOrder)) return;
+                if (!await PrepareForNMAsync(tool, activeOrder)) return;
 
                 int volume = balance > 0 ?
                     toolState.LongVolume - balance : toolState.ShortVolume + balance;
@@ -895,7 +687,7 @@ internal class ToolManager : IToolManager
         }
         else if (balance > toolState.LongVolume || -balance > toolState.ShortVolume)
         {
-            if (!await PrepareForNormalization(tool)) return;
+            if (!await PrepareForNMAsync(tool)) return;
 
             int volume = balance > toolState.LongVolume ?
                 balance - toolState.LongVolume : -balance - toolState.ShortVolume;
@@ -933,7 +725,7 @@ internal class ToolManager : IToolManager
         }
     }
 
-    private async Task<bool> PrepareForNormalization(Tool tool, Order activeOrderNM = null)
+    private async Task<bool> PrepareForNMAsync(Tool tool, Order activeOrderNM = null)
     {
         foreach (var script in tool.Scripts)
         {
@@ -949,7 +741,7 @@ internal class ToolManager : IToolManager
         return true;
     }
 
-    private async Task<bool> CheckPositionMatching(Tool tool, ToolState toolState)
+    private async Task<bool> CheckPositionMatchingAsync(Tool tool, ToolState toolState)
     {
         var Long = PositionType.Long;
         var Short = PositionType.Short;
@@ -971,7 +763,7 @@ internal class ToolManager : IToolManager
             if (position == Neutral && balance != 0 ||
                 position == Long && balance <= 0 || position == Short && balance >= 0)
             {
-                if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
+                if (!await PrepareForPMAsync(tool, toolState)) return true;
 
                 int volume;
                 bool isBuy = position == Neutral ? balance < 0 : position == Long;
@@ -1000,7 +792,7 @@ internal class ToolManager : IToolManager
                 if (position1 == Neutral && balance != 0 ||
                     position1 == Long && balance <= 0 || position1 == Short && balance >= 0)
                 {
-                    if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
+                    if (!await PrepareForPMAsync(tool, toolState)) return true;
 
                     int volume;
                     bool isBuy = position1 == Neutral ? balance < 0 : position1 == Long;
@@ -1017,7 +809,7 @@ internal class ToolManager : IToolManager
             {
                 if (balance != 0)
                 {
-                    if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
+                    if (!await PrepareForPMAsync(tool, toolState)) return true;
                     await Connector.SendOrderAsync(security, OrderType.Market,
                         balance < 0, security.Bars.Close[^2], Math.Abs(balance), "BringingIntoLine", null, "NM");
                     return false;
@@ -1028,7 +820,7 @@ internal class ToolManager : IToolManager
                 var position = position1 == Neutral ? position2 : position1;
                 if (position == Long && balance <= 0 || position == Short && balance >= 0)
                 {
-                    if (!await PrepareForBringingIntoLine(tool, toolState)) return true;
+                    if (!await PrepareForPMAsync(tool, toolState)) return true;
                     int vol = position == Long ?
                         Math.Abs(balance) + toolState.LongVolume : 
                         Math.Abs(balance) + toolState.ShortVolume;
@@ -1042,7 +834,7 @@ internal class ToolManager : IToolManager
         return true;
     }
 
-    private async Task<bool> PrepareForBringingIntoLine(Tool tool, ToolState toolState)
+    private async Task<bool> PrepareForPMAsync(Tool tool, ToolState toolState)
     {
         if (!toolState.IsBidding || !toolState.IsNormalPrice)
         {
@@ -1051,12 +843,12 @@ internal class ToolManager : IToolManager
             return false;
         }
         AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
-        await CancelActiveOrders(tool);
+        await CancelActiveOrdersAsync(tool);
         return true;
     }
 
 
-    private async Task<bool> CancelActiveOrders(Tool tool)
+    private async Task<bool> CancelActiveOrdersAsync(Tool tool)
     {
         var active = TradingSystem.Orders.ToArray()
             .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
@@ -1075,7 +867,7 @@ internal class ToolManager : IToolManager
         return false;
     }
 
-    private async Task<bool> CancelUnknownOrders(Tool tool)
+    private async Task<bool> CancelUnknownOrdersAsync(Tool tool)
     {
         var unknown = TradingSystem.Orders.ToArray().Where(x => x.Sender == null &&
             x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
@@ -1100,6 +892,7 @@ internal class ToolManager : IToolManager
         Window.Dispatcher.Invoke(() =>
         {
             tool.BorderState.Background = toolState.ReadyToTrade ? Theme.Green : Theme.Orange;
+            tool.BrushState = toolState.ReadyToTrade ? Theme.Green : Theme.Orange;
 
             tool.MainBlockInfo.Text =
             "\nReq " + Math.Round(toolState.LongReqs) + "/" + Math.Round(toolState.ShortReqs) +
@@ -1115,7 +908,7 @@ internal class ToolManager : IToolManager
 
     private void UpdateBarsColor(Tool tool, ToolState toolState)
     {
-        (tool.MainModel.Series[0] as CandleStickSeries).DecreasingColor = toolState.IsBidding &&
+        (tool.MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor = toolState.IsBidding &&
             (!tool.ShowBasicSecurity ||
             tool.ShowBasicSecurity && tool.BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
             Theme.RedBar : Theme.FadedBar;

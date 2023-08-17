@@ -134,13 +134,17 @@ internal class TXmlDataProcessor
         List<double> open = new(), high = new(),
             low = new(), close = new(), volume = new();
 
-        bool filter = security.Market != "4";
+        bool filter = true;
+        int startHour = 9;
+        if (security.Market == "4") { }
+        else if (security.Market == "1") startHour = 10;
+        else if (security.Market == "15") startHour = 7;
+        else filter = false;
+
         while (xr.Read())
         {
-            if (filter && xr.HasAttributes && (dateTime.Count == 0 ||
-                dateTime[^1].Date != DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC).Date) &&
-                double.Parse(xr.GetAttribute("high"), IC) - double.Parse(xr.GetAttribute("low"), IC) < 0.00001)
-                xr.Read();
+            if (filter && xr.HasAttributes &&
+                DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC).Hour < startHour) continue;
 
             if (xr.HasAttributes)
             {

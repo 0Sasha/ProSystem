@@ -209,7 +209,6 @@ public class TradingSystem
             DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
         await FileManager.ArchiveFiles("Data", ".xml", "Data", false);
         PortfolioManager.UpdateEquity();
-        PortfolioManager.CheckEquity();
         PortfolioManager.UpdatePositions();
         await Task.Delay(65000);
     }

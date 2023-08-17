@@ -23,16 +23,20 @@ public class Tool : INotifyPropertyChanged
     private int numberLots = 1;
     private int baseBalance = 0;
 
+    [NonSerialized] private TabItem tab;
     [NonSerialized] private PlotModel plot;
     [NonSerialized] private PlotModel miniPlot;
     [NonSerialized] private PlotController controller;
+    [NonSerialized] private Grid controlPanel;
     [NonSerialized] private Border borderState;
+    [NonSerialized] private Brush brushState = Theme.Red;
     [NonSerialized] private TextBlock blockInfo;
     [NonSerialized] private TextBlock mainBlockInfo;
-    [NonSerialized] internal int IsBusy;
+    [NonSerialized] internal int IsOccupied;
 
     public string Name { get; set; }
     public bool Active { get; set; }
+    public int BaseTF { get; set; } = 30;
     public bool ShowBasicSecurity
     {
         get => showBasicSec;
@@ -45,13 +49,15 @@ public class Tool : INotifyPropertyChanged
             }
         }
     }
-    public int BaseTF { get; set; } = 30;
-    public DateTime TimeLastRecalc { get; set; }
-    public DateTime TimeNextRecalc { get; set; }
-    public DateTime TriggerPosition { get; set; }
     public Security Security { get; set; }
     public Security BasicSecurity { get; set; }
     public Script[] Scripts { get; set; }
+
+    public TabItem Tab
+    {
+        get => tab;
+        set { tab = value; NotifyChange(); }
+    }
     public PlotModel MainModel
     {
         get => plot;
@@ -66,6 +72,31 @@ public class Tool : INotifyPropertyChanged
     {
         get => controller;
         set { controller = value; NotifyChange(); }
+    }
+    public Grid ControlPanel
+    {
+        get => controlPanel;
+        set { controlPanel = value; NotifyChange();}
+    }
+    public Border BorderState
+    {
+        get => borderState;
+        set { borderState = value; NotifyChange(); }
+    }
+    public Brush BrushState
+    {
+        get => brushState;
+        set { brushState = value; NotifyChange(); }
+    } 
+    public TextBlock BlockInfo
+    {
+        get => blockInfo;
+        set { blockInfo = value; NotifyChange(); }
+    }
+    public TextBlock MainBlockInfo
+    {
+        get => mainBlockInfo;
+        set { mainBlockInfo = value; NotifyChange(); }
     }
 
     public int WaitingLimit
@@ -133,23 +164,10 @@ public class Tool : INotifyPropertyChanged
         }
     }
 
-    public Border BorderState
-    {
-        get => borderState;
-        set { borderState = value; NotifyChange(); }
-    }
-    public TextBlock BlockInfo
-    {
-        get => blockInfo;
-        set { blockInfo = value; NotifyChange(); }
-    }
-    public TextBlock MainBlockInfo
-    {
-        get => mainBlockInfo;
-        set { mainBlockInfo = value; NotifyChange(); }
-    }
+    public DateTime TimeLastRecalc { get; set; }
+    public DateTime TimeNextRecalc { get; set; }
+    public DateTime TriggerPosition { get; set; }
 
-    [field: NonSerialized] public Brush BrushState { get; set; } = Theme.Red;
     [field: NonSerialized] public EventHandler<AxisChangedEventArgs> Handler { get; set; }
     [field: NonSerialized] public EventHandler<AxisChangedEventArgs> MiniHandler { get; set; }
 

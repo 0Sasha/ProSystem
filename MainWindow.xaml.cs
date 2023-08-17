@@ -293,7 +293,8 @@ public partial class MainWindow : Window
                 Tools[i] = Tools[x];
                 Tools[x] = initTool;
             }
-            TabsTools.Items.Add(ToolManager.Initialize(Tools[i]));
+            ToolManager.Initialize(Tools[i]);
+            TabsTools.Items.Add(Tools[i].Tab);
         }
     }
 
@@ -322,7 +323,8 @@ public partial class MainWindow : Window
         if (newTool)
         {
             Tools.Add(tool);
-            TabsTools.Items.Add(ToolManager.Initialize(tool));
+            ToolManager.Initialize(tool);
+            TabsTools.Items.Add(tool.Tab);
             TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
             ToolsByPriorityView.Items.Refresh();
             tool.PropertyChanged += UpdateTool;
@@ -333,16 +335,7 @@ public partial class MainWindow : Window
             tool.MainModel.Series.Add(new OxyPlot.Series.CandleStickSeries { });
             tool.MainModel.Annotations.Clear();
 
-            TradingSystem.ToolManager.UpdateControlGrid(tool);
-            var tab = TabsTools.Items[Tools.IndexOf(tool)] as TabItem;
-            if (tool.Scripts.Length < 2)
-            {
-                var grids = (tab.Content as Grid).Children
-                    .OfType<Grid>().Last().Children.OfType<Grid>().ToArray();
-                grids[1].Children.Clear();
-                grids[2].Children.Clear();
-            }
-            TradingSystem.ScriptManager.InitializeScripts(tool, tab);
+            TradingSystem.ToolManager.UpdateControlPanel(tool, true);
         }
 
         if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)
@@ -675,7 +668,7 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(Tool.ShowBasicSecurity))
             Task.Run(() => TradingSystem.ToolManager.UpdateView(sender as Tool, true));
         else if (e.PropertyName is nameof(Tool.TradeShare) or nameof(Tool.UseShiftBalance))
-            TradingSystem.ToolManager.UpdateControlGrid(sender as Tool);
+            TradingSystem.ToolManager.UpdateControlPanel(sender as Tool, false);
     }
     private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
     {
