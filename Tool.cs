@@ -1,9 +1,9 @@
-﻿using System;
+﻿using OxyPlot;
+using OxyPlot.Axes;
+using System;
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Media;
-using OxyPlot;
-using OxyPlot.Axes;
 
 namespace ProSystem;
 
@@ -27,7 +27,6 @@ public class Tool : INotifyPropertyChanged
     [NonSerialized] private PlotModel plot;
     [NonSerialized] private PlotModel miniPlot;
     [NonSerialized] private PlotController controller;
-    [NonSerialized] private Grid controlPanel;
     [NonSerialized] private Border borderState;
     [NonSerialized] private Brush brushState = Theme.Red;
     [NonSerialized] private TextBlock blockInfo;
@@ -72,11 +71,6 @@ public class Tool : INotifyPropertyChanged
     {
         get => controller;
         set { controller = value; NotifyChange(); }
-    }
-    public Grid ControlPanel
-    {
-        get => controlPanel;
-        set { controlPanel = value; NotifyChange();}
     }
     public Border BorderState
     {

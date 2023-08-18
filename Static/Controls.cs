@@ -12,6 +12,7 @@ internal static class Controls
 {
     public static TabItem GetTabForTool(Tool tool)
     {
+        if (tool == null) throw new ArgumentNullException(nameof(tool));
         return new()
         {
             Name = tool.Name,
@@ -96,7 +97,6 @@ internal static class Controls
         if (changeActivityTool == null) throw new ArgumentNullException(nameof(changeActivityTool));
         if (updateViewTool == null) throw new ArgumentNullException(nameof(updateViewTool));
 
-        tool.ControlPanel ??= (Grid)(tool.Tab.Content as Grid).Children[1];
         UpdateMainControlPanel(tool, changeActivityTool, updateViewTool);
         if (updateScriptPanel) UpdateScriptControlPanel(tool);
     }
@@ -151,7 +151,7 @@ internal static class Controls
         };
         tool.BorderState = borderState;
 
-        var grid = tool.ControlPanel.Children[0] as Grid;
+        var grid = ((tool.Tab.Content as Grid).Children[1] as Grid).Children[0] as Grid;
         grid.Children.Clear();
         grid.Children.Add(activeButton);
         grid.Children.Add(GetTextBlock("BaseTF", 5, 33));
@@ -201,7 +201,8 @@ internal static class Controls
 
     private static void UpdateScriptControlPanel(Tool tool)
     {
-        foreach (var grid in (tool.ControlPanel.Children.OfType<Grid>().Skip(1))) grid.Children.Clear();
+        var controlPanel = (Grid)(tool.Tab.Content as Grid).Children[1];
+        foreach (var grid in controlPanel.Children.OfType<Grid>().Skip(1)) grid.Children.Clear();
 
         var scripts = tool.Scripts;
         for (int i = 0; i < scripts.Length; i++)
@@ -216,7 +217,7 @@ internal static class Controls
                     plot.Visibility = Visibility.Visible;
                 }
             }
-            var collection = (((tool.Tab.Content as Grid).Children[1] as Grid).Children[i + 1] as Grid).Children;
+            var collection = (controlPanel.Children[i + 1] as Grid).Children;
 
             collection.Add(GetTextBlock(scripts[i].Name, 5, 0));
             AddUpperControls(scripts[i], collection, props);

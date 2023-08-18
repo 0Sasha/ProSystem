@@ -87,8 +87,8 @@ internal class ToolManager : IToolManager
         tool.BrushState = tool.Active ? (tool.StopTrading ? Theme.Orange : Theme.Green) : Theme.Red;
         var btnContent = tool.Active ? "Deactivate tool" : "Activate tool";
 
-        Window.Dispatcher.Invoke(() => tool.ControlPanel.Children
-            .OfType<Grid>().First().Children.OfType<Button>().First().Content = btnContent);
+        Window.Dispatcher.Invoke(() => (tool.Tab.Content as Grid).Children.OfType<Grid>()
+            .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = btnContent);
         tool.NotifyChange();
     }
 
