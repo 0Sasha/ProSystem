@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -149,52 +148,61 @@ public partial class MainWindow : Window
 
     private void BindData(Settings settings)
     {
-        IntervalUpdateTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("ModelUpdateInterval"), Mode = BindingMode.TwoWay });
-        IntervalRecalcTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("RecalcInterval"), Mode = BindingMode.TwoWay });
+        IntervalUpdateTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.ModelUpdateInterval)), Mode = BindingMode.TwoWay });
+        IntervalRecalcTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.RecalcInterval)), Mode = BindingMode.TwoWay });
         ScheduleCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("ScheduledConnection"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings,
+                Path = new PropertyPath(nameof(Settings.ScheduledConnection)), Mode = BindingMode.TwoWay });
 
         DisplaySentOrdersCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("DisplaySentOrders"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplaySentOrders)), Mode = BindingMode.TwoWay });
         DisplayNewTradesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("DisplayNewTrades"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplayNewTrades)), Mode = BindingMode.TwoWay });
         DisplayMessagesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("DisplayMessages"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplayMessages)), Mode = BindingMode.TwoWay });
         DisplaySpecialInfoCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("DisplaySpecialInfo"), Mode = BindingMode.TwoWay });
+            new Binding() { Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplaySpecialInfo)), Mode = BindingMode.TwoWay });
 
-        TxtLog.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("LoginConnector"), Mode = BindingMode.TwoWay });
-        ConnectorLogLevelTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("LogLevelConnector"), Mode = BindingMode.TwoWay });
-        RequestTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("RequestTM"), Mode = BindingMode.TwoWay });
-        SessionTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("SessionTM"), Mode = BindingMode.TwoWay });
+        TxtLog.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.LoginConnector)), Mode = BindingMode.TwoWay });
+        ConnectorLogLevelTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.LogLevelConnector)), Mode = BindingMode.TwoWay });
+        RequestTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.RequestTM)), Mode = BindingMode.TwoWay });
+        SessionTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.SessionTM)), Mode = BindingMode.TwoWay });
 
         ToleranceEquityTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("ToleranceEquity"),
+            Path = new PropertyPath(nameof(Settings.ToleranceEquity)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
-        TolerancePositionTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("TolerancePosition"), Mode = BindingMode.TwoWay });
+        TolerancePositionTxt.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = settings,
+            Path = new PropertyPath(nameof(Settings.TolerancePosition)),
+            Mode = BindingMode.TwoWay
+        });
 
         OptShareBaseAssetsTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("OptShareBaseAssets"),
+            Path = new PropertyPath(nameof(Settings.OptShareBaseAssets)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         ToleranceBaseAssetsTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("ToleranceBaseAssets"),
+            Path = new PropertyPath(nameof(Settings.ToleranceBaseAssets)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
@@ -202,38 +210,38 @@ public partial class MainWindow : Window
         MaxShareInitReqsPositionTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("MaxShareInitReqsPosition"),
+            Path = new PropertyPath(nameof(Settings.MaxShareInitReqsPosition)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         MaxShareInitReqsToolTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("MaxShareInitReqsTool"),
+            Path = new PropertyPath(nameof(Settings.MaxShareInitReqsTool)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         MaxShareInitReqsPortfolioTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("MaxShareInitReqsPortfolio"),
+            Path = new PropertyPath(nameof(Settings.MaxShareInitReqsPortfolio)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
         MaxShareMinReqsPortfolioTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
             Source = settings,
-            Path = new PropertyPath("MaxShareMinReqsPortfolio"),
+            Path = new PropertyPath(nameof(Settings.MaxShareMinReqsPortfolio)),
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
 
-        ShelflifeTradesTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeTrades"), Mode = BindingMode.TwoWay });
-        ShelflifeOrdersScriptsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeOrdersScripts"), Mode = BindingMode.TwoWay });
-        ShelflifeTradesScriptsTxt.SetBinding(TextBox.TextProperty,
-            new Binding() { Source = settings, Path = new PropertyPath("ShelfLifeTradesScripts"), Mode = BindingMode.TwoWay });
+        ShelflifeTradesTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.ShelfLifeTrades)), Mode = BindingMode.TwoWay });
+        ShelflifeOrdersScriptsTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.ShelfLifeOrdersScripts)), Mode = BindingMode.TwoWay });
+        ShelflifeTradesScriptsTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
+            Path = new PropertyPath(nameof(Settings.ShelfLifeTradesScripts)), Mode = BindingMode.TwoWay });
     }
 
     private void BindData(Portfolio portfolio)
@@ -241,42 +249,42 @@ public partial class MainWindow : Window
         AverageEquityTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = portfolio,
-            Path = new PropertyPath("AverageEquity"),
+            Path = new PropertyPath(nameof(Portfolio.AverageEquity)),
             Mode = BindingMode.OneWay,
             StringFormat = "### ### ### УЕ"
         });
         CurShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = portfolio,
-            Path = new PropertyPath("ShareInitReqs"),
+            Path = new PropertyPath(nameof(Portfolio.ShareInitReqs)),
             Mode = BindingMode.OneWay,
             StringFormat = "#.##'%'"
         });
         CurShareInitReqsBaseTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = portfolio,
-            Path = new PropertyPath("ShareInitReqsBaseAssets"),
+            Path = new PropertyPath(nameof(Portfolio.ShareInitReqsBaseAssets)),
             Mode = BindingMode.OneWay,
             StringFormat = "#.##'%'"
         });
         PotShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = portfolio,
-            Path = new PropertyPath("PotentialShareInitReqs"),
+            Path = new PropertyPath(nameof(Portfolio.PotentialShareInitReqs)),
             Mode = BindingMode.OneWay,
             StringFormat = "#.##'%'"
         });
         CurShareMinReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = portfolio,
-            Path = new PropertyPath("ShareMinReqs"),
+            Path = new PropertyPath(nameof(Portfolio.ShareMinReqs)),
             Mode = BindingMode.OneWay,
             StringFormat = "#.##'%'"
         });
         CurShareBaseAssetsTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
             Source = portfolio,
-            Path = new PropertyPath("ShareBaseAssets"),
+            Path = new PropertyPath(nameof(Portfolio.ShareBaseAssets)),
             Mode = BindingMode.OneWay,
             StringFormat = "#.##'%'"
         });
@@ -707,13 +715,12 @@ public partial class MainWindow : Window
         await TradingSystem.StopAsync();
         Logger.Stop();
     }
-    internal async void ChangeActivityTool(object sender, RoutedEventArgs e)
+    private async void ChangeActivityTool(object sender, RoutedEventArgs e)
     {
-        Button MyButton = sender as Button;
-        MyButton.IsEnabled = false;
-        if (MyButton.Content == null) await ToolManager.ChangeActivityAsync(MyButton.DataContext as Tool);
-        else await ToolManager.ChangeActivityAsync(Tools[TabsTools.SelectedIndex]);
-        MyButton.IsEnabled = true;
+        var button = sender as Button;
+        button.IsEnabled = false;
+        await ToolManager.ChangeActivityAsync(button.DataContext as Tool);
+        button.IsEnabled = true;
     }
     private void ComboBoxToolChanged(object sender, SelectionChangedEventArgs e)
     {

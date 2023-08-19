@@ -1,16 +1,13 @@
-﻿using System;
+﻿using OxyPlot;
+using OxyPlot.Annotations;
+using OxyPlot.Series;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using OxyPlot;
-using OxyPlot.Annotations;
-using OxyPlot.Series;
-using OxyPlot.SkiaSharp.Wpf;
-using static ProSystem.Controls;
 
 namespace ProSystem.Services;
 
@@ -19,14 +16,14 @@ internal class ScriptManager : IScriptManager
     private readonly Window Window;
     private readonly AddInformation AddInfo;
     private readonly TradingSystem TradingSystem;
-
-    private Connector Connector { get => TradingSystem.Connector; }
+    private readonly Connector Connector;
 
     public ScriptManager(Window window, TradingSystem tradingSystem, AddInformation addInfo)
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
+        Connector = TradingSystem.Connector ?? throw new ArgumentException("Connector is null");
     }
 
     public void IdentifyOrdersAndTrades(Tool tool)

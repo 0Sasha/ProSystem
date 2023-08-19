@@ -4,27 +4,28 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace ProSystem.Services;
 
 internal class ToolManager : IToolManager
 {
-    private readonly MainWindow Window;
+    private readonly Window Window;
     private readonly AddInformation AddInfo;
     private readonly TradingSystem TradingSystem;
     private readonly IScriptManager ScriptManager;
+    private readonly Connector Connector;
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    private Connector Connector { get => TradingSystem.Connector; }
-
-    public ToolManager(MainWindow window, TradingSystem tradingSystem,
+    public ToolManager(Window window, TradingSystem tradingSystem,
         IScriptManager scriptManager, AddInformation addInfo)
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
         ScriptManager = scriptManager ?? throw new ArgumentNullException(nameof(scriptManager));
         TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
+        Connector = TradingSystem.Connector ?? throw new ArgumentException("Connector is null");
     }
 
     public void Initialize(Tool tool)
@@ -38,7 +39,7 @@ internal class ToolManager : IToolManager
     }
 
     public void UpdateControlPanel(Tool tool, bool updateScriptPanel) => 
-        Controls.UpdateControlPanel(tool, updateScriptPanel, Window.ChangeActivityTool, UpdateViewTool);
+        Controls.UpdateControlPanel(tool, updateScriptPanel, ChangeActivityToolAsync, UpdateViewTool);
 
     public async Task ChangeActivityAsync(Tool tool)
     {
@@ -627,9 +628,11 @@ internal class ToolManager : IToolManager
 
     private async Task NormalizePositionAsync(Tool tool, ToolState toolState)
     {
+        if (!toolState.IsBidding || !toolState.IsNormalPrice) return;
+
         var activeOrders = TradingSystem.Orders.ToArray().Where(x => x.Sender == "System" &&
             x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
-        if (!activeOrders.Any() && !tool.UseNormalization || !toolState.IsBidding) return;
+        if (!activeOrders.Any() && !tool.UseNormalization) return;
         if (activeOrders.Count() > 1)
         {
             AddInfo(tool.Name + ": cancellation of several active system orders: " + activeOrders.Count());
@@ -637,44 +640,40 @@ internal class ToolManager : IToolManager
             return;
         }
 
-        if (TradingSystem.Orders.ToArray().Any(x => 
-            x.Sender != "System" && x.Seccode == tool.Security.Seccode && x.Status is "active" &&
-            (x.Quantity - x.Balance > 0.00001 || x.Note == "PartEx"))) return;
+        var activeOrder = activeOrders.SingleOrDefault();
+        if (CheckScriptOrderCloseToExecution(tool))
+        {
+            if (activeOrder != null) await Connector.CancelOrderAsync(activeOrder);
+            return;
+        }
 
         var security = tool.Security;
         var balance = toolState.Balance;
 
         double gap = Math.Abs(balance) / 14D;
-        bool needToNormalizeUp =
-            balance > 0 && 
-            balance + Math.Ceiling(balance * 0.04) + (gap < 0.5 ? gap : 0.5) < toolState.LongRealVolume ||
-            balance < 0 &&
-            -balance + Math.Ceiling(-balance * 0.04) + (gap < 0.5 ? gap : 0.5) < toolState.ShortRealVolume;
+        if (gap > 0.5) gap = 0.5;
+        bool normalizeUp =
+            balance > 0 && balance + Math.Ceiling(balance * 0.04) + gap < toolState.LongRealVolume ||
+            balance < 0 && -balance + Math.Ceiling(-balance * 0.04) + gap < toolState.ShortRealVolume;
 
-        var activeOrder = activeOrders.SingleOrDefault();
+        int volume = balance > toolState.LongVolume ?
+            balance - toolState.LongVolume : -balance - toolState.ShortVolume;
+
         if (activeOrder != null)
         {
             if ((activeOrder.BuySell == "B") == balance < 0 &&
                 (balance > toolState.LongVolume || -balance > toolState.ShortVolume))
             {
-                if (!await PrepareForNMAsync(tool, activeOrder)) return;
-
-                int volume = balance > toolState.LongVolume ?
-                    balance - toolState.LongVolume : -balance - toolState.ShortVolume;
-
                 if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.00001 &&
                     DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != volume)
                 {
-                    await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit,
-                        security.Bars.Close[^2], volume, "Normalization", null, "NM");
+                    await Connector.ReplaceOrderAsync(activeOrder, security,
+                        OrderType.Limit, security.Bars.Close[^2], volume, "Normalization", null, "NM");
                 }
             }
-            else if ((activeOrder.BuySell == "B") == balance > 0 && needToNormalizeUp)
+            else if ((activeOrder.BuySell == "B") == balance > 0 && normalizeUp)
             {
-                if (!await PrepareForNMAsync(tool, activeOrder)) return;
-
-                int volume = balance > 0 ?
-                    toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                volume = balance > 0 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
 
                 if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.00001 &&
                     DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != volume)
@@ -687,33 +686,19 @@ internal class ToolManager : IToolManager
         }
         else if (balance > toolState.LongVolume || -balance > toolState.ShortVolume)
         {
-            if (!await PrepareForNMAsync(tool)) return;
-
-            int volume = balance > toolState.LongVolume ?
-                balance - toolState.LongVolume : -balance - toolState.ShortVolume;
-
-            await Connector.SendOrderAsync(security, OrderType.Limit, balance < 0,
-                security.Bars.Close[^2], volume, "Normalization", null, "NM");
-            
+            await Connector.SendOrderAsync(security, OrderType.Limit,
+                balance < 0, security.Bars.Close[^2], volume, "Normalization", null, "NM");
             WriteStateLog(tool, toolState, "NM");
         }
-        else if (needToNormalizeUp)
+        else if (normalizeUp)
         {
-            foreach (var script in tool.Scripts)
-                if (script.ActiveOrder != null &&
-                    (script.ActiveOrder.Quantity - script.ActiveOrder.Balance > 0.00001 ||
-                    script.ActiveOrder.Note == "PartEx" ||
-                    Math.Abs(script.ActiveOrder.Price - security.Bars.Close[^2]) < 0.00001)) return;
-
             foreach (var script in tool.Scripts)
             {
                 var lastExecuted = script.Orders.LastOrDefault(x => x.Status == "matched");
-                if (lastExecuted != null &&
-                    (lastExecuted.DateTime.AddDays(4) > DateTime.Now ||
+                if (lastExecuted != null && (lastExecuted.DateTime.AddDays(4) > DateTime.Now ||
                     balance > 0 == security.Bars.Close[^2] < lastExecuted.Price))
                 {
-                    int volume = balance > 0 ?
-                        toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                    volume = balance > 0 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
 
                     await Connector.SendOrderAsync(security, OrderType.Limit,
                         balance > 0, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
@@ -725,27 +710,14 @@ internal class ToolManager : IToolManager
         }
     }
 
-    private async Task<bool> PrepareForNMAsync(Tool tool, Order activeOrderNM = null)
-    {
-        foreach (var script in tool.Scripts)
-        {
-            if (script.ActiveOrder != null &&
-                Math.Abs(script.ActiveOrder.Price - tool.Security.Bars.Close[^2]) < 0.00001)
-            {
-                AddInfo(tool.Name +
-                    ": NM: script has already sent an order with the closing price of the previous bar");
-                if (activeOrderNM != null) await Connector.CancelOrderAsync(activeOrderNM);
-                return false;
-            }
-        }
-        return true;
-    }
-
     private async Task<bool> CheckPositionMatchingAsync(Tool tool, ToolState toolState)
     {
-        var Long = PositionType.Long;
-        var Short = PositionType.Short;
-        var Neutral = PositionType.Neutral;
+        if (!toolState.IsBidding || !toolState.IsNormalPrice) return true;
+        if (CheckScriptOrderCloseToExecution(tool)) return true;
+
+        var longPos = PositionType.Long;
+        var shortPos = PositionType.Short;
+        var neutralPos = PositionType.Neutral;
 
         var security = tool.Security;
         var scripts = tool.Scripts;
@@ -753,22 +725,17 @@ internal class ToolManager : IToolManager
 
         if (scripts.Length == 1)
         {
-            // Проверка частичного исполнения заявки
-            if (scripts[0].ActiveOrder != null &&
-                (scripts[0].ActiveOrder.Quantity - scripts[0].ActiveOrder.Balance > 0.00001 ||
-                scripts[0].ActiveOrder.Note == "PartEx")) return true;
-
-            // Проверка соответствия позиций
             var position = scripts[0].CurrentPosition;
-            if (position == Neutral && balance != 0 ||
-                position == Long && balance <= 0 || position == Short && balance >= 0)
+            if (position == neutralPos && balance != 0 ||
+                position == longPos && balance <= 0 || position == shortPos && balance >= 0)
             {
-                if (!await PrepareForPMAsync(tool, toolState)) return true;
+                AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                await CancelActiveOrdersAsync(tool);
 
                 int volume;
-                bool isBuy = position == Neutral ? balance < 0 : position == Long;
-                if (position == Long) volume = Math.Abs(balance) + toolState.LongVolume;
-                else if (position == Short) volume = Math.Abs(balance) + toolState.ShortVolume;
+                bool isBuy = position == neutralPos ? balance < 0 : position == longPos;
+                if (position == longPos) volume = Math.Abs(balance) + toolState.LongVolume;
+                else if (position == shortPos) volume = Math.Abs(balance) + toolState.ShortVolume;
                 else volume = Math.Abs(balance);
 
                 await Connector.SendOrderAsync(security, OrderType.Market,
@@ -778,26 +745,20 @@ internal class ToolManager : IToolManager
         }
         else if (scripts.Length == 2)
         {
-            // Проверка частичного исполнения заявок
-            foreach (var script in scripts)
-                if (script.ActiveOrder != null &&
-                    (script.ActiveOrder.Quantity - script.ActiveOrder.Balance > 0.00001 ||
-                    script.ActiveOrder.Note == "PartEx")) return true;
-
-            // Проверка соответствия позиций
             var position1 = scripts[0].CurrentPosition;
             var position2 = scripts[1].CurrentPosition;
             if (position1 == position2)
             {
-                if (position1 == Neutral && balance != 0 ||
-                    position1 == Long && balance <= 0 || position1 == Short && balance >= 0)
+                if (position1 == neutralPos && balance != 0 ||
+                    position1 == longPos && balance <= 0 || position1 == shortPos && balance >= 0)
                 {
-                    if (!await PrepareForPMAsync(tool, toolState)) return true;
+                    AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                    await CancelActiveOrdersAsync(tool);
 
                     int volume;
-                    bool isBuy = position1 == Neutral ? balance < 0 : position1 == Long;
-                    if (position1 == Long) volume = Math.Abs(balance) + toolState.LongVolume;
-                    else if (position1 == Short) volume = Math.Abs(balance) + toolState.ShortVolume;
+                    bool isBuy = position1 == neutralPos ? balance < 0 : position1 == longPos;
+                    if (position1 == longPos) volume = Math.Abs(balance) + toolState.LongVolume;
+                    else if (position1 == shortPos) volume = Math.Abs(balance) + toolState.ShortVolume;
                     else volume = Math.Abs(balance);
 
                     await Connector.SendOrderAsync(security, OrderType.Market,
@@ -805,11 +766,13 @@ internal class ToolManager : IToolManager
                     return false;
                 }
             }
-            else if (position1 == Long && position2 == Short || position1 == Short && position2 == Long)
+            else if (position1 == longPos && position2 == shortPos || position1 == shortPos && position2 == longPos)
             {
                 if (balance != 0)
                 {
-                    if (!await PrepareForPMAsync(tool, toolState)) return true;
+                    AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                    await CancelActiveOrdersAsync(tool);
+
                     await Connector.SendOrderAsync(security, OrderType.Market,
                         balance < 0, security.Bars.Close[^2], Math.Abs(balance), "BringingIntoLine", null, "NM");
                     return false;
@@ -817,34 +780,31 @@ internal class ToolManager : IToolManager
             }
             else // Одна из позиций Neutral
             {
-                var position = position1 == Neutral ? position2 : position1;
-                if (position == Long && balance <= 0 || position == Short && balance >= 0)
+                var position = position1 == neutralPos ? position2 : position1;
+                if (position == longPos && balance <= 0 || position == shortPos && balance >= 0)
                 {
-                    if (!await PrepareForPMAsync(tool, toolState)) return true;
-                    int vol = position == Long ?
-                        Math.Abs(balance) + toolState.LongVolume : 
-                        Math.Abs(balance) + toolState.ShortVolume;
+                    AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                    await CancelActiveOrdersAsync(tool);
+
+                    int vol = position == longPos ?
+                        Math.Abs(balance) + toolState.LongVolume : Math.Abs(balance) + toolState.ShortVolume;
+
                     await Connector.SendOrderAsync(security, OrderType.Market,
-                        position == Long, security.Bars.Close[^2], vol, "BringingIntoLine", null, "NM");
+                        position == longPos, security.Bars.Close[^2], vol, "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
         }
-        else throw new ArgumentException("Unexpected number of scripts", nameof(tool));
+        else throw new ArgumentException("Unexpected number of scripts");
         return true;
     }
 
-    private async Task<bool> PrepareForPMAsync(Tool tool, ToolState toolState)
+    private bool CheckScriptOrderCloseToExecution(Tool tool)
     {
-        if (!toolState.IsBidding || !toolState.IsNormalPrice)
-        {
-            AddInfo(tool.Name + ": position mismatch, but it is not bidding or normal price.",
-                TradingSystem.Settings.DisplaySpecialInfo, true);
-            return false;
-        }
-        AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
-        await CancelActiveOrdersAsync(tool);
-        return true;
+        return TradingSystem.Orders.ToArray().Any(order =>
+            order.Seccode == tool.Security.Seccode && order.Status == "active" && order.Sender != "System" &&
+            (Math.Abs(order.Price - tool.Security.Bars.Close[^2]) < 0.00001 ||
+            order.Quantity - order.Balance > 0.00001 || order.Note == "PartEx"));
     }
 
 
@@ -943,5 +903,13 @@ internal class ToolManager : IToolManager
     {
         var tool = (sender as ComboBox).DataContext as Tool;
         Task.Run(() => UpdateView(tool, true));
+    }
+
+    private async void ChangeActivityToolAsync(object sender, RoutedEventArgs e)
+    {
+        var button = sender as Button;
+        button.IsEnabled = false;
+        await ChangeActivityAsync(button.DataContext as Tool);
+        button.IsEnabled = true;
     }
 }

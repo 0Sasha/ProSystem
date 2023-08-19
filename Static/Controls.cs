@@ -106,6 +106,7 @@ internal static class Controls
     {
         Button activeButton = new()
         {
+            DataContext = tool,
             Content = tool.Active ? "Deactivate tool" : "Activate tool",
             VerticalAlignment = System.Windows.VerticalAlignment.Top,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
