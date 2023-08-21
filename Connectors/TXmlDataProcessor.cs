@@ -114,7 +114,7 @@ internal class TXmlDataProcessor
         if (tool != null)
         {
             var security = tool.Security.Seccode == sec ? tool.Security : tool.BasicSecurity;
-            var tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Period / 60;
+            var tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Seconds / 60;
             ProcessBars(xr, tool, security, tf);
         }
         else

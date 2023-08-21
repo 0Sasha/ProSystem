@@ -4,7 +4,6 @@ using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -54,12 +53,12 @@ internal class ScriptManager : IScriptManager
         {
             foreach (var script in tool.Scripts)
             {
-                int i = Array.FindIndex(script.Orders.ToArray(), x => x.OrderNo == unknownTrade.OrderNo);
-                if (i > -1)
+                var order = script.Orders.ToArray().SingleOrDefault(o => o.OrderNo == unknownTrade.OrderNo);
+                if (order != null)
                 {
-                    unknownTrade.SenderOrder = script.Orders[i].Sender;
-                    unknownTrade.SignalOrder = script.Orders[i].Signal;
-                    unknownTrade.NoteOrder = script.Orders[i].Note;
+                    unknownTrade.SenderOrder = order.Sender;
+                    unknownTrade.SignalOrder = order.Signal;
+                    unknownTrade.NoteOrder = order.Note;
                     Window.Dispatcher.Invoke(() => script.Trades.Add(unknownTrade));
                     break;
                 }
@@ -78,13 +77,11 @@ internal class ScriptManager : IScriptManager
                 if (script.Orders[i].DateTime.Date >= DateTime.Now.Date.AddDays(-3) ||
                     script.Orders[i].Status == "active" || script.Orders[i].Status == "watching")
                 {
-                    // Поиск заявки скрипта в коллекции всех заявок торговой сессии
                     var orders = TradingSystem.Orders.ToArray();
                     var y = script.Orders[i].OrderNo == 0 ?
                         Array.FindIndex(orders, x => x.TrID == script.Orders[i].TrID) :
                         Array.FindIndex(orders, x => x.OrderNo == script.Orders[i].OrderNo);
 
-                    // Обновление свойств заявки из коллекции всех заявок и приведение обеих заявок к одному объекту
                     if (y > -1)
                     {
                         if (orders[y].Status == script.Orders[i].Status)
@@ -125,59 +122,116 @@ internal class ScriptManager : IScriptManager
         }
     }
 
-    public async Task<bool> UpdateOrdersAndPositionAsync(Script script)
-    {
-        if (script == null) throw new ArgumentNullException(nameof(script));
-
-        script.LastExecuted = script.Orders.ToArray().LastOrDefault(x => x.Status == "matched" && x.Note != "NM");
-
-        var activeOrders = script.Orders.ToArray()
-            .Where(x => x.Sender == script.Name && (x.Status is "active" or "watching")).ToArray();
-        if (activeOrders.Length > 1)
-        {
-            script.ActiveOrder = null;
-            AddInfo(script.Name + ": Отмена активных заявок скрипта: " + activeOrders.Length);
-            foreach (var order in activeOrders) await Connector.CancelOrderAsync(order);
-
-            for (int i = 0; i < 12; i++)
-            {
-                Thread.Sleep(250);
-                if (!activeOrders.Where(x => x.Status is "active" or "watching").Any()) return true;
-            }
-
-            AddInfo(script.Name + ": Не удалось вовремя отменить активные заявки.");
-            return false;
-        }
-        script.ActiveOrder = activeOrders.SingleOrDefault();
-        return true;
-    }
-
-    public async Task<bool> CalculateAsync(Script script, Security security)
-    {
-        if (security == null) throw new ArgumentNullException(nameof(security));
-        if (!await UpdateOrdersAndPositionAsync(script)) return false;
-        script.Calculate(security);
-        return true;
-    }
-
-    public async Task ProcessOrdersAsync(Tool tool, ToolState toolState, Script script)
+    public void UpdateView(Tool tool, Script script)
     {
         if (tool == null) throw new ArgumentNullException(nameof(tool));
-        if (toolState == null) throw new ArgumentNullException(nameof(toolState));
         if (script == null) throw new ArgumentNullException(nameof(script));
 
-        var volume = script.CurrentPosition == PositionType.Long ?
-            toolState.ShortVolume : toolState.LongVolume;
+        string selectedScript = "AllScripts";
+        var mainModel = tool.MainModel;
+        if (TradingSystem.Tools.IndexOf(tool) < TradingSystem.Window.TabsTools.Items.Count)
+        {
+            Window.Dispatcher.Invoke(() =>
+            {
+                var grid = ((tool.Tab.Content as Grid).Children[1] as Grid).Children[0] as Grid;
+                selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
 
-        if (script.Result.Type is ScriptType.OSC or ScriptType.Line)
-            await ProcessOSCAsync(tool, script, volume, toolState.IsNormalPrice);
-        else if (script.Result.Type is ScriptType.LimitLine)
-            await ProcessLimitLineAsync(tool, script, volume);
-        else if (script.Result.Type is ScriptType.StopLine)
-            await ProcessStopLineAsync(tool, script, volume,
-                toolState.IsNormalPrice, toolState.IsBidding, toolState.ATR);
-        else AddInfo(script.Name + ": Неизвестный тип скрипта: " + script.Result.Type, notify: true);
+                script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
+                "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
+            });
+        }
+
+        foreach (var ann in mainModel.Annotations.ToArray())
+            if (ann.ToolTip == script.Name || ann.ToolTip is "System" or null) mainModel.Annotations.Remove(ann);
+
+        if (script.Result.Type != ScriptType.OSC)
+            foreach (Series MySeries in mainModel.Series.ToArray())
+                if (MySeries.Title == script.Name) mainModel.Series.Remove(MySeries);
+
+        if (selectedScript == script.Name || selectedScript == "AllScripts")
+        {
+            if (script.Result.Type == ScriptType.OSC) Plot.UpdateMiniModel(tool, Window, script);
+            else foreach (double[] Indicator in script.Result.Indicators)
+                    mainModel.Series.Add(MakeLineSeries(Indicator, script.Name));
+
+            if (!tool.ShowBasicSecurity)
+            {
+                var trades = script.Trades.ToArray()
+                    .Concat(TradingSystem.SystemTrades.ToArray()
+                    .Where(x => x.Seccode == tool.Security.Seccode)).ToArray();
+                var orders =
+                    TradingSystem.Orders.ToArray()
+                    .Where(x => x.Seccode == tool.Security.Seccode && x.Status is "active" or "watching").ToArray();
+                if (trades.Length > 0 || orders.Length > 0) AddAnnotations(tool, trades, orders);
+            }
+        }
     }
+
+    public async Task<bool> UpdateStateAsync(Tool tool)
+    {
+        if (tool == null) throw new ArgumentNullException(nameof(tool));
+
+        var result = true;
+        foreach (var script in tool.Scripts)
+        {
+            script.LastExecuted = script.Orders.ToArray().LastOrDefault(x => x.Status == "matched" && x.Note != "NM");
+
+            var activeOrders = script.Orders.ToArray()
+                .Where(x => x.Sender == script.Name && (x.Status is "active" or "watching"));
+            if (activeOrders.Count() > 1)
+            {
+                script.ActiveOrder = null;
+                AddInfo(script.Name + ": Отмена активных заявок скрипта: " + activeOrders.Count());
+                foreach (var order in activeOrders) await Connector.CancelOrderAsync(order);
+
+                for (int i = 0; i < 12; i++)
+                {
+                    await Task.Delay(250);
+                    if (!activeOrders.Where(x => x.Status is "active" or "watching").Any()) continue;
+                    if (i == 11)
+                    {
+                        AddInfo(script.Name + ": Не удалось вовремя отменить активные заявки.");
+                        result = false;
+                    }
+                }
+            }
+            else script.ActiveOrder = activeOrders.SingleOrDefault();
+        }
+        return result;
+    }
+
+    public async Task ProcessOrdersAsync(Tool tool, ToolState toolState)
+    {
+        if (toolState == null) throw new ArgumentNullException(nameof(toolState));
+        if (!await UpdateStateAsync(tool)) return;
+
+        var security = tool.Security;
+        var basicSecurity = tool.BasicSecurity ?? security;
+        foreach (var script in tool.Scripts)
+        {
+            script.Calculate(basicSecurity);
+
+            UpdateView(tool, script);
+            if (toolState.IsLogging) WriteLog(script, tool.Name);
+
+            if (basicSecurity != security && !AlignData(tool, script)) continue;
+            if (!toolState.ReadyToTrade ||
+                script.Result.Type != ScriptType.StopLine && !toolState.IsBidding) continue;
+
+            var volume = script.CurrentPosition == PositionType.Long ?
+                toolState.ShortOrderVolume : toolState.LongOrderVolume;
+
+            if (script.Result.Type is ScriptType.OSC or ScriptType.Line)
+                await ProcessOSCAsync(tool, script, volume, toolState.IsNormalPrice);
+            else if (script.Result.Type is ScriptType.LimitLine)
+                await ProcessLimitLineAsync(tool, script, volume);
+            else if (script.Result.Type is ScriptType.StopLine)
+                await ProcessStopLineAsync(tool, script, volume,
+                    toolState.IsNormalPrice, toolState.IsBidding, toolState.ATR);
+            else AddInfo(script.Name + ": Неизвестный тип скрипта: " + script.Result.Type, notify: true);
+        }
+    }
+
 
     private async Task ProcessOSCAsync(Tool tool, Script script, int volume, bool normalPrice)
     {
@@ -189,7 +243,6 @@ internal class ScriptManager : IScriptManager
         var isGrow = script.Result.IsGrow;
         var lastExecuted = script.LastExecuted;
 
-        // Работа с активной заявкой
         if (script.ActiveOrder != null)
         {
             var activeOrder = script.ActiveOrder;
@@ -229,13 +282,11 @@ internal class ScriptManager : IScriptManager
             return;
         }
 
-        // Проверка условий для выхода
         if (lastExecuted != null && lastExecuted.DateTime >= script.Result.iLastDT || volume == 0 ||
             basicSecurity == null && security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date ||
             basicSecurity != null && basicSecurity.Bars.DateTime[^1].Date != basicSecurity.Bars.DateTime[^2].Date)
             return;
 
-        // Проверка условий для выставления новой заявки
         if (script.CurrentPosition == PositionType.Short && isGrow[^1] ||
             script.CurrentPosition == PositionType.Long && !isGrow[^1])
         {
@@ -256,17 +307,15 @@ internal class ScriptManager : IScriptManager
         var activeOrder = script.ActiveOrder;
         var lastExecuted = script.LastExecuted;
 
-        // Работа с активной заявкой // Нужно сделать уверенную замену через ReplaceOrder
         if (activeOrder != null)
         {
             if (activeOrder.Quantity - activeOrder.Balance > 0.00001)
             {
                 if (Math.Abs(activeOrder.Price - orderPrice) > 0.00001)
                 {
-                    int Quantity = activeOrder.Quantity - activeOrder.Balance;
-                    if (await Connector.CancelOrderAsync(activeOrder))
-                        await Connector.SendOrderAsync(security, OrderType.Market,
-                            activeOrder.BuySell == "S", orderPrice, Quantity, "CancelPartEx", script, "NM");
+                    int vol = activeOrder.Quantity - activeOrder.Balance;
+                    await Connector.ReplaceOrderAsync(activeOrder, security,
+                        OrderType.Market, orderPrice, vol, "CancelPartEx", script, "NM");
                 }
             }
             else if (volume == 0) await Connector.CancelOrderAsync(activeOrder);
@@ -280,13 +329,11 @@ internal class ScriptManager : IScriptManager
             return;
         }
 
-        // Проверка условий для выхода
         if (lastExecuted != null && lastExecuted.DateTime >= script.Result.iLastDT || volume == 0 ||
             basicSecurity == null && security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date ||
             basicSecurity != null && basicSecurity.Bars.DateTime[^1].Date != basicSecurity.Bars.DateTime[^2].Date)
             return;
 
-        // Проверка условий для выставления новой заявки
         if ((script.CurrentPosition == PositionType.Short && isGrow[^1] ||
             script.CurrentPosition == PositionType.Long && !isGrow[^1]) &&
             orderPrice - security.MinPrice > -0.00001 && orderPrice - security.MaxPrice < 0.00001)
@@ -310,7 +357,6 @@ internal class ScriptManager : IScriptManager
             prevStopLine = script.Result.Indicators[0][^1];
         }
 
-        // Работа с активной заявкой
         var isGrow = script.Result.IsGrow;
         if (script.ActiveOrder != null)
         {
@@ -364,7 +410,6 @@ internal class ScriptManager : IScriptManager
             return;
         }
 
-        // Проверка условий для выхода
         var lastExecuted = script.LastExecuted;
         if (!nowBidding || volume == 0) return;
         if (lastExecuted != null && 
@@ -384,7 +429,6 @@ internal class ScriptManager : IScriptManager
             }
         }
 
-        // Проверка условий для выставления новой заявки
         var curPosition = script.CurrentPosition;
         if (security.LastTrade.DateTime < DateTime.Today.AddHours(7.5) && DateTime.Now < DateTime.Today.AddHours(7.5))
         {
@@ -421,7 +465,8 @@ internal class ScriptManager : IScriptManager
         }
     }
 
-    public bool AlignData(Tool tool, Script script)
+
+    private bool AlignData(Tool tool, Script script)
     {
         if (tool == null) throw new ArgumentNullException(nameof(tool));
         if (script == null) throw new ArgumentNullException(nameof(script));
@@ -460,53 +505,7 @@ internal class ScriptManager : IScriptManager
         return true;
     }
 
-    public void UpdateView(Tool tool, Script script)
-    {
-        if (tool == null) throw new ArgumentNullException(nameof(tool));
-        if (script == null) throw new ArgumentNullException(nameof(script));
-
-        string selectedScript = "AllScripts";
-        var mainModel = tool.MainModel;
-        if (TradingSystem.Tools.IndexOf(tool) < TradingSystem.Window.TabsTools.Items.Count)
-        {
-            Window.Dispatcher.Invoke(() =>
-            {
-                var grid = (((TradingSystem.Window.TabsTools.Items[TradingSystem.Tools.IndexOf(tool)]
-                    as TabItem).Content as Grid).Children[1] as Grid).Children[0] as Grid;
-                selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
-
-                script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
-                "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
-            });
-        }
-
-        foreach (var ann in mainModel.Annotations.ToArray())
-            if (ann.ToolTip == script.Name || ann.ToolTip is "System" or null) mainModel.Annotations.Remove(ann);
-
-        if (script.Result.Type != ScriptType.OSC)
-            foreach (Series MySeries in mainModel.Series.ToArray())
-                if (MySeries.Title == script.Name) mainModel.Series.Remove(MySeries);
-
-        if (selectedScript == script.Name || selectedScript == "AllScripts")
-        {
-            if (script.Result.Type == ScriptType.OSC) Plot.UpdateMiniModel(tool, Window, script);
-            else foreach (double[] Indicator in script.Result.Indicators)
-                    mainModel.Series.Add(MakeLineSeries(Indicator, script.Name));
-
-            if (!tool.ShowBasicSecurity)
-            {
-                var trades = script.Trades.ToArray()
-                    .Concat(TradingSystem.SystemTrades.ToArray()
-                    .Where(x => x.Seccode == tool.Security.Seccode)).ToArray();
-                var orders =
-                    TradingSystem.Orders.ToArray()
-                    .Where(x => x.Seccode == tool.Security.Seccode && x.Status is "active" or "watching").ToArray();
-                if (trades.Length > 0 || orders.Length > 0) AddAnnotations(tool, trades, orders);
-            }
-        }
-    }
-
-    public void WriteLog(Script script, string toolName)
+    private void WriteLog(Script script, string toolName)
     {
         if (script == null) throw new ArgumentNullException(nameof(script));
         if (toolName == null) throw new ArgumentNullException(nameof(toolName));
@@ -525,6 +524,7 @@ internal class ScriptManager : IScriptManager
         }
         catch (Exception e) { AddInfo(toolName + ": Исключение логирования скрипта: " + e.Message); }
     }
+
 
     private void AddAnnotations(Tool tool, Trade[] trades, Order[] orders)
     {

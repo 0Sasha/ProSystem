@@ -8,10 +8,32 @@ namespace ProSystem;
 
 public abstract class Connector : INotifyPropertyChanged
 {
+    protected bool backupServer;
+    protected ConnectionState connection = ConnectionState.Disconnected;
+
     public virtual bool Initialized { get; protected set; }
-    public virtual bool BackupServer { get; set; }
+    public virtual bool BackupServer
+    {
+        get => backupServer;
+        set
+        {
+            backupServer = value;
+            NotifyChange(nameof(BackupServer));
+        }
+    }
     public virtual bool ServerAvailable { get; set; }
-    public virtual ConnectionState Connection { get; set; }
+    public virtual ConnectionState Connection
+    {
+        get => connection;
+        set
+        {
+            if (connection != value)
+            {
+                connection = value;
+                NotifyChange(nameof(Connection));
+            }
+        }
+    }
     public virtual DateTime ReconnectionTrigger { get; set; } = DateTime.Now.AddMinutes(5);
 
     public virtual List<Security> Securities { get; protected set; } = new();

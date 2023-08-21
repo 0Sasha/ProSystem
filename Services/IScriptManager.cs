@@ -10,15 +10,9 @@ public interface IScriptManager
 
     public void ClearObsoleteData(Tool tool);
 
-    public Task<bool> UpdateOrdersAndPositionAsync(Script script);
-
-    public Task<bool> CalculateAsync(Script script, Security security);
-
-    public Task ProcessOrdersAsync(Tool tool, ToolState toolState, Script script);
-
-    public bool AlignData(Tool tool, Script script);
-
     public void UpdateView(Tool tool, Script script);
 
-    public void WriteLog(Script script, string toolName);
+    public Task<bool> UpdateStateAsync(Tool tool);
+
+    public Task ProcessOrdersAsync(Tool tool, ToolState toolState);
 }

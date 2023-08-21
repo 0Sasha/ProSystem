@@ -138,7 +138,7 @@ internal class ToolManager : IToolManager
             return;
         }
 
-        var tf = Connector.TimeFrames.Last(x => x.Period / 60 <= tool.BaseTF);
+        var tf = Connector.TimeFrames.Last(x => x.Seconds / 60 <= tool.BaseTF);
         int count = 25;
 
         var security = tool.Security;
@@ -311,42 +311,26 @@ internal class ToolManager : IToolManager
     private async Task CalculateToolAsync(Tool tool)
     {
         await WaitCertaintyAsync(tool);
-
         var toolState = CalculateToolState(tool);
+
         UpdateControlPanel(tool, toolState);
         UpdateBarsColor(tool, toolState);
         if (toolState.IsLogging) WriteStateLog(tool, toolState);
 
-        ScriptManager.IdentifyOrdersAndTrades(tool);
-        IdentifySystemOrdersAndTrades(tool);
-
+        IdentifyOrdersAndTrades(tool);
         if (!tool.StopTrading)
         {
             if (!await CancelUnknownOrdersAsync(tool)) return;
             if (toolState.ReadyToTrade)
             {
-                foreach (var script in tool.Scripts) await ScriptManager.UpdateOrdersAndPositionAsync(script);
+                await ScriptManager.UpdateStateAsync(tool);
                 if (!await CheckPositionMatchingAsync(tool, toolState)) return;
                 await NormalizePositionAsync(tool, toolState);
             }
         }
         else if (!await CancelActiveOrdersAsync(tool)) return;
 
-        var security = tool.Security;
-        var basicSecurity = tool.BasicSecurity ?? security;
-        foreach (var script in tool.Scripts)
-        {
-            if (!await ScriptManager.CalculateAsync(script, basicSecurity)) continue;
-
-            ScriptManager.UpdateView(tool, script);
-            if (toolState.IsLogging) ScriptManager.WriteLog(script, tool.Name);
-
-            if (basicSecurity != security && !ScriptManager.AlignData(tool, script)) continue;
-            if (!toolState.ReadyToTrade ||
-                script.Result.Type != ScriptType.StopLine && !toolState.IsBidding) continue;
-
-            await ScriptManager.ProcessOrdersAsync(tool, toolState, script);
-        }
+        await ScriptManager.ProcessOrdersAsync(tool, toolState);
     }
 
     private async Task WaitCertaintyAsync(Tool tool)
@@ -368,8 +352,10 @@ internal class ToolManager : IToolManager
         if (lastTrade != null && lastTrade.DateTime.AddSeconds(2) > DateTime.Now) await Task.Delay(1500);
     }
 
-    private void IdentifySystemOrdersAndTrades(Tool tool)
+    private void IdentifyOrdersAndTrades(Tool tool)
     {
+        ScriptManager.IdentifyOrdersAndTrades(tool);
+
         var systemOrders = TradingSystem.SystemOrders;
         var unknownOrders = TradingSystem.Orders.ToArray()
             .Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode);
@@ -486,8 +472,8 @@ internal class ToolManager : IToolManager
                 AddInfo(tool.Name + ": request of USDRUB and EURRUB", notify: true);
                 Task.Run(async () =>
                 {
-                    await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
-                    await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
+                    await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
+                    await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
                 });
                 toolState.ReadyToTrade = false;
             }
@@ -730,7 +716,7 @@ internal class ToolManager : IToolManager
                 position == longPos && balance <= 0 || position == shortPos && balance >= 0)
             {
                 AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
-                await CancelActiveOrdersAsync(tool);
+                if (!await CancelActiveOrdersAsync(tool)) return false;
 
                 int volume;
                 bool isBuy = position == neutralPos ? balance < 0 : position == longPos;
@@ -753,7 +739,7 @@ internal class ToolManager : IToolManager
                     position1 == longPos && balance <= 0 || position1 == shortPos && balance >= 0)
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
-                    await CancelActiveOrdersAsync(tool);
+                    if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     int volume;
                     bool isBuy = position1 == neutralPos ? balance < 0 : position1 == longPos;
@@ -771,7 +757,7 @@ internal class ToolManager : IToolManager
                 if (balance != 0)
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
-                    await CancelActiveOrdersAsync(tool);
+                    if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     await Connector.SendOrderAsync(security, OrderType.Market,
                         balance < 0, security.Bars.Close[^2], Math.Abs(balance), "BringingIntoLine", null, "NM");
@@ -784,7 +770,7 @@ internal class ToolManager : IToolManager
                 if (position == longPos && balance <= 0 || position == shortPos && balance >= 0)
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
-                    await CancelActiveOrdersAsync(tool);
+                    if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     int vol = position == longPos ?
                         Math.Abs(balance) + toolState.LongVolume : Math.Abs(balance) + toolState.ShortVolume;

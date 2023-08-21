@@ -84,8 +84,8 @@ public class TradingSystem
         if (!ReadyToTrade)
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
-            await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1"), 1);
-            await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1"), 1);
+            await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
+            await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
             await PrepareToolsAsync();
 
             if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();

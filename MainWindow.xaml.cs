@@ -136,6 +136,13 @@ public partial class MainWindow : Window
         ComboBoxDistrib.SelectedIndex = 1;
         BoxConnectors.ItemsSource = new string[] { nameof(TXmlConnector) };
         BoxConnectors.SelectedIndex = 0;
+        BackupServerCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new Binding()
+            {
+                Source = TradingSystem.Connector,
+                Path = new PropertyPath(nameof(Connector.BackupServer)),
+                Mode = BindingMode.TwoWay
+            });
 
         TradingSystem.Portfolio.PropertyChanged += UpdatePortfolio;
         TradingSystem.Portfolio.PropertyChanged += SaveData;
@@ -418,9 +425,16 @@ public partial class MainWindow : Window
             else Column.Width = new GridLength(100);
         }
     }
-    private void Test(object sender, RoutedEventArgs e)
+    private async void Test(object sender, RoutedEventArgs e)
     {
-
+        Connector.BackupServer = !Connector.BackupServer;
+        return;
+        try
+        {
+            var con = new BnbConnector(TradingSystem, AddInfo);
+            await con.ConnectAsync(TxtLog.Text, TxtPas.SecurePassword);
+        }
+        catch { }
     }
     #endregion
 

@@ -19,7 +19,6 @@ internal class TXmlConnector : Connector
     private readonly TXmlDataProcessor DataProcessor;
 
     private int waitingTime = 18000;
-    private ConnectionState connection;
     private Thread mainThread;
     private bool isWorking;
 
@@ -37,19 +36,6 @@ internal class TXmlConnector : Connector
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
     public List<ClientAccount> Clients { get; } = new();
-
-    public override ConnectionState Connection
-    {
-        get => connection;
-        set
-        {
-            if (connection != value)
-            {
-                connection = value;
-                NotifyChange(nameof(Connection));
-            }
-        }
-    }
 
     public TXmlConnector(TradingSystem tradingSystem, AddInformation addInfo)
     {
