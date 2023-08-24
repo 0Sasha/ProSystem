@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Shapes;
 using ProSystem.Services;
 
 namespace ProSystem;
@@ -427,14 +428,7 @@ public partial class MainWindow : Window
     }
     private async void Test(object sender, RoutedEventArgs e)
     {
-        Connector.BackupServer = !Connector.BackupServer;
-        return;
-        try
-        {
-            var con = new BnbConnector(TradingSystem, AddInfo);
-            await con.ConnectAsync(TxtLog.Text, TxtPas.SecurePassword);
-        }
-        catch { }
+        
     }
     #endregion
 

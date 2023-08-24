@@ -394,7 +394,7 @@ internal class ToolManager : IToolManager
         var atr = Indicators.ATR(tool.Security.Bars.High, tool.Security.Bars.Low, tool.Security.Bars.Close, 50);
         var toolState = new ToolState(readyToTrade, IsLogging(tool), IsBidding(tool))
         {
-            IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 10,
+            IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 15,
             AveragePrice = average,
             ATR = atr[^2]
         };
@@ -848,7 +848,7 @@ internal class ToolManager : IToolManager
 
             tool.BlockInfo.Text = "\nBal/Real " + toolState.Balance + "/" + toolState.RealBalance +
             "\nRealV " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
-            "\nSMA " + toolState.AveragePrice + "\n10ATR " + Math.Round(toolState.ATR * 10, tool.Security.Decimals);
+            "\nSMA " + toolState.AveragePrice + "\n15ATR " + Math.Round(toolState.ATR * 15, tool.Security.Decimals);
         });
     }
 
