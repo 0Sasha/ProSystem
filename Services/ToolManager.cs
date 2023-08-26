@@ -147,14 +147,14 @@ internal class ToolManager : IToolManager
         {
             if (basicSec.SourceBars == null || basicSec.SourceBars.Close.Length < 500 ||
                 basicSec.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-                tool.BaseTF != basicSec.SourceBars.TF && tool.BaseTF != basicSec.Bars.TF) count = 10000;
+                tool.BaseTF != basicSec.SourceBars.TF && tool.BaseTF != basicSec.Bars.TF) count = 5000;
             await Connector.OrderHistoricalDataAsync(basicSec, tf, count);
         }
 
         count = 25;
         if (security.SourceBars == null || security.SourceBars.Close.Length < 500 ||
             security.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-            tool.BaseTF != security.SourceBars.TF && tool.BaseTF != security.Bars.TF) count = 10000;
+            tool.BaseTF != security.SourceBars.TF && tool.BaseTF != security.Bars.TF) count = 5000;
         await Connector.OrderHistoricalDataAsync(security, tf, count);
     }
 
@@ -187,15 +187,15 @@ internal class ToolManager : IToolManager
 
     public void UpdateBars(Tool tool, bool updateBasicSecurity)
     {
-        var sec = tool.Security;
-        var basicSec = tool.BasicSecurity;
         if (updateBasicSecurity)
         {
-            if (basicSec.SourceBars.TF == tool.BaseTF) basicSec.Bars = basicSec.SourceBars;
-            else basicSec.Bars = basicSec.SourceBars.Compress(tool.BaseTF);
+            var basic = tool.BasicSecurity;
+            if (basic.SourceBars.TF == tool.BaseTF) basic.Bars = basic.SourceBars;
+            else basic.Bars = basic.SourceBars.Compress(tool.BaseTF);
         }
         else
         {
+            var sec = tool.Security;
             if (sec.SourceBars.TF == tool.BaseTF) sec.Bars = sec.SourceBars;
             else sec.Bars = sec.SourceBars.Compress(tool.BaseTF);
         }
@@ -203,7 +203,7 @@ internal class ToolManager : IToolManager
 
     public void UpdateView(Tool tool, bool updateScriptView)
     {
-        if (updateScriptView)
+        if (updateScriptView && tool.Security.Bars != null)
         {
             if (tool.MainModel == null) Plot.UpdateModel(tool);
             foreach (var script in tool.Scripts)

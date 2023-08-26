@@ -103,8 +103,9 @@ public partial class NewTool : Window
     {
         try
         {
-            SecuritiesView.ItemsSource = Securities.Where(x => x.Market == Markets.Single(y => y.Name == BoxMarkets.Text).ID &&
-            (x.ShortName.Contains(SearchSec.Text) || x.Seccode.Contains(SearchSec.Text)));
+            SecuritiesView.ItemsSource = Securities.Where(x => 
+                (x.Market == null || x.Market == Markets.Single(y => y.Name == BoxMarkets.Text).ID) &&
+                (x.ShortName != null && x.ShortName.Contains(SearchSec.Text) || x.Seccode.Contains(SearchSec.Text)));
         }
         catch { }
     }

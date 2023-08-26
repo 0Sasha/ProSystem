@@ -40,7 +40,7 @@ public partial class MainWindow : Window
 
         TradingSystem = new(this, typeof(TXmlConnector), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
 
-        Settings.Check(Tools);
+        Settings.Check(TradingSystem.Tools);
         if (Settings.EmailPassword != null) Notifier = new EmailNotifier(587,
             "smtp.gmail.com", Settings.Email, Settings.EmailPassword, (info) => AddInfo(info));
 
@@ -428,7 +428,7 @@ public partial class MainWindow : Window
     }
     private async void Test(object sender, RoutedEventArgs e)
     {
-        
+
     }
     #endregion
 

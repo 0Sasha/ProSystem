@@ -40,6 +40,7 @@ public class TradingSystem
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
         if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, Window.AddInfo);
+        else if (connectorType == typeof(BnbConnector)) Connector = new BnbConnector(this, Window.AddInfo);
         else throw new ArgumentException("Unknown connector", nameof(connectorType));
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -58,8 +59,8 @@ public class TradingSystem
 
     public void Start()
     {
-        if (Connector.GetType() == typeof(TXmlConnector) && File.Exists("txmlconnector64.dll"))
-            Connector.Initialize(Settings.LogLevelConnector);
+        if (Connector.GetType() == typeof(TXmlConnector) && File.Exists("txmlconnector64.dll") ||
+            Connector.GetType() == typeof(BnbConnector)) Connector.Initialize(Settings.LogLevelConnector);
         else
         {
             Window.AddInfo("Connector is not found");
@@ -84,8 +85,11 @@ public class TradingSystem
         if (!ReadyToTrade)
         {
             await Connector.OrderPortfolioInfoAsync(Portfolio);
-            await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
-            await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
+            if (Connector.GetType() == typeof(TXmlConnector))
+            {
+                await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
+                await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
+            }
             await PrepareToolsAsync();
 
             if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();

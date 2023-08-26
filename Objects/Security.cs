@@ -13,7 +13,7 @@ public class Security
     public string Market { get; set; }
     public int Decimals { get; set; } // Количество десятичных знаков в цене
     public double MinStep { get; set; } // Шаг цены
-    public int LotSize { get; set; } // Размер лота
+    public double LotSize { get; set; } // Размер лота
 
     public Trade LastTrade { get; set; } // Последняя сделка
     public DateTime LastTrDT { get; set; }
@@ -46,7 +46,7 @@ public class Security
         Seccode = seccode;
     }
 
-    public async Task UpdateRequirements()
+    public async Task UpdateRequirementsAsync()
     {
         for (int i = 0; Bars == null && i < 20; i++) await Task.Delay(250);
         if (Bars == null) throw new Exception("There is no bars to update requirements");

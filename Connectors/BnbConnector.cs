@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -16,6 +17,7 @@ internal class BnbConnector : Connector
     private string apiKey;
     private byte[] apiSecret;
     private readonly AddInformation AddInfo;
+    private readonly BnbDataProcessor DataProcessor;
     private readonly TradingSystem TradingSystem;
     private readonly HttpClient HttpClient = new();
     private readonly WebSocketManager SocketManager;
@@ -27,19 +29,29 @@ internal class BnbConnector : Connector
 
     public BnbConnector(TradingSystem tradingSystem, AddInformation addInfo)
     {
-        TradingSystem = tradingSystem;
-        AddInfo = addInfo;
+        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
+        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
         TimeFrames.Add(new("1m", 60, "ONE_MINUTE"));
         TimeFrames.Add(new("5m", 300, "FIVE_MINUTE"));
         TimeFrames.Add(new("30m", 1800, "THIRTY_MINUTE"));
         TimeFrames.Add(new("1h", 3600, "ONE_HOUR"));
         TimeFrames.Add(new("1d", 86400, "ONE_DAY"));
-        SocketManager = new(BaseFuturesStreamUrl + "/ws/btcusdt@kline_30m", ProcessData, addInfo);
+        DataProcessor = new(this, tradingSystem, addInfo);
+        SocketManager = new(BaseFuturesStreamUrl +
+            "/ws/btcusdt@kline_30m", DataProcessor.ProcessData, addInfo);
     }
 
-    public override bool Initialize(int logLevel) => true;
+    public override bool Initialize(int logLevel)
+    {
+        Initialized = true;
+        return Initialized;
+    }
 
-    public override bool Uninitialize() => true;
+    public override bool Uninitialize()
+    {
+        Initialized = false;
+        return Initialized;
+    }
 
     public override async Task<bool> ConnectAsync(string login, SecureString password)
     {
@@ -51,21 +63,10 @@ internal class BnbConnector : Connector
         apiSecret = Encoding.UTF8.GetBytes(Marshal.PtrToStringUni(valuePtr));
         Marshal.ZeroFreeGlobalAllocUnicode(valuePtr);
 
+        if (!await CheckServerTimeAsync() || !await CheckAPIPermissionsAsync()) return false;
+        
         Connection = ConnectionState.Connecting;
-
-        AddInfo("GetServerTimeAsync " + (await GetServerTimeAsync()).ToString());
-        AddInfo("GetExchangeInfo " + await GetExchangeInfo(), false);
-        AddInfo("GetCandlestickData " + await GetCandlestickData("btcusdt"), false);
-        AddInfo("GetOrders " + await GetOrders("btcusdt"), false);
-        AddInfo("GetTrades " + await GetTrades("btcusdt"), false);
-        AddInfo("GetPosition " + await GetPosition("btcusdt"), false);
-        AddInfo("GetPortfolio " + await GetPortfolio(), false);
-
-        AddInfo("GetAccountSnapshot " + await GetAccountSnapshot(), false);
-        AddInfo("GetFundingWallet " + await GetFundingWallet(), false);
-        AddInfo("GetUserAssets " + await GetUserAssets(), false);
-        AddInfo("GetAPIKeyPermissions " + await GetAPIKeyPermissions(), false);
-        return false;
+        await GetExchangeInfoAsync();
 
         if (!SocketManager.Connected)
         {
@@ -75,7 +76,7 @@ internal class BnbConnector : Connector
                 return false;
             }
             await SocketManager.SendAsync("{ \"method\": \"LIST_SUBSCRIPTIONS\",\r\n\"id\": 3 }");
-            await SubscribeToTradesAsync(new("ETHUSDT"));
+            //await SubscribeToTradesAsync(new("ETHUSDT"));
         }
         Connection = ConnectionState.Connected;
         return true;
@@ -107,37 +108,77 @@ internal class BnbConnector : Connector
         throw new NotImplementedException();
     }
 
-    public override async Task<bool> SubscribeToTradesAsync(Security security)
+    public override async Task<bool> SubscribeToTradesAsync(Security security) =>
+        await SubUnsub(security, true);
+
+    public override async Task<bool> UnsubscribeFromTradesAsync(Security security) =>
+        await SubUnsub(security, false);
+
+    private async Task<bool> SubUnsub(Security security, bool subscribe)
     {
+        var method = subscribe ? "SUBSCRIBE" : "UNSUBSCRIBE";
         if (SocketManager.Connected)
         {
-            await SocketManager.SendAsync("{\r\n\"method\": \"SUBSCRIBE\",\r\n\"params\":\r\n[\r\n\"" +
+            await SocketManager.SendAsync("{\r\n\"method\": \"" + method + "\",\r\n\"params\":\r\n[\r\n\"" +
                 security.Seccode.ToLower() + "@kline_30m\"],\r\n\"id\": 1\r\n}");
             return true;
         }
-        
-        AddInfo("SubscribeToTrades: WebSocketState is not open");
+
+        AddInfo("SubUnsubToBars: WebSocketState is not open");
         return false;
     }
 
-    public override Task<bool> UnsubscribeFromTradesAsync(Security security)
+    public override async Task<bool> OrderHistoricalDataAsync(Security security, TimeFrame tf, int count)
     {
-        throw new NotImplementedException();
+        var tool = TradingSystem.Tools.Single(t => t.Security.Seccode == security.Seccode ||
+            t.BasicSecurity?.Seccode == security.Seccode);
+        if (count > 1500)
+        {
+            var timeStep = (long)TimeSpan.FromSeconds(tf.Seconds * 980).TotalMilliseconds;
+            var endTime = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeMilliseconds();
+            var startTime = endTime - timeStep;
+            while (count > 0)
+            {
+                var bars = await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/klines", false, HttpMethod.Get,
+                    new()
+                    {
+                        { "symbol", security.Seccode },
+                        { "interval", tf.ID },
+                        { "startTime", startTime.ToString() },
+                        { "endTime", endTime.ToString() },
+                        { "limit", "1500" }
+                    });
+                _ = Task.Run(() => DataProcessor.ProcessBars(bars, tf, security, tool.BaseTF));
+                count -= 980;
+                endTime = startTime;
+                startTime = endTime - timeStep;
+            }
+        }
+        else
+        {
+            var bars = await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/klines", false, HttpMethod.Get,
+                new()
+                {
+                    { "symbol", security.Seccode },
+                    { "interval", tf.ID },
+                    { "limit", count.ToString() }
+                });
+            _ = Task.Run(() => DataProcessor.ProcessBars(bars, tf, security, tool.BaseTF));
+        }
+        return true;
     }
 
-    public override Task<bool> OrderHistoricalDataAsync(Security security, TimeFrame tf, int count)
-    {
-        throw new NotImplementedException();
-    }
+    public override async Task<bool> OrderSecurityInfoAsync(Security security) => true;
 
-    public override Task<bool> OrderSecurityInfoAsync(Security security)
+    public override async Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio)
     {
-        throw new NotImplementedException();
-    }
-
-    public override Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio)
-    {
-        throw new NotImplementedException();
+        var info = await SendRequestAsync(BaseFuturesUrl + "/fapi/v2/account", true, HttpMethod.Get,
+            new()
+            {
+                { "timestamp", DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString(IC) }
+            });
+        AddInfo(info, false);
+        return true;
     }
 
 
@@ -160,7 +201,6 @@ internal class BnbConnector : Connector
     private async Task<string> SendRequestAsync(string requestUri, HttpMethod httpMethod)
     {
         using var request = new HttpRequestMessage(httpMethod, requestUri);
-        //request.Headers.Add("User-Agent", "binance-connector-dotnet/4.0.0");
         request.Headers.Add("X-MBX-APIKEY", apiKey);
 
         var response = await HttpClient.SendAsync(request);
@@ -198,24 +238,19 @@ internal class BnbConnector : Connector
     }
 
 
-    private async Task<string> GetServerTimeAsync() =>
-        await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/time", false, HttpMethod.Get);
-
-    private async Task<string> GetExchangeInfo() =>
-        await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/exchangeInfo", false, HttpMethod.Get);
-
-    private async Task<string> GetCandlestickData(string symbol)
+    private async Task<bool> CheckServerTimeAsync()
     {
-        return await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/klines", false, HttpMethod.Get,
-            new()
-            {
-                { "symbol", symbol },
-                { "interval", "30m" },
-                { "limit", "5" } // Amount
-            });
+        var info = await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/time", false, HttpMethod.Get);
+        return DataProcessor.CheckServerTime(info);
     }
 
-    private async Task<string> GetOrders(string symbol)
+    private async Task GetExchangeInfoAsync()
+    {
+        var info = await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/exchangeInfo", false, HttpMethod.Get);
+        DataProcessor.ProcessExchangeInfo(info);
+    }
+
+    private async Task<string> GetOrdersAsync(string symbol)
     {
         return await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/allOrders", true, HttpMethod.Get,
             new()
@@ -226,7 +261,7 @@ internal class BnbConnector : Connector
             });
     }
 
-    private async Task<string> GetTrades(string symbol)
+    private async Task<string> GetTradesAsync(string symbol)
     {
         return await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/userTrades", true, HttpMethod.Get,
             new()
@@ -237,7 +272,7 @@ internal class BnbConnector : Connector
             });
     }
 
-    private async Task<string> GetPosition(string symbol)
+    private async Task<string> GetPositionAsync(string symbol)
     {
         return await SendRequestAsync(BaseFuturesUrl + "/fapi/v2/positionRisk", true, HttpMethod.Get,
             new()
@@ -247,18 +282,19 @@ internal class BnbConnector : Connector
             });
     }
 
-    private async Task<string> GetPortfolio()
+
+
+    private async Task<bool> CheckAPIPermissionsAsync()
     {
-        return await SendRequestAsync(BaseFuturesUrl + "/fapi/v2/account", true, HttpMethod.Get,
+        var info = await SendRequestAsync(BaseUrl + "/sapi/v1/account/apiRestrictions", true, HttpMethod.Get,
             new()
             {
                 { "timestamp", DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString(IC) }
             });
+        return DataProcessor.CheckAPIPermissions(info);
     }
 
-
-
-    private async Task<string> GetAccountSnapshot()
+    private async Task<string> GetAccountSnapshotAsync()
     {
         return await SendRequestAsync(BaseUrl + "/sapi/v1/accountSnapshot", true, HttpMethod.Get,
             new()
@@ -268,7 +304,7 @@ internal class BnbConnector : Connector
             });
     }
 
-    private async Task<string> GetFundingWallet()
+    private async Task<string> GetFundingWalletAsync()
     {
         return await SendRequestAsync(BaseUrl + "/sapi/v1/asset/get-funding-asset", true, HttpMethod.Post,
             new()
@@ -277,26 +313,12 @@ internal class BnbConnector : Connector
             });
     }
 
-    private async Task<string> GetUserAssets()
+    private async Task<string> GetUserAssetsAsync()
     {
         return await SendRequestAsync(BaseUrl + "/sapi/v3/asset/getUserAsset", true, HttpMethod.Post,
             new()
             {
                 { "timestamp", DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString(IC) }
             });
-    }
-
-    private async Task<string> GetAPIKeyPermissions()
-    {
-        return await SendRequestAsync(BaseUrl + "/sapi/v1/account/apiRestrictions", true, HttpMethod.Get,
-            new()
-            {
-                { "timestamp", DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString(IC) }
-            });
-    }
-
-    private void ProcessData(string data)
-    {
-        AddInfo(data.Length > 350 ? data[..350] : data);
     }
 }

@@ -65,7 +65,7 @@ internal class WebSocketManager : IDisposable
     {
         string data = string.Empty;
         WebSocketReceiveResult result;
-        while (true)
+        while (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseSent)
         {
             try
             {

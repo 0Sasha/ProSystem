@@ -607,7 +607,7 @@ internal class TXmlDataProcessor
         if (!GoToTheValue(xr, "reserate_short")) return;
         tool.Security.ReserateShort = double.Parse(xr.Value, IC);
 
-        Task.Run(tool.Security.UpdateRequirements);
+        Task.Run(tool.Security.UpdateRequirementsAsync);
     }
 
 
