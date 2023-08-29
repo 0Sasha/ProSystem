@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Security;
 using System.Threading.Tasks;
 
@@ -8,6 +9,10 @@ namespace ProSystem;
 
 public abstract class Connector : INotifyPropertyChanged
 {
+    protected readonly AddInformation AddInfo;
+    protected readonly TradingSystem TradingSystem;
+    protected readonly CultureInfo IC = CultureInfo.InvariantCulture;
+
     protected bool backupServer;
     protected ConnectionState connection = ConnectionState.Disconnected;
 
@@ -45,6 +50,12 @@ public abstract class Connector : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
+    protected Connector(TradingSystem tradingSystem, AddInformation addInfo)
+    {
+        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
+        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
+    }
+
     protected void NotifyChange(string propertyName = "") =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
@@ -73,4 +84,41 @@ public abstract class Connector : INotifyPropertyChanged
     public abstract Task<bool> OrderSecurityInfoAsync(Security security);
 
     public abstract Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio);
+
+    protected async Task WaitSentCommandAsync(Task sentCommand, string command, int shortMsTimeout, int longMsTimeout)
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                if (!sentCommand.Wait(shortMsTimeout))
+                {
+                    var initReadyToTrade = TradingSystem.ReadyToTrade;
+                    TradingSystem.ReadyToTrade = false;
+                    AddInfo("Server response timed out. Trading is suspended.", false);
+                    if (!sentCommand.Wait(longMsTimeout))
+                    {
+                        ServerAvailable = false;
+                        if (Connection == ConnectionState.Connected)
+                        {
+                            Connection = ConnectionState.Connecting;
+                            ReconnectionTrigger = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
+                        }
+                        AddInfo("Server is not responding. Command: " + command, false);
+
+                        if (!sentCommand.Wait(longMsTimeout * 15))
+                        {
+                            AddInfo("Infinitely waiting for a server response", notify: true);
+                            sentCommand.Wait();
+                        }
+                        AddInfo("Server is responding", false);
+                        ServerAvailable = true;
+                    }
+                    else if (Connection == ConnectionState.Connected) TradingSystem.ReadyToTrade = initReadyToTrade;
+                }
+            });
+        }
+        catch (Exception e) { AddInfo("Exception during sending command: " + e.Message); }
+        finally { sentCommand.Dispose(); }
+    }
 }

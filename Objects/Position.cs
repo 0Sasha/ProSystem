@@ -112,6 +112,12 @@ public class Position : INotifyPropertyChanged
 
     public Position() { }
 
+    public Position(string seccode, double saldo)
+    {
+        Seccode = seccode;
+        Saldo = saldo;
+    }
+
     public Position(string seccode, string shortName, string market, string marketName)
     {
         Seccode = seccode;

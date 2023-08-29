@@ -69,15 +69,70 @@ internal class BnbDataProcessor
                 Connector.Securities.Add(security);
             }
             security.TradingStatus = symbol.GetProperty("status").GetString();
+            security.Market = symbol.GetProperty("underlyingType").GetString();
 
             var filters = symbol.GetProperty("filters");
             foreach (var filter in filters.EnumerateArray())
             {
                 var type = filter.GetProperty("filterType").GetString();
                 if (type == "PRICE_FILTER")
-                    security.MinStep = double.Parse(filter.GetProperty("tickSize").GetString(), IC);
+                {
+                    var tickSize = filter.GetProperty("tickSize").GetString();
+                    security.MinStep = double.Parse(tickSize, IC);
+
+                    if (tickSize.StartsWith("0.")) security.Decimals = tickSize.Length - 2;
+                    else if (tickSize == "1.0") security.Decimals = 0;
+                    else AddInfo("Unknown tickSize", notify: true);
+                }
                 else if (type == "LOT_SIZE")
                     security.LotSize = double.Parse(filter.GetProperty("stepSize").GetString(), IC);
+            }
+        }
+    }
+
+    public void ProcessPortfolio(string data)
+    {
+        var doc = JsonDocument.Parse(data);
+        var portfolio = TradingSystem.Portfolio;
+        portfolio.InitReqs = double.Parse(doc.RootElement.GetProperty("totalInitialMargin").GetString(), IC);
+        portfolio.MinReqs = double.Parse(doc.RootElement.GetProperty("totalMaintMargin").GetString(), IC);
+        portfolio.Saldo = double.Parse(doc.RootElement.GetProperty("totalWalletBalance").GetString(), IC);
+        portfolio.UnrealPL = double.Parse(doc.RootElement.GetProperty("totalUnrealizedProfit").GetString(), IC);
+
+        // totalPositionInitialMargin, totalOpenOrderInitialMargin, totalCrossWalletBalance
+        // totalCrossUnPnl, availableBalance
+
+        foreach (var a in doc.RootElement.GetProperty("assets").EnumerateArray())
+        {
+            var code = a.GetProperty("asset").GetString();
+            var saldo = double.Parse(a.GetProperty("walletBalance").GetString(), IC);
+            if (saldo > 0.00000001 || portfolio.MoneyPositions.Any(p => p.Seccode == code))
+            {
+                var pos = portfolio.MoneyPositions.SingleOrDefault(p => p.Seccode == code);
+                if (pos == null)
+                {
+                    pos = new(code, saldo);
+                    portfolio.MoneyPositions.Add(pos);
+                }
+                else pos.Saldo = saldo;
+                pos.PL = double.Parse(a.GetProperty("unrealizedProfit").GetString(), IC);
+            }
+        }
+
+        foreach (var p in doc.RootElement.GetProperty("positions").EnumerateArray())
+        {
+            var code = p.GetProperty("symbol").GetString();
+            var saldo = double.Parse(p.GetProperty("positionAmt").GetString(), IC);
+            if (saldo > 0.00000001 || portfolio.Positions.Any(p => p.Seccode == code))
+            {
+                var pos = portfolio.Positions.SingleOrDefault(p => p.Seccode == code);
+                if (pos == null)
+                {
+                    pos = new(code, saldo);
+                    portfolio.Positions.Add(pos);
+                }
+                else pos.Saldo = saldo;
+                pos.PL = double.Parse(p.GetProperty("unrealizedProfit").GetString(), IC);
             }
         }
     }
@@ -117,12 +172,17 @@ internal class BnbDataProcessor
         {
             var eventType = et.GetString();
             if (eventType == "kline") ProcessBar(root);
-            else throw new NotImplementedException();
+            else
+            {
+                var info = root.GetRawText();
+                AddInfo("Unknown eventType: " + eventType + "\n" + info);
+            }
         }
         else
         {
             var res = root.GetProperty("result");
-            AddInfo(res.GetRawText());
+            var text = res.GetRawText();
+            if (text != "null") AddInfo(text);
         }
     }
 
@@ -143,6 +203,7 @@ internal class BnbDataProcessor
         var tfID = kline.GetProperty("i").GetString();
         var tf = Connector.TimeFrames.Single(t => t.ID == tfID).Seconds / 60;
         if (security.Bars.TF != tf) throw new ArgumentException("TF is not suitable");
+        security.LastTrade = new(DateTime.Now);
 
         var startTime = DateTimeOffset.FromUnixTimeMilliseconds(kline.GetProperty("t").GetInt64()).UtcDateTime;
         var open = double.Parse(kline.GetProperty("o").GetString(), IC);

@@ -9,7 +9,7 @@ using ProSystem.Services;
 
 namespace ProSystem;
 
-internal delegate void AddInformation(string data, bool important = true, bool notify = false);
+public delegate void AddInformation(string data, bool important = true, bool notify = false);
 
 public class TradingSystem
 {

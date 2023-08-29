@@ -704,11 +704,14 @@ public partial class MainWindow : Window
 
     private async void ChangeСonnection(object sender, RoutedEventArgs e)
     {
+        var button = sender as Button;
+        button.IsEnabled = false;
         if (Connector.Connection is ConnectionState.Connected or ConnectionState.Connecting)
             await Connector.DisconnectAsync();
         else if (TxtLog.Text.Length > 0 && TxtPas.SecurePassword.Length > 0)
             await Connector.ConnectAsync(TxtLog.Text, TxtPas.SecurePassword);
         else AddInfo("Type login and password");
+        button.IsEnabled = true;
     }
     private async void ClosingMainWindow(object sender, CancelEventArgs e)
     {

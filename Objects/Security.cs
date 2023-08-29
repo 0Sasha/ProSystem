@@ -50,7 +50,7 @@ public class Security
     {
         for (int i = 0; Bars == null && i < 20; i++) await Task.Delay(250);
         if (Bars == null) throw new Exception("There is no bars to update requirements");
-        if (MinStep < double.Epsilon) throw new Exception("MinStep is <= 0");
+        if (MinStep < 0.00000001) throw new Exception("MinStep is <= 0");
 
         LastTrade ??= new Trade()
         {

@@ -41,7 +41,7 @@ public class Portfolio : INotifyPropertyChanged
         get => saldoIn;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(SaldoIn));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(SaldoIn));
             saldoIn = value;
             NotifyChange(nameof(SaldoIn));
         }
@@ -51,7 +51,7 @@ public class Portfolio : INotifyPropertyChanged
         get => saldo;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(Saldo));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(Saldo));
             saldo = value;
             NotifyChange(nameof(Saldo));
         }
@@ -70,7 +70,7 @@ public class Portfolio : INotifyPropertyChanged
         get => initReqs;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(InitReqs));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(InitReqs));
             initReqs = value;
             ShareInitReqs = Math.Round(initReqs / Saldo * 100, 2);
             NotifyChange(nameof(InitReqs));
@@ -81,7 +81,7 @@ public class Portfolio : INotifyPropertyChanged
         get => minReqs;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(MinReqs));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(MinReqs));
             minReqs = value;
             ShareMinReqs = Math.Round(minReqs / Saldo * 100, 2);
             NotifyChange(nameof(MinReqs));
@@ -92,7 +92,7 @@ public class Portfolio : INotifyPropertyChanged
         get => free;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(Free));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(Free));
             free = value;
             NotifyChange(nameof(Free));
         }
@@ -111,7 +111,7 @@ public class Portfolio : INotifyPropertyChanged
         get => go;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(GO));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(GO));
             go = value;
             NotifyChange(nameof(GO));
         }
@@ -140,7 +140,7 @@ public class Portfolio : INotifyPropertyChanged
         get => shareBaseAssets;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareBaseAssets));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(ShareBaseAssets));
             shareBaseAssets = value;
             NotifyChange(nameof(ShareBaseAssets));
         }
@@ -150,7 +150,7 @@ public class Portfolio : INotifyPropertyChanged
         get => shareInitReqsBaseAssets;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareInitReqsBaseAssets));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(ShareInitReqsBaseAssets));
             shareInitReqsBaseAssets = value;
             NotifyChange(nameof(ShareInitReqsBaseAssets));
         }
@@ -160,7 +160,7 @@ public class Portfolio : INotifyPropertyChanged
         get => shareInitReqs;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareInitReqs));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(ShareInitReqs));
             shareInitReqs = value;
             NotifyChange(nameof(ShareInitReqs));
         }
@@ -170,7 +170,7 @@ public class Portfolio : INotifyPropertyChanged
         get => shareMinReqs;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(ShareMinReqs));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(ShareMinReqs));
             shareMinReqs = value;
             NotifyChange(nameof(ShareMinReqs));
         }
@@ -180,7 +180,7 @@ public class Portfolio : INotifyPropertyChanged
         get => potentialShareInitReqs;
         set
         {
-            if (value < -double.Epsilon) throw new ArgumentOutOfRangeException(nameof(PotentialShareInitReqs));
+            if (value < -0.00000001) throw new ArgumentOutOfRangeException(nameof(PotentialShareInitReqs));
             potentialShareInitReqs = value;
             NotifyChange(nameof(PotentialShareInitReqs));
         }

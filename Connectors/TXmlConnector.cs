@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -14,17 +13,10 @@ namespace ProSystem;
 
 internal class TXmlConnector : Connector
 {
-    private readonly AddInformation AddInfo;
-    private readonly TradingSystem TradingSystem;
-    private readonly TXmlDataProcessor DataProcessor;
-
-    private int waitingTime = 18000;
-    private Thread mainThread;
-    private bool isWorking;
-
     private delegate bool CallBackTXmlConnector(IntPtr Data);
-    private readonly CallBackTXmlConnector CallBackTXml;
 
+    private readonly TXmlDataProcessor DataProcessor;
+    private readonly CallBackTXmlConnector CallBackTXml;
     private readonly ConcurrentQueue<string> DataQueue = new();
     private readonly XmlReaderSettings XS = new()
     {
@@ -33,14 +25,15 @@ internal class TXmlConnector : Connector
         DtdProcessing = DtdProcessing.Parse
     };
     private readonly StringComparison SC = StringComparison.Ordinal;
-    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
+
+    private int waitingTime = 18000;
+    private Thread mainThread;
+    private bool isWorking;
 
     public List<ClientAccount> Clients { get; } = new();
 
-    public TXmlConnector(TradingSystem tradingSystem, AddInformation addInfo)
+    public TXmlConnector(TradingSystem tradingSystem, AddInformation addInfo) : base(tradingSystem, addInfo)
     {
-        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
         DataProcessor = new(this, tradingSystem, addInfo);
         CallBackTXml = CallBack;
     }
@@ -95,8 +88,8 @@ internal class TXmlConnector : Connector
 
         var settings = TradingSystem.Settings;
         waitingTime = settings.RequestTM * 1000 + 3000;
-        Connection = ConnectionState.Connecting;
         ReconnectionTrigger = DateTime.Now.AddSeconds(settings.SessionTM);
+        Connection = ConnectionState.Connecting;
 
         // Частота обращений коннектора к серверу Transaq в миллисекундах. Минимум 10.
         var delay = "20";
@@ -113,7 +106,7 @@ internal class TXmlConnector : Connector
             settings.RequestTM + "</request_timeout><push_u_limits>" + limits +
             "</push_u_limits><push_pos_equity>" + equity + "</push_pos_equity></command>";
 
-        var res = await SendCommand(firstPart, lastPart, password);
+        var res = await SendCommandAsync(firstPart, lastPart, password);
         if (res.StartsWith("<result success=\"true\"", SC) || res.Contains("уже устанавливается")) return true;
         Connection = ConnectionState.Disconnected;
         AddInfo("Connect: " + res);
@@ -126,7 +119,7 @@ internal class TXmlConnector : Connector
         TradingSystem.ReadyToTrade = false;
         Connection = ConnectionState.Disconnecting;
 
-        var res = await SendCommand("<command id=\"disconnect\"/>");
+        var res = await SendCommandAsync("<command id=\"disconnect\"/>");
         if (res.StartsWith("<result success=\"true\"", SC)) Connection = ConnectionState.Disconnected;
         else
         {
@@ -144,7 +137,7 @@ internal class TXmlConnector : Connector
     {
         var senderName = sender != null ? sender.Name : "System";
         if (symbol == null) throw new ArgumentNullException(nameof(symbol));
-        if (price < double.Epsilon)
+        if (price < 0.00000001)
             throw new ArgumentOutOfRangeException(nameof(price), "Price <= 0. Sender: " + senderName);
         if (quantity < 1)
             throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity < 1. Sender: " + senderName);
@@ -182,7 +175,7 @@ internal class TXmlConnector : Connector
             "<cond_type>" + condition + "</cond_type><cond_value>" + price.ToString(IC) + "</cond_value>" +
             "<validafter>0</validafter><validbefore>till_canceled</validbefore>" + credit + "</command>");
 
-        using XmlReader xr = XmlReader.Create(new StringReader(await SendCommand(command)), XS);
+        using XmlReader xr = XmlReader.Create(new StringReader(await SendCommandAsync(command)), XS);
         xr.Read();
         if (xr.GetAttribute("success") == "true")
         {
@@ -217,7 +210,7 @@ internal class TXmlConnector : Connector
 
     public override async Task<bool> CancelOrderAsync(Order activeOrder)
     {
-        var result = await SendCommand("<command id=\"cancelorder\"><transactionid>" +
+        var result = await SendCommandAsync("<command id=\"cancelorder\"><transactionid>" +
             activeOrder.TrID + "</transactionid></command>");
         using XmlReader xr = XmlReader.Create(new StringReader(result), XS);
         xr.Read();
@@ -268,11 +261,13 @@ internal class TXmlConnector : Connector
         return false;
     }
 
-    public override async Task<bool> SubscribeToTradesAsync(Security security) => await SubUnsub(true, security);
+    public override async Task<bool> SubscribeToTradesAsync(Security security) =>
+        await SubUnsubAsync(true, security);
 
-    public override async Task<bool> UnsubscribeFromTradesAsync(Security security) => await SubUnsub(false, security);
+    public override async Task<bool> UnsubscribeFromTradesAsync(Security security) =>
+        await SubUnsubAsync(false, security);
 
-    private async Task<bool> SubUnsub(bool subscribe, Security symbol, bool quotations = false, bool quotes = false)
+    private async Task<bool> SubUnsubAsync(bool subscribe, Security symbol, bool quotations = false, bool quotes = false)
     {
         var command = (subscribe ? "<command id=\"subscribe\">" : "<command id=\"unsubscribe\">") +
             "<alltrades><security><board>" + symbol.Board + "</board><seccode>" + symbol.Seccode +
@@ -283,7 +278,7 @@ internal class TXmlConnector : Connector
                 symbol.Board + "</board><seccode>" + symbol.Seccode + "</seccode></security></quotes>";
         command += "</command>";
 
-        var result = await SendCommand(command);
+        var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
         AddInfo("SubUnsub: " + result);
         return false;
@@ -294,26 +289,26 @@ internal class TXmlConnector : Connector
         var command = "<command id=\"gethistorydata\"><security><board>" + symbol.Board +
             "</board><seccode>" + symbol.Seccode +"</seccode></security><period>" +
             tf.ID + "</period><count>" + count + "</count><reset>true</reset></command>";
-        var result = await SendCommand(command);
+        var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
         AddInfo("OrderHistoricalData: " + result);
         return false;
     }
 
     public override async Task<bool> OrderSecurityInfoAsync(Security symbol) =>
-        await GetClnSecPermissions(symbol) && await GetSecurityInfo(symbol);
+        await GetClnSecPermissionsAsync(symbol) && await GetSecurityInfoAsync(symbol);
 
-    private async Task<bool> GetSecurityInfo(Security symbol)
+    private async Task<bool> GetSecurityInfoAsync(Security symbol)
     {
         var command = "<command id=\"get_securities_info\"><security><market>" + symbol.Market +
             "</market><seccode>" + symbol.Seccode + "</seccode></security></command>";
-        var result = await SendCommand(command);
+        var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
         AddInfo("GetSecurityInfo: " + result);
         return false;
     }
 
-    private async Task<bool> GetClnSecPermissions(Security symbol)
+    private async Task<bool> GetClnSecPermissionsAsync(Security symbol)
     {
         var client = Clients.SingleOrDefault(x => x.Market == symbol.Market);
         if (client == null)
@@ -324,7 +319,7 @@ internal class TXmlConnector : Connector
 
         var command = "<command id=\"get_cln_sec_permissions\"><security><board>" + symbol.Board + "</board>" +
             "<seccode>" + symbol.Seccode + "</seccode></security><client>" + client.ID + "</client></command>";
-        var result = await SendCommand(command);
+        var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
         AddInfo("GetClnSecPermissions: " + result);
         return false;
@@ -335,7 +330,7 @@ internal class TXmlConnector : Connector
         var union = portfolio.Union == null || portfolio.Union == "" ? Clients[0].Union : portfolio.Union;
         var command = "<command id=\"get_mc_portfolio\" union=\"" + union +
             "\" currency=\"false\" asset=\"false\" money=\"false\" depo=\"true\" registers=\"false\"/>";
-        var result = await SendCommand(command);
+        var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
         AddInfo("OrderPortfolioInfo: " + result);
         return false;
@@ -394,16 +389,16 @@ internal class TXmlConnector : Connector
         return false;
     }
 
-    private async Task<string> SendCommand(string command)
+    private async Task<string> SendCommandAsync(string command)
     {
         if (Connection == ConnectionState.Disconnected) return "There is no connection";
         IntPtr nintCommand = Marshal.StringToHGlobalAnsi(command);
-        var result = await SendCommand(nintCommand, command);
+        var result = await SendCommandAsync(nintCommand, command);
         Marshal.FreeHGlobal(nintCommand);
         return result;
     }
 
-    private async Task<string> SendCommand(string firstPart, string lastPart, SecureString middlePart)
+    private async Task<string> SendCommandAsync(string firstPart, string lastPart, SecureString middlePart)
     {
         lastPart += "\0";
         IntPtr first = Marshal.StringToHGlobalAnsi(firstPart);
@@ -424,7 +419,7 @@ internal class TXmlConnector : Connector
             for (int i = 0; i < lastPart.Length; i++) *data++ = *lastPartBt++;
         }
 
-        var result = await SendCommand(command, firstPart);
+        var result = await SendCommandAsync(command, firstPart);
         Marshal.FreeHGlobal(command);
         Marshal.ZeroFreeGlobalAllocAnsi(middle);
         Marshal.FreeHGlobal(first);
@@ -432,48 +427,16 @@ internal class TXmlConnector : Connector
         return result;
     }
     
-    private async Task<string> SendCommand(IntPtr command, string strCommand)
+    private async Task<string> SendCommandAsync(IntPtr command, string strCommand)
     {
         var result = "Empty";
-        var sending = Task.Run(() =>
+        var sentCommand = Task.Run(() =>
         {
             IntPtr res = SendCommand(command);
             result = Marshal.PtrToStringUTF8(res);
             FreeMemory(res);
         });
-
-        try
-        {
-            await Task.Run(() =>
-            {
-                if (!sending.Wait(2000))
-                {
-                    TradingSystem.ReadyToTrade = false;
-                    AddInfo("Server response timed out. Trading is suspended.", false);
-                    if (!sending.Wait(waitingTime))
-                    {
-                        ServerAvailable = false;
-                        if (Connection == ConnectionState.Connected)
-                        {
-                            Connection = ConnectionState.Connecting;
-                            ReconnectionTrigger = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
-                        }
-                        AddInfo("Server is not responding. Command: " + strCommand, false);
-
-                        if (!sending.Wait(waitingTime * 15))
-                        {
-                            AddInfo("Infinitely waiting for a server response", notify: true);
-                            sending.Wait();
-                        }
-                        AddInfo("Server is responding", false);
-                        ServerAvailable = true;
-                    }
-                    else if (Connection == ConnectionState.Connected) TradingSystem.ReadyToTrade = true;
-                }
-            });
-        }
-        catch (Exception e) { AddInfo("Exception during sending command: " + e.Message); }
-        finally { sending.Dispose(); }
+        await WaitSentCommandAsync(sentCommand, strCommand, 2000, waitingTime);
         return result;
     }
     #endregion

@@ -130,6 +130,8 @@ public static class BarsExtensions
 
     public static void UpdateBars(this Security security, Bars newBars, int baseTF)
     {
+        if (security == null) throw new ArgumentNullException(nameof(security));
+        if (newBars == null) throw new ArgumentNullException(nameof(newBars));
         if (newBars.TF <= 0) throw new ArgumentException("TF <= 0", nameof(newBars));
         if (baseTF <= 0) throw new ArgumentException("baseTF <= 0", nameof(baseTF));
         if (newBars.DateTime.Length < 2) throw new ArgumentException("DateTime.Length < 2", nameof(newBars));

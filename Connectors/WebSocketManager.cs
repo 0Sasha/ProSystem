@@ -19,9 +19,10 @@ internal class WebSocketManager : IDisposable
 
     public WebSocketManager(string url, Action<string> dataHandler, AddInformation addInfo)
     {
+        if (url == null || url == string.Empty) throw new ArgumentNullException(nameof(url));
         URL = new(url);
-        AddInfo = addInfo;
-        DataHandler = dataHandler;
+        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
+        DataHandler = dataHandler ?? throw new ArgumentNullException(nameof(dataHandler));
     }
 
     public async Task<bool> ConnectAsync()
@@ -56,6 +57,7 @@ internal class WebSocketManager : IDisposable
 
     public async Task SendAsync(string message, CancellationToken? token = null)
     {
+        if (message == null || message == string.Empty) throw new ArgumentNullException(nameof(message));
         var data = Encoding.ASCII.GetBytes(message);
         await webSocket.SendAsync(new(data), WebSocketMessageType.Text,
             true, token == null ? CancellationToken.None : token.Value);
@@ -65,11 +67,12 @@ internal class WebSocketManager : IDisposable
     {
         string data = string.Empty;
         WebSocketReceiveResult result;
-        while (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseSent)
+        while (true)
         {
             try
             {
-                while (tokenSource != null && !tokenSource.Token.IsCancellationRequested)
+                while (webSocket != null && tokenSource != null && !tokenSource.Token.IsCancellationRequested &&
+                    (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseSent))
                 {
                     var buffer = new ArraySegment<byte>(new byte[8192]);
                     result = await webSocket.ReceiveAsync(buffer, tokenSource.Token);
