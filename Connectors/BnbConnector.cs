@@ -1,6 +1,6 @@
-﻿using ProSystem.Algorithms;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -39,18 +39,7 @@ internal class BnbConnector : Connector
         Markets.Add(new("COIN", "COIN"));
         DataProcessor = new(this, tradingSystem, addInfo);
         SocketManager = new(BaseFuturesStreamUrl + "/ws/!contractInfo", DataProcessor.ProcessData, addInfo);
-    }
-
-    public override bool Initialize(int logLevel)
-    {
-        Initialized = true;
-        return true;
-    }
-
-    public override bool Uninitialize()
-    {
-        Initialized = false;
-        return true;
+        SocketManager.PropertyChanged += SocketManagerConnectionChanged;
     }
 
     public override async Task<bool> ConnectAsync(string login, SecureString password)
@@ -78,7 +67,7 @@ internal class BnbConnector : Connector
             }
             await SocketManager.SendAsync("{ \"method\": \"LIST_SUBSCRIPTIONS\",\r\n\"id\": 3 }");
         }
-        Connection = ConnectionState.Connected;
+        else Connection = ConnectionState.Connected;
         return true;
     }
 
@@ -89,7 +78,7 @@ internal class BnbConnector : Connector
             Connection = ConnectionState.Disconnecting;
             await SocketManager.DisconnectAsync();
         }
-        Connection = ConnectionState.Disconnected;
+        else Connection = ConnectionState.Disconnected;
         return true;
     }
 
@@ -109,12 +98,12 @@ internal class BnbConnector : Connector
     }
 
     public override async Task<bool> SubscribeToTradesAsync(Security security) =>
-        await SubUnsub(security, true);
+        await SubUnsubAsync(security, true);
 
     public override async Task<bool> UnsubscribeFromTradesAsync(Security security) =>
-        await SubUnsub(security, false);
+        await SubUnsubAsync(security, false);
 
-    private async Task<bool> SubUnsub(Security security, bool subscribe)
+    private async Task<bool> SubUnsubAsync(Security security, bool subscribe)
     {
         var method = subscribe ? "SUBSCRIBE" : "UNSUBSCRIBE";
         if (SocketManager.Connected)
@@ -178,8 +167,6 @@ internal class BnbConnector : Connector
         return true;
     }
 
-    public override async Task<bool> OrderSecurityInfoAsync(Security security) => true;
-
     public override async Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio)
     {
         var info = await SendRequestAsync(BaseFuturesUrl + "/fapi/v2/account", true, HttpMethod.Get,
@@ -194,6 +181,15 @@ internal class BnbConnector : Connector
         }
         _ = Task.Run(() => DataProcessor.ProcessPortfolio(info));
         return true;
+    }
+
+
+    public override bool SecurityIsBidding(Security security) =>
+        security.LastTrade.DateTime.AddMinutes(5) > DateTime.Now;
+
+    public override bool CheckRequirements(Security security)
+    {
+        throw new NotImplementedException();
     }
 
 
@@ -334,7 +330,7 @@ internal class BnbConnector : Connector
         return BitConverter.ToString(hash).Replace("-", string.Empty).ToLower();
     }
 
-    private StringBuilder BuildQueryString(Dictionary<string, string> queryParameters, StringBuilder builder)
+    private static StringBuilder BuildQueryString(Dictionary<string, string> queryParameters, StringBuilder builder)
     {
         foreach (var cur in queryParameters)
         {
@@ -346,5 +342,11 @@ internal class BnbConnector : Connector
         }
 
         return builder;
+    }
+
+    private void SocketManagerConnectionChanged(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SocketManager.Connected))
+            Connection = SocketManager.Connected ? ConnectionState.Connected : ConnectionState.Disconnected;
     }
 }

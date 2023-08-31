@@ -26,10 +26,12 @@ internal class TXmlConnector : Connector
     };
     private readonly StringComparison SC = StringComparison.Ordinal;
 
-    private int waitingTime = 18000;
+    private int waitingTimeMs = 18000;
     private Thread mainThread;
     private bool isWorking;
 
+    public virtual double USDRUB { get; set; }
+    public virtual double EURRUB { get; set; }
     public List<ClientAccount> Clients { get; } = new();
 
     public TXmlConnector(TradingSystem tradingSystem, AddInformation addInfo) : base(tradingSystem, addInfo)
@@ -87,7 +89,7 @@ internal class TXmlConnector : Connector
         TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Orders.Clear());
 
         var settings = TradingSystem.Settings;
-        waitingTime = settings.RequestTM * 1000 + 3000;
+        waitingTimeMs = settings.RequestTM * 1000 + 3000;
         ReconnectionTrigger = DateTime.Now.AddSeconds(settings.SessionTM);
         Connection = ConnectionState.Connecting;
 
@@ -295,6 +297,58 @@ internal class TXmlConnector : Connector
         return false;
     }
 
+    public override async Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio)
+    {
+        var union = portfolio.Union == null || portfolio.Union == "" ? Clients[0].Union : portfolio.Union;
+        var command = "<command id=\"get_mc_portfolio\" union=\"" + union +
+            "\" currency=\"false\" asset=\"false\" money=\"false\" depo=\"true\" registers=\"false\"/>";
+        var result = await SendCommandAsync(command);
+        if (result == "<result success=\"true\"/>") return true;
+        AddInfo("OrderPortfolioInfo: " + result);
+        return false;
+    }
+
+
+    public override bool SecurityIsBidding(Security security)
+    {
+        if (DateTime.Now < DateTime.Today.AddHours(1) ||
+            DateTime.Now > DateTime.Today.AddMinutes(839).AddSeconds(55) &&
+            DateTime.Now < DateTime.Today.AddMinutes(845)) return false;
+
+        if (DateTime.Now > DateTime.Today.AddMinutes(1129).AddSeconds(55) &&
+            DateTime.Now < DateTime.Today.AddMinutes(1145))
+            return security.LastTrade.DateTime > DateTime.Today.AddMinutes(1130);
+
+        return security.LastTrade.DateTime.AddHours(1) > DateTime.Now;
+    }
+
+    public override bool CheckRequirements(Security security)
+    {
+        if (security.Market != "4")
+        {
+            AddInfo(security.Seccode + ": unexpected market: " + security.Market, notify: true);
+            return false;
+        }
+
+        if (security.InitReqLong < 100 || security.InitReqShort < 100 ||
+            security.SellDeposit < 100 || security.InitReqLong < security.SellDeposit / 2)
+        {
+            AddInfo(security.Seccode + ": reqs are out of norm: " +
+                security.InitReqLong + "/" + security.InitReqShort + " SellDep: " + security.SellDeposit, true, true);
+            Task.Run(async () => await OrderSecurityInfoAsync(security));
+            return false;
+        }
+        return true;
+    }
+
+
+    public override async Task<bool> OrderSpecificPreTradingData()
+    {
+        await OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
+        await OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
+        return true;
+    }
+
     public override async Task<bool> OrderSecurityInfoAsync(Security symbol) =>
         await GetClnSecPermissionsAsync(symbol) && await GetSecurityInfoAsync(symbol);
 
@@ -322,17 +376,6 @@ internal class TXmlConnector : Connector
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
         AddInfo("GetClnSecPermissions: " + result);
-        return false;
-    }
-
-    public override async Task<bool> OrderPortfolioInfoAsync(Portfolio portfolio)
-    {
-        var union = portfolio.Union == null || portfolio.Union == "" ? Clients[0].Union : portfolio.Union;
-        var command = "<command id=\"get_mc_portfolio\" union=\"" + union +
-            "\" currency=\"false\" asset=\"false\" money=\"false\" depo=\"true\" registers=\"false\"/>";
-        var result = await SendCommandAsync(command);
-        if (result == "<result success=\"true\"/>") return true;
-        AddInfo("OrderPortfolioInfo: " + result);
         return false;
     }
     #endregion
@@ -436,7 +479,7 @@ internal class TXmlConnector : Connector
             result = Marshal.PtrToStringUTF8(res);
             FreeMemory(res);
         });
-        await WaitSentCommandAsync(sentCommand, strCommand, 2000, waitingTime);
+        await WaitSentCommandAsync(sentCommand, strCommand, 2000, waitingTimeMs);
         return result;
     }
     #endregion

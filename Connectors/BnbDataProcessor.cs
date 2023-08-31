@@ -85,7 +85,11 @@ internal class BnbDataProcessor
                     else AddInfo("Unknown tickSize", notify: true);
                 }
                 else if (type == "LOT_SIZE")
+                {
                     security.LotSize = double.Parse(filter.GetProperty("stepSize").GetString(), IC);
+                    //var minQty = double.Parse(filter.GetProperty("minQty").GetString(), IC);
+                    //AddInfo(security.LotSize + "/" + minQty);
+                }
             }
         }
     }
@@ -189,21 +193,15 @@ internal class BnbDataProcessor
     private void ProcessBar(JsonElement root)
     {
         var code = root.GetProperty("s").GetString();
-        var tool = TradingSystem.Tools.ToArray().SingleOrDefault(t =>
-            t.Security.Seccode == code || t.BasicSecurity?.Seccode == code);
-
-        if (tool == null)
-        {
-            if (code == "BTCUSDT") return;
-            throw new ArgumentException("Symbol is not suitable");
-        }
+        var tool = TradingSystem.Tools.ToArray()
+            .Single(t => t.Security.Seccode == code || t.BasicSecurity?.Seccode == code);
         var security = tool.Security.Seccode == code ? tool.Security : tool.BasicSecurity;
 
         var kline = root.GetProperty("k");
         var tfID = kline.GetProperty("i").GetString();
         var tf = Connector.TimeFrames.Single(t => t.ID == tfID).Seconds / 60;
         if (security.Bars.TF != tf) throw new ArgumentException("TF is not suitable");
-        security.LastTrade = new(DateTime.Now);
+        //var eventTime = DateTimeOffset.FromUnixTimeMilliseconds(root.GetProperty("E").GetInt64()).UtcDateTime;
 
         var startTime = DateTimeOffset.FromUnixTimeMilliseconds(kline.GetProperty("t").GetInt64()).UtcDateTime;
         var open = double.Parse(kline.GetProperty("o").GetString(), IC);
@@ -212,6 +210,7 @@ internal class BnbDataProcessor
         var close = double.Parse(kline.GetProperty("c").GetString(), IC);
         var volume = double.Parse(kline.GetProperty("v").GetString(), IC);
         var barIsClosed = kline.GetProperty("x").GetBoolean();
+        security.LastTrade = new(code, DateTime.Now, close);
 
         if (startTime == security.Bars.DateTime[^1])
         {

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 
 namespace ProSystem;
 
@@ -44,24 +43,5 @@ public class Security
     {
         Board = board;
         Seccode = seccode;
-    }
-
-    public async Task UpdateRequirementsAsync()
-    {
-        for (int i = 0; Bars == null && i < 20; i++) await Task.Delay(250);
-        if (Bars == null) throw new Exception("There is no bars to update requirements");
-        if (MinStep < 0.00000001) throw new Exception("MinStep is <= 0");
-
-        LastTrade ??= new Trade()
-        {
-            Price = Bars.Close[^1],
-            DateTime = Bars.DateTime[^1]
-        };
-        MinStepCost = PointCost * MinStep * Math.Pow(10, Decimals) / 100;
-        var lastPrice = LastTrade.DateTime > Bars.DateTime[^1] ? LastTrade.Price : Bars.Close[^1];
-        var value = lastPrice * MinStepCost / MinStep * LotSize / 100;
-
-        InitReqLong = Math.Round((RiskrateLong + ReserateLong) * value, 2);
-        InitReqShort = Math.Round((RiskrateShort + ReserateShort) * value, 2);
     }
 }

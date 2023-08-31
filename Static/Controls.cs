@@ -10,7 +10,7 @@ namespace ProSystem;
 
 internal static class Controls
 {
-    public static TabItem GetTabForTool(Tool tool)
+    public static TabItem GetTab(Tool tool)
     {
         if (tool == null) throw new ArgumentNullException(nameof(tool));
         return new()

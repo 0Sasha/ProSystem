@@ -33,7 +33,7 @@ internal class ToolManager : IToolManager
         if (tool.BaseTF < 1) tool.BaseTF = 30;
         tool.Controller ??= Plot.GetController();
         tool.BrushState = tool.Active ? Theme.Green : Theme.Red;
-        tool.Tab = Controls.GetTabForTool(tool);
+        tool.Tab = Controls.GetTab(tool);
         UpdateControlPanel(tool, true);
         UpdateView(tool, true);
     }
@@ -280,29 +280,28 @@ internal class ToolManager : IToolManager
         var basicSecurity = tool.BasicSecurity;
         if (security.LastTrade == null || security.LastTrade.DateTime < DateTime.Now.AddDays(-5))
         {
-            AddInfo(tool.Name +
-                ": Последняя сделка не актуальна или её не существует. Подписка на сделки и выход.", notify: true);
+            AddInfo(tool.Name + ": last trade is not actual. Subscribing.", notify: true);
             await Connector.SubscribeToTradesAsync(security);
             return false;
         }
         else if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
         {
-            AddInfo(tool.Name + ": Базовых баров не существует. Запрос баров и выход.", notify: true);
+            AddInfo(tool.Name + ": there is no bars. Request.", notify: true);
             await RequestBarsAsync(tool);
             return false;
         }
         else if (basicSecurity == null && security.Bars.Close.Length < 200 ||
             basicSecurity != null && (security.Bars.Close.Length < 200 || basicSecurity.Bars.Close.Length < 200))
         {
-            string Counts = security.Bars.Close.Length.ToString();
-            if (basicSecurity != null) Counts += "/" + basicSecurity.Bars.Close.Length;
-            AddInfo(tool.Name + ": Недостаточно базовых баров: " + Counts + " Запрос баров и выход.", notify: true);
+            var counts = security.Bars.Close.Length.ToString();
+            if (basicSecurity != null) counts += "/" + basicSecurity.Bars.Close.Length;
+            AddInfo(tool.Name + ": not enough bars: " + counts + " Request.", notify: true);
             await RequestBarsAsync(tool);
             return false;
         }
         else if (tool.Scripts.Length > 2)
         {
-            AddInfo(tool.Name + ": Непредвиденное количество скриптов: " + tool.Scripts.Length, notify: true);
+            AddInfo(tool.Name + ": unexpected number of scripts: " + tool.Scripts.Length, notify: true);
             return false;
         }
         return true;
@@ -389,39 +388,25 @@ internal class ToolManager : IToolManager
 
     private ToolState CalculateToolState(Tool tool)
     {
-        var readyToTrade = !tool.StopTrading && TradingSystem.PortfolioManager.CheckEquity();
         var average = Math.Round(tool.Security.Bars.Close.TakeLast(30).Average(), tool.Security.Decimals);
         var atr = Indicators.ATR(tool.Security.Bars.High, tool.Security.Bars.Low, tool.Security.Bars.Close, 50);
-        var toolState = new ToolState(readyToTrade, IsLogging(tool), IsBidding(tool))
+
+        var readyToTrade = !tool.StopTrading &&
+            TradingSystem.PortfolioManager.CheckEquity() && Connector.CheckRequirements(tool.Security);
+        var toolState = new ToolState(readyToTrade, IsLogging(tool), Connector.SecurityIsBidding(tool.Security))
         {
             IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 15,
             AveragePrice = average,
-            ATR = atr[^2]
+            ATR = atr[^2],
+            LongReqs = tool.Security.InitReqLong,
+            ShortReqs = tool.Security.InitReqShort
         };
         if (!toolState.IsNormalPrice) AddInfo(tool.Name + ": the price is out of range", notify: true);
 
-        SetRubReqs(tool, toolState);
         SetPositionVolumes(tool, toolState);
         SetBalance(tool, toolState);
         SetOrdersVolumes(tool, toolState);
         return toolState;
-    }
-
-    private bool IsBidding(Tool tool)
-    {
-        if (DateTime.Now < DateTime.Today.AddHours(1)) return false;
-
-        if (DateTime.Now > DateTime.Today.AddMinutes(839).AddSeconds(55) &&
-            DateTime.Now < DateTime.Today.AddMinutes(845)) return false;
-
-        if (DateTime.Now > DateTime.Today.AddMinutes(1129).AddSeconds(55) &&
-            DateTime.Now < DateTime.Today.AddMinutes(1145))
-        {
-            return tool.Security.LastTrade.DateTime > DateTime.Today.AddMinutes(1130);
-        }
-
-        if (tool.Security.LastTrade.DateTime.AddHours(1) > DateTime.Now) return true;
-        return false;
     }
 
     private bool IsLogging(Tool tool)
@@ -460,44 +445,6 @@ internal class ToolManager : IToolManager
         return false;
     }
 
-    private void SetRubReqs(Tool tool, ToolState toolState)
-    {
-        var security = tool.Security;
-        var mult = 1D;
-
-        if (security.Market == "7")
-        {
-            if (Connector.USDRUB < 0.1 || Connector.EURRUB < 0.1)
-            {
-                AddInfo(tool.Name + ": request of USDRUB and EURRUB", notify: true);
-                Task.Run(async () =>
-                {
-                    await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
-                    await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
-                });
-                toolState.ReadyToTrade = false;
-            }
-            else if (security.Currency == "USD") mult = Connector.USDRUB;
-            else if (security.Currency == "EUR") mult = Connector.EURRUB;
-            else
-            {
-                AddInfo(tool.Name + ": unknown currency: " + security.Currency, notify: true);
-                toolState.ReadyToTrade = false;
-            }
-        }
-        toolState.LongReqs = security.InitReqLong * mult;
-        toolState.ShortReqs = security.InitReqShort * mult;
-
-        if (toolState.LongReqs < 10 || toolState.ShortReqs < 10 ||
-            security.SellDeposit < 10 || toolState.LongReqs < security.SellDeposit / 2)
-        {
-            AddInfo(tool.Name + ": rub reqs are out of norm: " +
-                toolState.LongReqs + "/" + toolState.ShortReqs + " SellDep: " + security.SellDeposit, true, true);
-            Task.Run(async () => await Connector.OrderSecurityInfoAsync(security));
-            toolState.ReadyToTrade = false;
-        }
-    }
-
     private void SetPositionVolumes(Tool tool, ToolState toolState)
     {
         var saldo = TradingSystem.Portfolio.Saldo;
@@ -508,28 +455,41 @@ internal class ToolManager : IToolManager
             var optShare = saldo / 100 * tool.ShareOfFunds;
             if (optShare > maxShare)
             {
-                AddInfo(tool.Name + ": ShareOfFunds превышает допустимый объём риска: " +
-                    settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
+                AddInfo(tool.Name + ": ShareOfFunds exceeds risk level", settings.DisplaySpecialInfo, true);
                 optShare = maxShare;
             }
 
             int longVol = (int)Math.Floor(optShare / toolState.LongReqs);
-            if (longVol < tool.MinNumberOfLots) longVol = tool.MinNumberOfLots;
-            if (longVol > tool.MaxNumberOfLots) longVol = tool.MaxNumberOfLots;
+            if (longVol < tool.MinNumberOfLots)
+            {
+                AddInfo(tool.Name + ": LongVolume < MinNumberOfLots", settings.DisplaySpecialInfo, true);
+                longVol = tool.MinNumberOfLots;
+            }
+            if (longVol > tool.MaxNumberOfLots)
+            {
+                AddInfo(tool.Name + ": LongVolume > MaxNumberOfLots", settings.DisplaySpecialInfo, true);
+                longVol = tool.MaxNumberOfLots;
+            }
             if (longVol * toolState.LongReqs > maxShare)
             {
-                AddInfo(tool.Name + ": LongVolume превышает допустимый объём риска: " +
-                    settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
+                AddInfo(tool.Name + ": LongVolume exceeds risk level", settings.DisplaySpecialInfo, true);
                 longVol = (int)Math.Floor(optShare / toolState.LongReqs);
             }
 
             int shortVol = (int)Math.Floor(optShare / toolState.ShortReqs);
-            if (shortVol < tool.MinNumberOfLots) shortVol = tool.MinNumberOfLots;
-            if (shortVol > tool.MaxNumberOfLots) shortVol = tool.MaxNumberOfLots;
+            if (shortVol < tool.MinNumberOfLots)
+            {
+                AddInfo(tool.Name + ": shortVol < MinNumberOfLots", settings.DisplaySpecialInfo, true);
+                shortVol = tool.MinNumberOfLots;
+            }
+            if (shortVol > tool.MaxNumberOfLots)
+            {
+                AddInfo(tool.Name + ": shortVol > MaxNumberOfLots", settings.DisplaySpecialInfo, true);
+                shortVol = tool.MaxNumberOfLots;
+            }
             if (shortVol * toolState.ShortReqs > maxShare)
             {
-                AddInfo(tool.Name + ": ShortVolume превышает допустимый объём риска: " +
-                    settings.MaxShareInitReqsPosition.ToString(IC) + "%", settings.DisplaySpecialInfo, true);
+                AddInfo(tool.Name + ": ShortVolume exceeds risk level", settings.DisplaySpecialInfo, true);
                 shortVol = (int)Math.Floor(optShare / toolState.ShortReqs);
             }
 
@@ -598,7 +558,7 @@ internal class ToolManager : IToolManager
         else if (tool.TriggerPosition != DateTime.MinValue) tool.TriggerPosition = DateTime.MinValue;
     }
 
-    private void SetOrdersVolumes(Tool tool, ToolState toolState)
+    private static void SetOrdersVolumes(Tool tool, ToolState toolState)
     {
         var balance = Math.Abs(toolState.Balance);
 
@@ -852,7 +812,7 @@ internal class ToolManager : IToolManager
         });
     }
 
-    private void UpdateBarsColor(Tool tool, ToolState toolState)
+    private static void UpdateBarsColor(Tool tool, ToolState toolState)
     {
         (tool.MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor = toolState.IsBidding &&
             (!tool.ShowBasicSecurity ||

@@ -129,17 +129,14 @@ internal class ScriptManager : IScriptManager
 
         string selectedScript = "AllScripts";
         var mainModel = tool.MainModel;
-        if (TradingSystem.Tools.IndexOf(tool) < TradingSystem.Window.TabsTools.Items.Count)
+        Window.Dispatcher.Invoke(() =>
         {
-            Window.Dispatcher.Invoke(() =>
-            {
-                var grid = ((tool.Tab.Content as Grid).Children[1] as Grid).Children[0] as Grid;
-                selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
+            var grid = ((tool.Tab.Content as Grid).Children[1] as Grid).Children[0] as Grid;
+            selectedScript = grid.Children.OfType<ComboBox>().Last().Text;
 
-                script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
-                "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
-            });
-        }
+            script.BlockInfo.Text = "IsGrow[i] " + script.Result.IsGrow[^1] +
+            "     IsGrow[i-1] " + script.Result.IsGrow[^2] + "\nType " + script.Result.Type;
+        });
 
         foreach (var ann in mainModel.Annotations.ToArray())
             if (ann.ToolTip == script.Name || ann.ToolTip is "System" or null) mainModel.Annotations.Remove(ann);

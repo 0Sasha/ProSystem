@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using ProSystem.Services;
-
 namespace ProSystem;
 
 public delegate void AddInformation(string data, bool important = true, bool notify = false);
@@ -20,7 +21,10 @@ public class TradingSystem
     private DateTime triggerUpdateModels;
     private DateTime triggerCheckPortfolio;
 
-    public MainWindow Window { get; init; }
+    private readonly AddInformation AddInfo;
+    private readonly Func<NetworkCredential> GetCredential;
+
+    public Window Window { get; init; }
     public Connector Connector { get; init; }
     public Portfolio Portfolio { get; init; }
     public Settings Settings { get; init; }
@@ -36,21 +40,28 @@ public class TradingSystem
     public ObservableCollection<Order> SystemOrders { get; init; } = new();
     public ObservableCollection<Trade> SystemTrades { get; init; } = new();
 
-    public TradingSystem(MainWindow window, Type connectorType, Portfolio portfolio, Settings settings)
+    public TradingSystem(Window window, AddInformation addInfo, Func<NetworkCredential> getCredential,
+        Type connectorType, Portfolio portfolio, Settings settings)
     {
         Window = window ?? throw new ArgumentNullException(nameof(window));
-        if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, Window.AddInfo);
-        else if (connectorType == typeof(BnbConnector)) Connector = new BnbConnector(this, Window.AddInfo);
+        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
+        GetCredential = getCredential ?? throw new ArgumentNullException(nameof(getCredential));
+
+        if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, addInfo);
+        else if (connectorType == typeof(BnbConnector)) Connector = new BnbConnector(this, addInfo);
         else throw new ArgumentException("Unknown connector", nameof(connectorType));
+
         Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
         Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        ScriptManager = new ScriptManager(Window, this, Window.AddInfo);
-        ToolManager = new ToolManager(Window, this, ScriptManager, Window.AddInfo);
-        PortfolioManager = new PortfolioManager(this, Window.AddInfo);
+        ScriptManager = new ScriptManager(Window, this, addInfo);
+        ToolManager = new ToolManager(Window, this, ScriptManager, addInfo);
+        PortfolioManager = new PortfolioManager(this, addInfo);
     }
 
-    public TradingSystem(MainWindow window, Type connectorType, Portfolio portfolio, Settings settings,
-        IEnumerable<Tool> tools, IEnumerable<Trade> trades) : this(window, connectorType, portfolio, settings)
+    public TradingSystem(Window window, AddInformation addInfo, Func<NetworkCredential> getCredential,
+        Type connectorType, Portfolio portfolio, Settings settings,
+        IEnumerable<Tool> tools, IEnumerable<Trade> trades) :
+        this(window, addInfo, getCredential, connectorType, portfolio, settings)
     {
         Tools = new(tools);
         Trades = new(trades);
@@ -60,10 +71,13 @@ public class TradingSystem
     public void Start()
     {
         if (Connector.GetType() == typeof(TXmlConnector) && File.Exists("txmlconnector64.dll") ||
-            Connector.GetType() == typeof(BnbConnector)) Connector.Initialize(Settings.LogLevelConnector);
+            Connector.GetType() == typeof(BnbConnector))
+        {
+            if (!Connector.Initialized) Connector.Initialize(Settings.LogLevelConnector);
+        }
         else
         {
-            Window.AddInfo("Connector is not found");
+            AddInfo("Connector is not found");
             return;
         }
 
@@ -75,33 +89,28 @@ public class TradingSystem
     public async Task StopAsync()
     {
         IsWorking = false;
-        Thread.Sleep(50);
+        await Task.Delay(50);
         if (Connector.Connection != ConnectionState.Disconnected) await Connector.DisconnectAsync();
         if (Connector.Initialized) Connector.Uninitialize();
     }
 
     public async Task PrepareForTrading()
     {
+        await Connector.OrderPortfolioInfoAsync(Portfolio);
         if (!ReadyToTrade)
         {
-            await Connector.OrderPortfolioInfoAsync(Portfolio);
-            if (Connector.GetType() == typeof(TXmlConnector))
-            {
-                await Connector.OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
-                await Connector.OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
-            }
+            await Connector.OrderSpecificPreTradingData();
             await PrepareToolsAsync();
 
             if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
             if (Connector.Connection != ConnectionState.Connected) return;
             ReadyToTrade = true;
-            Window.AddInfo("System is ready to trade.", false);
+            AddInfo("System is ready to trade.", false);
         }
         else
         {
-            await Connector.OrderPortfolioInfoAsync(Portfolio);
             foreach (var tool in Tools) await ToolManager.RequestBarsAsync(tool);
-            Window.AddInfo("PrepareForTrading: bars updated.", false);
+            AddInfo("PrepareForTrading: bars updated.", false);
         }
     }
 
@@ -117,7 +126,7 @@ public class TradingSystem
                 if (tool.Security.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
                 {
                     await ToolManager.ChangeActivityAsync(tool);
-                    Window.AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
+                    AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
                 }
                 else
                 {
@@ -148,8 +157,8 @@ public class TradingSystem
                 }
                 catch (Exception ex)
                 {
-                    Window.AddInfo("CheckState: " + ex.Message, notify: true);
-                    Window.AddInfo("StackTrace: " + ex.StackTrace, false);
+                    AddInfo("CheckState: " + ex.Message, notify: true);
+                    AddInfo("StackTrace: " + ex.StackTrace, false);
                 }
             }
             else Thread.Sleep(10);
@@ -173,26 +182,29 @@ public class TradingSystem
 
         if (DateTime.Now > triggerRequestInfo)
         {
-            triggerRequestInfo = DateTime.Now.AddMinutes(95 - DateTime.Now.Minute);
+            var min = DateTime.Now.Minute;
+            var minutes = min < 25 ? 25 - min : min < 55 ? 55 - min : 85 - min;
+            triggerRequestInfo = DateTime.Now.AddMinutes(minutes);
             await Connector.OrderPortfolioInfoAsync(Portfolio);
             foreach (var tool in Tools) await Connector.OrderSecurityInfoAsync(tool.Security);
         }
 
         if (Settings.ScheduledConnection && DateTime.Now.Minute == 50 &&
             DateTime.Now < DateTime.Today.AddMinutes(400)) await Connector.DisconnectAsync();
-    } 
+    }
 
     private async Task ConnectAsync()
     {
-        if (Settings.ScheduledConnection &&
-            (Connector.ServerAvailable || DateTime.Now > Connector.ReconnectionTrigger) &&
-            Window.Dispatcher.Invoke(() => Window.TxtLog.Text.Length > 0 && Window.TxtPas.SecurePassword.Length > 0))
+        if (Settings.ScheduledConnection)
         {
-            await Window.Dispatcher.Invoke(async () =>
-                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword));
+            if (Connector.ServerAvailable || DateTime.Now > Connector.ReconnectionTrigger)
+            {
+                var cred = GetCredential();
+                if (cred.UserName.Length > 0 && cred.SecurePassword.Length > 0)
+                    await Connector.ConnectAsync(cred.UserName, cred.SecurePassword);
+            }
         }
-        else if (!Settings.ScheduledConnection && DateTime.Now.Minute is 0 or 30)
-            Settings.ScheduledConnection = true;
+        else if (DateTime.Now.Minute is 0 or 30) Settings.ScheduledConnection = true;
     }
 
     private async Task ReconnectAsync()
@@ -200,15 +212,19 @@ public class TradingSystem
         if (DateTime.Now > Connector.ReconnectionTrigger)
         {
             await Connector.DisconnectAsync();
-            if (!Settings.ScheduledConnection) await Window.Dispatcher.Invoke(async () =>
-                await Connector.ConnectAsync(Window.TxtLog.Text, Window.TxtPas.SecurePassword));
+            if (!Settings.ScheduledConnection)
+            {
+                var cred = GetCredential();
+                await Connector.ConnectAsync(cred.UserName, cred.SecurePassword);
+            }
         }
     }
 
     private async Task ResetAsync()
     {
         Connector.BackupServer = false;
-        Window.RestartLogging();
+        Logger.Stop();
+        Logger.Start();
         await FileManager.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
             DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
         await FileManager.ArchiveFiles("Data", ".xml", "Data", false);
@@ -216,6 +232,7 @@ public class TradingSystem
         PortfolioManager.UpdatePositions();
         await Task.Delay(65000);
     }
+
 
     private async Task RecalculateToolsAsync()
     {
@@ -237,8 +254,11 @@ public class TradingSystem
     private void ClearObsoleteData()
     {
         var old = Trades.ToArray().Where(x => x.DateTime.Date < DateTime.Today.AddDays(-Settings.ShelfLifeTrades));
-        Window.Dispatcher.Invoke(() => { foreach (var trade in old) Trades.Remove(trade); });
+        Window.Dispatcher.Invoke(() =>
+        {
+            foreach (var trade in old) Trades.Remove(trade);
+        });
         foreach (var tool in Tools) ScriptManager.ClearObsoleteData(tool);
-        Window.AddInfo("ClearObsoleteData: data is cleared", false);
+        AddInfo("ClearObsoleteData: data is cleared", false);
     }
 }

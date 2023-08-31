@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -607,7 +608,7 @@ internal class TXmlDataProcessor
         if (!GoToTheValue(xr, "reserate_short")) return;
         tool.Security.ReserateShort = double.Parse(xr.Value, IC);
 
-        Task.Run(tool.Security.UpdateRequirementsAsync);
+        Task.Run(() => UpdateRequirements(tool.Security));
     }
 
 
@@ -720,5 +721,32 @@ internal class TXmlDataProcessor
             else throw new ArgumentException("Market is not found", nameof(seccode));
         }
         else throw new ArgumentException("Security with this seccode is not found", nameof(seccode));
+    }
+
+    private static void UpdateRequirements(Security security)
+    {
+        for (int i = 0; security.Bars == null && i < 20; i++) Thread.Sleep(250);
+        if (security.Bars == null) throw new ArgumentException("There is no bars");
+        if (security.MinStep < 0.00000001) throw new ArgumentException("MinStep is <= 0");
+        if (security.PointCost < 0.00000001) throw new ArgumentException("PointCost is <= 0");
+        if (security.Decimals < -0.00000001) throw new ArgumentException("Decimals is < 0");
+        if (security.RiskrateLong < 0.00000001) throw new ArgumentException("RiskrateLong is <= 0");
+        if (security.RiskrateShort < 0.00000001) throw new ArgumentException("RiskrateShort is <= 0");
+        if (security.ReserateLong < -0.00000001) throw new ArgumentException("ReserateLong is < 0");
+        if (security.ReserateShort < -0.00000001) throw new ArgumentException("ReserateShort is < 0");
+
+        security.LastTrade ??= new()
+        {
+            Price = security.Bars.Close[^1],
+            DateTime = security.Bars.DateTime[^1]
+        };
+        security.MinStepCost = security.PointCost * security.MinStep * Math.Pow(10, security.Decimals) / 100;
+
+        var lastPrice = security.LastTrade.DateTime > security.Bars.DateTime[^1] ?
+            security.LastTrade.Price : security.Bars.Close[^1];
+        var value = lastPrice * security.MinStepCost / security.MinStep * security.LotSize / 100;
+
+        security.InitReqLong = Math.Round((security.RiskrateLong + security.ReserateLong) * value, 2);
+        security.InitReqShort = Math.Round((security.RiskrateShort + security.ReserateShort) * value, 2);
     }
 }

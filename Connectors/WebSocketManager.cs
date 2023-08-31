@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -6,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ProSystem;
 
-internal class WebSocketManager : IDisposable
+internal class WebSocketManager : IDisposable, INotifyPropertyChanged
 {
     private readonly Uri URL;
     private readonly AddInformation AddInfo;
@@ -14,6 +15,8 @@ internal class WebSocketManager : IDisposable
 
     private ClientWebSocket webSocket;
     private CancellationTokenSource tokenSource;
+
+    public event PropertyChangedEventHandler PropertyChanged;
 
     public bool Connected { get => webSocket != null && webSocket.State == WebSocketState.Open; }
 
@@ -32,8 +35,10 @@ internal class WebSocketManager : IDisposable
             tokenSource = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
             webSocket = new();
             await webSocket.ConnectAsync(URL, tokenSource.Token);
-            if (webSocket.State == WebSocketState.Open)
-                _ = Task.Run(ReceiveAsync, tokenSource.Token);
+            if (webSocket.State != WebSocketState.Open) await Task.Delay(250);
+
+            _ = Task.Run(ReceiveAsync, tokenSource.Token);
+            PropertyChanged.Invoke(this, new(nameof(Connected)));
         }
         return Connected;
     }
@@ -65,7 +70,7 @@ internal class WebSocketManager : IDisposable
 
     private async Task ReceiveAsync()
     {
-        string data = string.Empty;
+        var data = string.Empty;
         WebSocketReceiveResult result;
         while (true)
         {
@@ -81,18 +86,20 @@ internal class WebSocketManager : IDisposable
                     data = Encoding.UTF8.GetString(buffer.ToArray(), buffer.Offset, buffer.Count);
                     DataHandler(data);
                 }
+                await DisconnectAsync();
+                PropertyChanged.Invoke(this, new(nameof(Connected)));
                 return;
             }
             catch (TaskCanceledException)
             {
                 await DisconnectAsync();
+                PropertyChanged.Invoke(this, new(nameof(Connected)));
                 return;
             }
             catch (Exception ex)
             {
                 AddInfo("WebSocketManager: " + ex.Message, notify: true);
                 AddInfo("StackTrace: " + ex.StackTrace);
-                AddInfo("Data: " + data, false);
                 if (ex.InnerException != null)
                 {
                     AddInfo("Inner: " + ex.InnerException.Message, false);

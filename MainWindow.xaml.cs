@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,7 +39,8 @@ public partial class MainWindow : Window
         Serializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
         RestoreInfo();
 
-        TradingSystem = new(this, typeof(TXmlConnector), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
+        TradingSystem = new(this, AddInfo, GetCredential,
+            typeof(TXmlConnector), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
 
         Settings.Check(TradingSystem.Tools);
         if (Settings.EmailPassword != null) Notifier = new EmailNotifier(587,
@@ -48,12 +50,6 @@ public partial class MainWindow : Window
         RestoreToolTabsAndInitialize();
 
         TradingSystem.Start();
-    }
-
-    public void RestartLogging()
-    {
-        Logger.Stop();
-        Logger.Start();
     }
 
     private Settings GetSettings()
@@ -107,6 +103,10 @@ public partial class MainWindow : Window
             return Array.Empty<Trade>();
         }
     }
+
+    private NetworkCredential GetCredential() =>
+        Dispatcher.Invoke(() => new NetworkCredential(TxtLog.Text, TxtPas.SecurePassword));
+    
 
     private void RestoreInfo()
     {
@@ -325,10 +325,10 @@ public partial class MainWindow : Window
         Logger.WriteLog(data);
         if (important)
         {
-            Window.Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(() =>
             {
-                Window.TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss", IC) + ": " + data);
-                Window.TxtBox.ScrollToEnd();
+                TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss", IC) + ": " + data);
+                TxtBox.ScrollToEnd();
             });
         }
         if (notify) Notifier.Notify(data);
@@ -426,7 +426,7 @@ public partial class MainWindow : Window
             else Column.Width = new GridLength(100);
         }
     }
-    private async void Test(object sender, RoutedEventArgs e)
+    private void Test(object sender, RoutedEventArgs e)
     {
 
     }

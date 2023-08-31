@@ -19,9 +19,16 @@ public class Trade
 
     public Trade() { }
 
-    public Trade(long tradeNo) { TradeNo = tradeNo; }
+    public Trade(long tradeNo) => TradeNo = tradeNo;
 
-    public Trade(DateTime dateTime) { DateTime = dateTime; }
+    public Trade(DateTime dateTime) => DateTime = dateTime;
+
+    public Trade(string seccode, DateTime dateTime, double price)
+    {
+        Seccode = seccode;
+        DateTime = dateTime;
+        Price = price;
+    }
 
     public Trade GetCopy() => (Trade)MemberwiseClone();
 }

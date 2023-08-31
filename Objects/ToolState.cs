@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem;
+﻿namespace ProSystem;
 
 public class ToolState
 {
