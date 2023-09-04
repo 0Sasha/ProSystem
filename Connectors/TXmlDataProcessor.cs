@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,12 +8,9 @@ using System.Xml;
 
 namespace ProSystem;
 
-internal class TXmlDataProcessor
+internal class TXmlDataProcessor : DataProcessor
 {
     private readonly TXmlConnector Connector;
-    private readonly TradingSystem TradingSystem;
-    private readonly AddInformation AddInfo;
-
     private readonly XmlReaderSettings XS = new()
     {
         IgnoreWhitespace = true,
@@ -22,17 +18,11 @@ internal class TXmlDataProcessor
         DtdProcessing = DtdProcessing.Parse
     };
     private readonly string DTForm = "dd.MM.yyyy HH:mm:ss";
-    private readonly StringComparison SC = StringComparison.Ordinal;
-    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
     private static bool Scheduled { get => (int)DateTime.Now.TimeOfDay.TotalMinutes is 50 or 400; }
 
-    public TXmlDataProcessor(TXmlConnector connector, TradingSystem tradingSystem, AddInformation addInfo)
-    {
-        Connector = connector ?? throw new ArgumentNullException(nameof(connector));
-        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-    }
+    public TXmlDataProcessor(TXmlConnector connector, TradingSystem tradingSystem, AddInformation addInfo) :
+        base(tradingSystem, addInfo) => Connector = connector ?? throw new ArgumentNullException(nameof(connector));
 
     public void ProcessData(string data)
     {
@@ -69,10 +59,7 @@ internal class TXmlDataProcessor
                 }
                 xr.Read();
                 trade.Seccode = xr.Value;
-
-                var tool = TradingSystem.Tools
-                    .Single(x => x.Security.Seccode == trade.Seccode || x.BasicSecurity?.Seccode == trade.Seccode);
-                TradingSystem.ToolManager.UpdateLastTrade(tool, trade);
+                UpdateLastBar(trade);
             }
         }
         else ProcessSections(xr, xr.Name);
@@ -129,8 +116,6 @@ internal class TXmlDataProcessor
 
     private void ProcessBars(XmlReader xr, Tool tool, Security security, int tf)
     {
-        if (security.SourceBars == null || security.SourceBars.TF != tf) security.SourceBars = new Bars(tf);
-
         List<DateTime> dateTime = new();
         List<double> open = new(), high = new(),
             low = new(), close = new(), volume = new();
@@ -158,77 +143,12 @@ internal class TXmlDataProcessor
             }
             else if (xr.NodeType == XmlNodeType.EndElement)
             {
-                if (dateTime.Count < 2) return;
-                if (security.SourceBars.DateTime == null)
+                if (dateTime.Count > 1)
                 {
-                    security.SourceBars = new Bars(tf)
-                    {
-                        DateTime = dateTime.ToArray(),
-                        Open = open.ToArray(),
-                        High = high.ToArray(),
-                        Low = low.ToArray(),
-                        Close = close.ToArray(),
-                        Volume = volume.ToArray()
-                    };
+                    var newBars = new Bars(dateTime.ToArray(), open.ToArray(),
+                        high.ToArray(), low.ToArray(), close.ToArray(), volume.ToArray(), tf);
+                    UpdateBars(security, newBars, tool.BaseTF);
                 }
-                else if (dateTime[^1] >= security.SourceBars.DateTime[^1]) // Полученные данные свежее исходных
-                {
-                    // Поиск первого общего бара
-                    int y = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[0]);
-                    if (y == -1) y = Array.FindIndex(security.SourceBars.DateTime, x => x == dateTime[1]);
-
-                    if (y > -1) // Есть общие бары
-                    {
-                        security.SourceBars.DateTime = security.SourceBars.DateTime[..y].Concat(dateTime).ToArray();
-                        security.SourceBars.Open = security.SourceBars.Open[..y].Concat(open).ToArray();
-                        security.SourceBars.High = security.SourceBars.High[..y].Concat(high).ToArray();
-                        security.SourceBars.Low = security.SourceBars.Low[..y].Concat(low).ToArray();
-                        security.SourceBars.Close = security.SourceBars.Close[..y].Concat(close).ToArray();
-                        security.SourceBars.Volume = security.SourceBars.Volume[..y].Concat(volume).ToArray();
-                    }
-                    else security.SourceBars = new Bars(tf) // Отсутствует общий бар
-                    {
-                        DateTime = dateTime.ToArray(),
-                        Open = open.ToArray(),
-                        High = high.ToArray(),
-                        Low = low.ToArray(),
-                        Close = close.ToArray(),
-                        Volume = volume.ToArray()
-                    };
-                }
-                else if (dateTime[^1] < security.SourceBars.DateTime[0]) // Полученные данные глубже исходных
-                {
-                    if (dateTime[^1].AddDays(5) < security.SourceBars.DateTime[0])
-                    {
-                        AddInfo("ProcessBars: received bars are too deep: " + security.ShortName);
-                        return;
-                    }
-                    security.SourceBars.DateTime = dateTime.Concat(security.SourceBars.DateTime).ToArray();
-                    security.SourceBars.Open = open.Concat(security.SourceBars.Open).ToArray();
-                    security.SourceBars.High = high.Concat(security.SourceBars.High).ToArray();
-                    security.SourceBars.Low = low.Concat(security.SourceBars.Low).ToArray();
-                    security.SourceBars.Close = close.Concat(security.SourceBars.Close).ToArray();
-                    security.SourceBars.Volume = volume.Concat(security.SourceBars.Volume).ToArray();
-                }
-                else if (dateTime[0] < security.SourceBars.DateTime[0])
-                {
-                    int count = dateTime.FindIndex(d => d == security.SourceBars.DateTime[0]);
-                    security.SourceBars.DateTime =
-                        dateTime.Take(count).Concat(security.SourceBars.DateTime).ToArray();
-                    security.SourceBars.Open =
-                        open.Take(count).Concat(security.SourceBars.Open).ToArray();
-                    security.SourceBars.High =
-                        high.Take(count).Concat(security.SourceBars.High).ToArray();
-                    security.SourceBars.Low =
-                        low.Take(count).Concat(security.SourceBars.Low).ToArray();
-                    security.SourceBars.Close =
-                        close.Take(count).Concat(security.SourceBars.Close).ToArray();
-                    security.SourceBars.Volume =
-                        volume.Take(count).Concat(security.SourceBars.Volume).ToArray();
-                }
-                else return;
-
-                Task.Run(() => TradingSystem.ToolManager.UpdateBars(tool, security == tool.BasicSecurity));
                 return;
             }
         }
@@ -330,7 +250,7 @@ internal class TXmlDataProcessor
             if (!GoToTheValue(xr, "result")) continue;
             if (xr.HasValue)
             {
-                if (xr.Value.StartsWith("{37}", SC) || xr.Value.StartsWith("{42}", SC))
+                if (xr.Value.StartsWith("{37}", OC) || xr.Value.StartsWith("{42}", OC))
                     AddInfo(order.Seccode + "/" + order.TrID + ": OrderReply: " + xr.Value, false);
                 else AddInfo(order.Seccode + "/" + order.TrID + ": OrderReply: " + xr.Value);
             }

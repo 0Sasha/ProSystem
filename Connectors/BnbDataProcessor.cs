@@ -1,25 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace ProSystem;
 
-internal class BnbDataProcessor
+internal class BnbDataProcessor : DataProcessor
 {
     private readonly BnbConnector Connector;
-    private readonly AddInformation AddInfo;
-    private readonly TradingSystem TradingSystem;
-    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    public BnbDataProcessor(BnbConnector connector, TradingSystem tradingSystem, AddInformation addInfo)
-    {
-        Connector = connector ?? throw new ArgumentNullException(nameof(connector));
-        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-    }
+    public BnbDataProcessor(BnbConnector connector, TradingSystem tradingSystem, AddInformation addInfo) :
+        base(tradingSystem, addInfo) => Connector = connector ?? throw new ArgumentNullException(nameof(connector));
 
     public bool CheckServerTime(string data)
     {
@@ -65,7 +56,10 @@ internal class BnbDataProcessor
             var security = Connector.Securities.SingleOrDefault(s => s.Seccode == code);
             if (security == null)
             {
-                security = new(code);
+                var tool = TradingSystem.Tools
+                    .SingleOrDefault(t => t.Security.Seccode == code || t.BasicSecurity?.Seccode == code);
+                if (tool != null) security = tool.Security.Seccode == code ? tool.Security : tool.BasicSecurity;
+                else security = new(code);
                 Connector.Securities.Add(security);
             }
             security.TradingStatus = symbol.GetProperty("status").GetString();
@@ -77,6 +71,9 @@ internal class BnbDataProcessor
                 var type = filter.GetProperty("filterType").GetString();
                 if (type == "PRICE_FILTER")
                 {
+                    security.MinPrice = double.Parse(filter.GetProperty("minPrice").GetString(), IC);
+                    security.MaxPrice = double.Parse(filter.GetProperty("maxPrice").GetString(), IC);
+
                     var tickSize = filter.GetProperty("tickSize").GetString();
                     security.MinStep = double.Parse(tickSize, IC);
 
@@ -85,10 +82,14 @@ internal class BnbDataProcessor
                     else AddInfo("Unknown tickSize", notify: true);
                 }
                 else if (type == "LOT_SIZE")
-                {
                     security.LotSize = double.Parse(filter.GetProperty("stepSize").GetString(), IC);
-                    //var minQty = double.Parse(filter.GetProperty("minQty").GetString(), IC);
-                    //AddInfo(security.LotSize + "/" + minQty);
+                else if (type == "MIN_NOTIONAL")
+                    security.Notional = double.Parse(filter.GetProperty("notional").GetString(), IC);
+                else if (type == "MARKET_LOT_SIZE")
+                {
+                    var l = double.Parse(filter.GetProperty("stepSize").GetString(), IC);
+                    if (Math.Abs(security.LotSize - l) > 0.00000001)
+                        AddInfo(code + ": MARKET_LOT_SIZE != LOT_SIZE", notify: true);
                 }
             }
         }
@@ -158,11 +159,11 @@ internal class BnbDataProcessor
             _ = bar[10];
         }
 
-        if (dateTime.Count > 2)
+        if (dateTime.Count > 1)
         {
             var newBars = new Bars(dateTime.ToArray(), open.ToArray(), high.ToArray(),
                 low.ToArray(), close.ToArray(), volume.ToArray(), barsTF.Seconds / 60);
-            security.UpdateBars(newBars, baseTF);
+            UpdateBars(security, newBars, baseTF);
         }
     }
 
@@ -209,55 +210,9 @@ internal class BnbDataProcessor
         var low = double.Parse(kline.GetProperty("l").GetString(), IC);
         var close = double.Parse(kline.GetProperty("c").GetString(), IC);
         var volume = double.Parse(kline.GetProperty("v").GetString(), IC);
-        var barIsClosed = kline.GetProperty("x").GetBoolean();
-        security.LastTrade = new(code, DateTime.Now, close);
+        //var barIsClosed = kline.GetProperty("x").GetBoolean();
 
-        if (startTime == security.Bars.DateTime[^1])
-        {
-            security.Bars.Open[^1] = open;
-            security.Bars.High[^1] = high;
-            security.Bars.Low[^1] = low;
-            security.Bars.Close[^1] = close;
-            security.Bars.Volume[^1] = volume;
-        }
-        else if (startTime > security.Bars.DateTime[^1])
-        {
-            security.LastTrDT = DateTime.Now.AddSeconds(10);
-            tool.TimeNextRecalc = DateTime.Now.AddSeconds(30);
-
-            security.Bars.DateTime = security.Bars.DateTime.Concat(new[] { startTime }).ToArray();
-            security.Bars.Open = security.Bars.Open.Concat(new[] { open }).ToArray();
-            security.Bars.High = security.Bars.High.Concat(new[] { high }).ToArray();
-            security.Bars.Low = security.Bars.Low.Concat(new[] { low }).ToArray();
-            security.Bars.Close = security.Bars.Close.Concat(new[] { close }).ToArray();
-            security.Bars.Volume = security.Bars.Volume.Concat(new[] { volume }).ToArray();
-
-            Task.Run(async () =>
-            {
-                await Task.Delay(250);
-                var lastExecuted = TradingSystem.Orders.ToArray()
-                    .LastOrDefault(x => x.Seccode == tool.Security.Seccode && x.Status == "matched");
-
-                if (lastExecuted != null && lastExecuted.DateTime.AddSeconds(3) > DateTime.Now)
-                {
-                    AddInfo(tool.Name + ": an order is executed during the bar opening. Waiting.", false);
-                    await Task.Delay(2000);
-                }
-                else if (tool.Security.Seccode == security.Seccode)
-                {
-                    var active = TradingSystem.Orders.ToArray()
-                        .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
-                    if (active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.00001))
-                    {
-                        AddInfo(tool.Name + ": active order price equals bar opening. Waiting.", false);
-                        await Task.Delay(2000);
-                    }
-                }
-
-                await TradingSystem.ToolManager.CalculateAsync(tool);
-                tool.MainModel.InvalidatePlot(true);
-            });
-        }
-        else throw new ArgumentException("StartTime is not suitable");
+        var lastTrade = new Trade(code, DateTime.Now, close);
+        UpdateLastBar(lastTrade, startTime, open, high, low, close, volume);
     }
 }

@@ -342,7 +342,7 @@ internal class TXmlConnector : Connector
     }
 
 
-    public override async Task<bool> OrderSpecificPreTradingData()
+    public override async Task<bool> OrderPreTradingData()
     {
         await OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
         await OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);

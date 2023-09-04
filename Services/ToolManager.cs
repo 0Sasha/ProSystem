@@ -216,63 +216,6 @@ internal class ToolManager : IToolManager
         if (tool.Model != null) Plot.UpdateMiniModel(tool, Window);
     }
 
-    public void UpdateLastTrade(Tool tool, Trade lastTrade)
-    {
-        var security = tool.Security.Seccode == lastTrade.Seccode ? tool.Security : tool.BasicSecurity;
-        security.LastTrade = lastTrade;
-        var bars = security.Bars;
-
-        if (lastTrade.DateTime < bars.DateTime[^1].AddMinutes(bars.TF))
-        {
-            bars.Close[^1] = lastTrade.Price;
-            if (lastTrade.Price > bars.High[^1]) bars.High[^1] = lastTrade.Price;
-            else if (lastTrade.Price < bars.Low[^1]) bars.Low[^1] = lastTrade.Price;
-            bars.Volume[^1] += lastTrade.Quantity;
-        }
-        else if (DateTime.Now > security.LastTrDT)
-        {
-            security.LastTrDT = DateTime.Now.AddSeconds(10);
-            tool.TimeNextRecalc = DateTime.Now.AddSeconds(30);
-
-            if (DateTime.Now.Date == bars.DateTime[^1].Date) bars.DateTime =
-                    bars.DateTime.Concat(new DateTime[] { bars.DateTime[^1].AddMinutes(bars.TF) }).ToArray();
-            else bars.DateTime =
-                    bars.DateTime.Concat(new DateTime[] { DateTime.Now.Date.AddHours(DateTime.Now.Hour) }).ToArray();
-            bars.Open = bars.Open.Concat(new double[] { lastTrade.Price }).ToArray();
-            bars.High = bars.High.Concat(new double[] { lastTrade.Price }).ToArray();
-            bars.Low = bars.Low.Concat(new double[] { lastTrade.Price }).ToArray();
-            bars.Close = bars.Close.Concat(new double[] { lastTrade.Price }).ToArray();
-            bars.Volume = bars.Volume.Concat(new double[] { lastTrade.Quantity }).ToArray();
-
-            Task.Run(async () =>
-            {
-                await Task.Delay(250);
-                var lastExecuted = TradingSystem.Orders.ToArray()
-                    .LastOrDefault(x => x.Seccode == tool.Security.Seccode && x.Status == "matched");
-
-                if (lastExecuted != null && lastExecuted.DateTime.AddSeconds(3) > DateTime.Now)
-                {
-                    AddInfo(tool.Name + ": an order is executed during the bar opening. Waiting.", false);
-                    await Task.Delay(2000);
-                }
-                else if (tool.Security.Seccode == security.Seccode)
-                {
-                    var active = TradingSystem.Orders.ToArray()
-                        .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
-                    if (active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.00001))
-                    {
-                        AddInfo(tool.Name + ": active order price equals bar opening. Waiting.", false);
-                        await Task.Delay(2000);
-                    }
-                }
-
-                await CalculateAsync(tool);
-                tool.MainModel.InvalidatePlot(true);
-                await RequestBarsAsync(tool);
-            });
-        }
-    }
-
 
     private async Task<bool> CheckToolAsync(Tool tool)
     {
@@ -391,8 +334,8 @@ internal class ToolManager : IToolManager
         var average = Math.Round(tool.Security.Bars.Close.TakeLast(30).Average(), tool.Security.Decimals);
         var atr = Indicators.ATR(tool.Security.Bars.High, tool.Security.Bars.Low, tool.Security.Bars.Close, 50);
 
-        var readyToTrade = !tool.StopTrading &&
-            TradingSystem.PortfolioManager.CheckEquity() && Connector.CheckRequirements(tool.Security);
+        var readyToTrade = !tool.StopTrading &
+            TradingSystem.PortfolioManager.CheckEquity() & Connector.CheckRequirements(tool.Security);
         var toolState = new ToolState(readyToTrade, IsLogging(tool), Connector.SecurityIsBidding(tool.Security))
         {
             IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 15,

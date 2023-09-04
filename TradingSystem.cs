@@ -99,7 +99,7 @@ public class TradingSystem
         await Connector.OrderPortfolioInfoAsync(Portfolio);
         if (!ReadyToTrade)
         {
-            await Connector.OrderSpecificPreTradingData();
+            await Connector.OrderPreTradingData();
             await PrepareToolsAsync();
 
             if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
@@ -191,6 +191,11 @@ public class TradingSystem
 
         if (Settings.ScheduledConnection && DateTime.Now.Minute == 50 &&
             DateTime.Now < DateTime.Today.AddMinutes(400)) await Connector.DisconnectAsync();
+        else if (!ReadyToTrade)
+        {
+            await Task.Delay(5000);
+            if (!ReadyToTrade && Connector.Connection == ConnectionState.Connected) _ = Task.Run(PrepareForTrading);
+        }
     }
 
     private async Task ConnectAsync()

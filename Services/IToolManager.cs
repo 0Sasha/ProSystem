@@ -19,6 +19,4 @@ public interface IToolManager
     public void UpdateBars(Tool tool, bool updateBasicSecurity);
 
     public void UpdateView(Tool tool, bool updateScriptView);
-
-    public void UpdateLastTrade(Tool tool, Trade lastTrade);
 }

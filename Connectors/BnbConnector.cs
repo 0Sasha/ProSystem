@@ -105,10 +105,10 @@ internal class BnbConnector : Connector
 
     private async Task<bool> SubUnsubAsync(Security security, bool subscribe)
     {
-        var method = subscribe ? "SUBSCRIBE" : "UNSUBSCRIBE";
         if (SocketManager.Connected)
         {
-            await SocketManager.SendAsync("{\r\n\"method\": \"" + method + "\",\r\n\"params\":\r\n[\r\n\"" +
+            var s = subscribe ? "SUBSCRIBE" : "UNSUBSCRIBE";
+            await SocketManager.SendAsync("{\r\n\"method\": \"" + s + "\",\r\n\"params\":\r\n[\r\n\"" +
                 security.Seccode.ToLower() + "@kline_30m\"],\r\n\"id\": 1\r\n}");
             return true;
         }
@@ -189,7 +189,25 @@ internal class BnbConnector : Connector
 
     public override bool CheckRequirements(Security security)
     {
-        throw new NotImplementedException();
+        if (security.MinStep < 0.00000001 || security.LotSize < 0.00000001 ||
+            security.Notional < 0.00000001 || security.Decimals < -0.00000001)
+        {
+            AddInfo(security.Seccode + ": MinStep, LotSize, Notional or Decimals <= 0", notify: true);
+            return false;
+        }
+        if (security.Bars == null || security.LastTrade == null)
+        {
+            AddInfo(security.Seccode + ": Bars or LastTrade is null", notify: true);
+            return false;
+        }
+
+        var precision = security.LotSize < 0.99 ? security.LotSize.ToString(IC)[2..].Length : 0;
+        security.MinQty = Math.Round(security.Notional /
+            security.Bars.Close[^1], precision, MidpointRounding.ToZero) + security.LotSize;
+
+        security.InitReqLong = security.Bars.Close[^1] * security.LotSize;
+        security.InitReqShort = security.Bars.Close[^1] * security.LotSize;
+        return true;
     }
 
 
