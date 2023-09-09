@@ -410,6 +410,7 @@
                 <Separator Background="{StaticResource txtBorder}"/>
                 <MenuItem Header="Resize control panel" Click="ResizeControlPanel"></MenuItem>
                 <MenuItem Header="Test">
+                    <MenuItem Header="NotifierTest" Click="NotifierTest"></MenuItem>
                     <MenuItem Header="Test 1" Click="Test"></MenuItem>
                 </MenuItem>
             </MenuItem>

@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using System.Xml;
 
 namespace ProSystem;
@@ -182,14 +183,15 @@ internal class TXmlConnector : Connector
         if (xr.GetAttribute("success") == "true")
         {
             int trId = int.Parse(xr.GetAttribute("transactionid"), IC);
-            TradingSystem.Window.Dispatcher.Invoke(() =>
+            var order = new Order(trId, senderName, signal, note);
+            await TradingSystem.Window.Dispatcher.InvokeAsync(() =>
             {
-                if (sender != null) sender.Orders.Add(new Order(trId, sender.Name, signal, note));
-                else TradingSystem.SystemOrders.Add(new Order(trId, senderName, signal, note));
-            });
+                if (sender != null) sender.Orders.Add(order);
+                else TradingSystem.SystemOrders.Add(order);
+            }, DispatcherPriority.Send);
 
             AddInfo("SendOrder: order is sent: " + senderName + "/" + symbol.Seccode + "/" +
-                buySell + "/" + price + "/" + quantity, TradingSystem.Settings.DisplaySentOrders);
+                buySell + "/" + price + "/" + quantity + "/" + trId, TradingSystem.Settings.DisplaySentOrders);
 
             xr.Close();
             return true;

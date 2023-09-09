@@ -425,6 +425,11 @@ public partial class MainWindow : Window
             else Column.Width = new GridLength(100);
         }
     }
+    private void NotifierTest(object sender, RoutedEventArgs e)
+    {
+        try { Notifier.Notify("Test data"); }
+        catch (Exception ex) { AddInfo("NotifierTest: " + ex.Message); }
+    }
     private void Test(object sender, RoutedEventArgs e)
     {
 
