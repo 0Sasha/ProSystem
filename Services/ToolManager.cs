@@ -221,7 +221,9 @@ internal class ToolManager : IToolManager
     {
         var security = tool.Security;
         var basicSecurity = tool.BasicSecurity;
-        if (security.LastTrade == null || security.LastTrade.DateTime < DateTime.Now.AddDays(-5))
+        if (security.LastTrade == null || security.LastTrade.DateTime < DateTime.Now.AddDays(-5) ||
+            basicSecurity != null &&
+            (basicSecurity.LastTrade == null || basicSecurity.LastTrade.DateTime < DateTime.Now.AddDays(-5)))
         {
             AddInfo(tool.Name + ": last trade is not actual. Subscribing.", notify: true);
             await Connector.SubscribeToTradesAsync(security);
