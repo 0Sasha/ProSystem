@@ -34,20 +34,20 @@ internal class PARS : Script
         properties = new(isOSC, upper);
     }
 
-    public override void Calculate(Security Symbol)
+    public override void Calculate(Security symbol)
     {
-        var iBars = Symbol.Bars.Compress(IndicatorTF);
-        var parStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, Symbol.Decimals);
-        parStop = Indicators.Synchronize(parStop, iBars, Symbol.Bars);
+        var iBars = symbol.Bars.Compress(IndicatorTF);
+        var parStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, symbol.Decimals);
+        parStop = Indicators.Synchronize(parStop, iBars, symbol.Bars);
 
         var pastParStop = 0D;
-        var isGrow = new bool[Symbol.Bars.Close.Length];
-        for (int i = 1; i < Symbol.Bars.Close.Length; i++)
+        var isGrow = new bool[symbol.Bars.Close.Length];
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (Math.Abs(pastParStop - parStop[i - 1]) > 0.00001 || pastParStop < 0.00001)
             {
-                if (!isGrow[i - 1] && Symbol.Bars.High[i] - parStop[i - 1] > 0.00001 ||
-                    isGrow[i - 1] && Symbol.Bars.Low[i] - parStop[i - 1] < -0.00001)
+                if (!isGrow[i - 1] && symbol.Bars.High[i] - parStop[i - 1] > 0.00001 ||
+                    isGrow[i - 1] && symbol.Bars.Low[i] - parStop[i - 1] < -0.00001)
                 {
                     isGrow[i] = !isGrow[i - 1];
                     pastParStop = parStop[i - 1];

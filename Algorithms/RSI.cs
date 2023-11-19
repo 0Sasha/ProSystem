@@ -49,14 +49,14 @@ internal class RSI : Script
         properties = new(isOSC, upper, middle);
     }
 
-    public override void Calculate(Security Symbol)
+    public override void Calculate(Security symbol)
     {
-        var iBars = Symbol.Bars.Compress(IndicatorTF);
+        var iBars = symbol.Bars.Compress(IndicatorTF);
         var rsi = Indicators.RSI(iBars.Close, Period);
-        rsi = Indicators.Synchronize(rsi, iBars, Symbol.Bars);
+        rsi = Indicators.Synchronize(rsi, iBars, symbol.Bars);
 
-        var isGrow = new bool[Symbol.Bars.Close.Length];
-        for (int i = 1; i < Symbol.Bars.Close.Length; i++)
+        var isGrow = new bool[symbol.Bars.Close.Length];
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (rsi[i - 1] - (50 + Level) > 0.00001) isGrow[i] = IsTrend;
             else if (rsi[i - 1] - (50 - Level) < -0.00001) isGrow[i] = !IsTrend;

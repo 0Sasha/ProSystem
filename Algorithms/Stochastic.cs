@@ -56,7 +56,7 @@ internal class Stochastic : Script
         stoch = Indicators.Synchronize(stoch, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < symbol.Bars.Close.Length; i++)
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (stoch[i - 1] - (50 + Level) > 0.00001) isGrow[i] = IsTrend;
             else if (stoch[i - 1] - (50 - Level) < -0.00001) isGrow[i] = !IsTrend;

@@ -91,7 +91,7 @@ internal class CrossMA : Script
         longMA = Indicators.Synchronize(longMA, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < symbol.Bars.Close.Length; i++)
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (shortMA[i - 1] - longMA[i - 1] > 0.00001) isGrow[i] = true;
             else if (shortMA[i - 1] - longMA[i - 1] < -0.00001) isGrow[i] = false;

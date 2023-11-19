@@ -75,7 +75,7 @@ internal class CHO : Script
         cho = Indicators.Synchronize(cho, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 2; i < symbol.Bars.Close.Length; i++)
+        for (int i = 2; i < isGrow.Length; i++)
         {
             if (oneLevel)
             {

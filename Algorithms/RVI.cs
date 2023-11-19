@@ -56,7 +56,7 @@ internal class RVI : Script
         rvi = Indicators.Synchronize(rvi, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < symbol.Bars.Close.Length; i++)
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (rvi[i - 1] - Level > 0.00001) isGrow[i] = IsTrend;
             else if (rvi[i - 1] - -Level < -0.00001) isGrow[i] = !IsTrend;

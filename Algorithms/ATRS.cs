@@ -58,7 +58,7 @@ internal class ATRS : Script
 
         var pastStopATR = 0D;
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < symbol.Bars.Close.Length; i++)
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (Math.Abs(pastStopATR - atr[i - 1]) > 0.00001 || pastStopATR < 0.00001)
             {

@@ -72,7 +72,7 @@ internal class AD : Script
         ad = Indicators.Synchronize(ad, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 2; i < symbol.Bars.Close.Length; i++)
+        for (int i = 2; i < isGrow.Length; i++)
         {
             if (UseChannel)
             {

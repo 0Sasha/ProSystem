@@ -56,7 +56,7 @@ internal class CMF : Script
         cmf = Indicators.Synchronize(cmf, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < symbol.Bars.Close.Length; i++)
+        for (int i = 1; i < isGrow.Length; i++)
         {
             if (cmf[i - 1] - Level > 0.00001) isGrow[i] = IsTrend;
             else if (cmf[i - 1] - -Level < -0.00001) isGrow[i] = !IsTrend;
