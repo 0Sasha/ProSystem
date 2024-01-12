@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class FRC : Script
@@ -58,9 +56,10 @@ internal class FRC : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var oneLevel = PeriodEx < 1;
-        double[] upper = null, lower = null, signalLine = null;
+        double[] upper = [], lower = [], signalLine = [];
         double[] frc = Indicators.FRC(iBars.Close, iBars.Volume, Period);
         if (!oneLevel)
         {
@@ -79,28 +78,27 @@ internal class FRC : Script
         {
             if (oneLevel)
             {
-                if (frc[i - 1] > 0.00001) isGrow[i] = IsTrend;
-                else if (frc[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+                if (frc[i - 1] > 0.000001) isGrow[i] = IsTrend;
+                else if (frc[i - 1] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
             else if (UseChannel)
             {
-                if (frc[i - 1] - upper[i - 2] > 0.00001) isGrow[i] = IsTrend;
-                else if (frc[i - 1] - lower[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+                if (frc[i - 1] - upper[i - 2] > 0.000001) isGrow[i] = IsTrend;
+                else if (frc[i - 1] - lower[i - 2] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
             else
             {
-                if (frc[i - 1] - signalLine[i - 1] > 0.00001) isGrow[i] = IsTrend;
-                else if (frc[i - 1] - signalLine[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+                if (frc[i - 1] - signalLine[i - 1] > 0.000001) isGrow[i] = IsTrend;
+                else if (frc[i - 1] - signalLine[i - 1] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
         }
 
-        if (oneLevel)
-            Result = new(ScriptType.OSC, isGrow, new double[][] { frc }, iBars.DateTime[^1], 0, 0, OnlyLimit);
+        if (oneLevel) Result = new(ScriptType.OSC, isGrow, [frc], iBars.DateTime[^1], 0, 0, OnlyLimit);
         else if (UseChannel)
-            Result = new(ScriptType.OSC, isGrow, new double[][] { frc, upper, lower }, iBars.DateTime[^1], OnlyLimit);
-        else Result = new(ScriptType.OSC, isGrow, new double[][] { frc, signalLine }, iBars.DateTime[^1], OnlyLimit);
+            Result = new(ScriptType.OSC, isGrow, [frc, upper, lower], iBars.DateTime[^1], OnlyLimit);
+        else Result = new(ScriptType.OSC, isGrow, [frc, signalLine], iBars.DateTime[^1], OnlyLimit);
     }
 }

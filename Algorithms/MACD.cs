@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class MACD : Script
@@ -51,6 +49,7 @@ internal class MACD : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var macdLine = Indicators.MACD(iBars.Close, Period, Period * Mult);
         var signalLine = Indicators.EMA(macdLine, (int)(Period * 0.75));
@@ -60,10 +59,10 @@ internal class MACD : Script
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (macdLine[i - 1] - signalLine[i - 1] > 0.00001) isGrow[i] = IsTrend;
-            else if (macdLine[i - 1] - signalLine[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+            if (macdLine[i - 1] - signalLine[i - 1] > 0.000001) isGrow[i] = IsTrend;
+            else if (macdLine[i - 1] - signalLine[i - 1] < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.OSC, isGrow, new double[][] { macdLine, signalLine }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [macdLine, signalLine], iBars.DateTime[^1], OnlyLimit);
     }
 }

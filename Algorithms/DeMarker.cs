@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class DeMarker : Script
@@ -51,6 +49,7 @@ internal class DeMarker : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var dem = Indicators.DeMarker(iBars.High, iBars.Low, Period);
         dem = Indicators.Synchronize(dem, iBars, symbol.Bars);
@@ -58,10 +57,10 @@ internal class DeMarker : Script
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (dem[i - 1] - (50 + Level) > 0.00001) isGrow[i] = IsTrend;
-            else if (dem[i - 1] - (50 - Level) < -0.00001) isGrow[i] = !IsTrend;
+            if (dem[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
+            else if (dem[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.OSC, isGrow, new double[][] { dem }, iBars.DateTime[^1], 50, Level, OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [dem], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class CrossMA : Script
@@ -59,32 +57,33 @@ internal class CrossMA : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         double[] shortMA, longMA;
         if (NameMA == NameMA.SMA)
         {
-            shortMA = Indicators.SMA(iBars.Close, Period, symbol.Decimals);
-            longMA = Indicators.SMA(iBars.Close, Period * Mult, symbol.Decimals);
+            shortMA = Indicators.SMA(iBars.Close, Period, symbol.TickPrecision);
+            longMA = Indicators.SMA(iBars.Close, Period * Mult, symbol.TickPrecision);
         }
         else if (NameMA == NameMA.EMA)
         {
-            shortMA = Indicators.EMA(iBars.Close, Period, symbol.Decimals);
-            longMA = Indicators.EMA(iBars.Close, Period * Mult, symbol.Decimals);
+            shortMA = Indicators.EMA(iBars.Close, Period, symbol.TickPrecision);
+            longMA = Indicators.EMA(iBars.Close, Period * Mult, symbol.TickPrecision);
         }
         else if (NameMA == NameMA.SMMA)
         {
-            shortMA = Indicators.SMMA(iBars.Close, Period, symbol.Decimals);
-            longMA = Indicators.SMMA(iBars.Close, Period * Mult, symbol.Decimals);
+            shortMA = Indicators.SMMA(iBars.Close, Period, symbol.TickPrecision);
+            longMA = Indicators.SMMA(iBars.Close, Period * Mult, symbol.TickPrecision);
         }
         else if (NameMA == NameMA.DEMA)
         {
-            shortMA = Indicators.DEMA(iBars.Close, Period, symbol.Decimals);
-            longMA = Indicators.DEMA(iBars.Close, Period * Mult, symbol.Decimals);
+            shortMA = Indicators.DEMA(iBars.Close, Period, symbol.TickPrecision);
+            longMA = Indicators.DEMA(iBars.Close, Period * Mult, symbol.TickPrecision);
         }
         else if (NameMA == NameMA.KAMA)
         {
-            shortMA = Indicators.KAMA(iBars.Close, Period, symbol.Decimals);
-            longMA = Indicators.KAMA(iBars.Close, Period * Mult, symbol.Decimals);
+            shortMA = Indicators.KAMA(iBars.Close, Period, symbol.TickPrecision);
+            longMA = Indicators.KAMA(iBars.Close, Period * Mult, symbol.TickPrecision);
         }
         else throw new Exception("Непредвиденный тип MA");
         shortMA = Indicators.Synchronize(shortMA, iBars, symbol.Bars);
@@ -93,11 +92,11 @@ internal class CrossMA : Script
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (shortMA[i - 1] - longMA[i - 1] > 0.00001) isGrow[i] = true;
-            else if (shortMA[i - 1] - longMA[i - 1] < -0.00001) isGrow[i] = false;
+            if (shortMA[i - 1] - longMA[i - 1] > 0.000001) isGrow[i] = true;
+            else if (shortMA[i - 1] - longMA[i - 1] < -0.000001) isGrow[i] = false;
             else isGrow[i] = isGrow[i - 1];
         }
         Result = new(IsCrossMALim ? ScriptType.LimitLine : ScriptType.Line,
-            isGrow, new double[][] { shortMA, longMA }, iBars.DateTime[^1], OnlyLimit);
+            isGrow, [shortMA, longMA], iBars.DateTime[^1], OnlyLimit);
     }
 }

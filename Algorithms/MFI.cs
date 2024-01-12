@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class MFI : Script
@@ -51,6 +49,7 @@ internal class MFI : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var mfi = Indicators.MFI(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period);
         mfi = Indicators.Synchronize(mfi, iBars, symbol.Bars);
@@ -58,10 +57,10 @@ internal class MFI : Script
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (mfi[i - 1] - (50 + Level) > 0.00001) isGrow[i] = IsTrend;
-            else if (mfi[i - 1] - (50 - Level) < -0.00001) isGrow[i] = !IsTrend;
+            if (mfi[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
+            else if (mfi[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.OSC, isGrow, new double[][] { mfi }, iBars.DateTime[^1], 50, Level, OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [mfi], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

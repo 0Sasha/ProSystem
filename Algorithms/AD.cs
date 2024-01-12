@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class AD : Script
@@ -58,8 +56,9 @@ internal class AD : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        double[] upper = null, lower = null, ma = null;
+        double[] upper = [], lower = [], ma = [];
         double[] ad = Indicators.AD(iBars.High, iBars.Low, iBars.Close, iBars.Volume);
 
         if (UseChannel)
@@ -76,17 +75,17 @@ internal class AD : Script
         {
             if (UseChannel)
             {
-                if (ad[i - 1] - upper[i - 2] > 0.00001) isGrow[i] = IsTrend;
-                else if (ad[i - 1] - lower[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+                if (ad[i - 1] - upper[i - 2] > 0.000001) isGrow[i] = IsTrend;
+                else if (ad[i - 1] - lower[i - 2] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
             else
             {
-                if (ad[i - 1] - ma[i - 1] > 0.00001) isGrow[i] = IsTrend;
-                else if (ad[i - 1] - ma[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+                if (ad[i - 1] - ma[i - 1] > 0.000001) isGrow[i] = IsTrend;
+                else if (ad[i - 1] - ma[i - 1] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
         }
-        Result = new(ScriptType.OSC, isGrow, new double[][] { ad, upper, lower, ma }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [ad, upper, lower, ma], iBars.DateTime[^1], OnlyLimit);
     }
 }

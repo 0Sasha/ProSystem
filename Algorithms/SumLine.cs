@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class SumLine : Script
@@ -65,8 +63,9 @@ internal class SumLine : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        double[] upper = null, lower = null, ma = null;
+        double[] upper = [], lower = [], ma = [];
         double[] sumLine = Indicators.SumLine(iBars.Close, Period);
 
         if (UseChannel)
@@ -84,18 +83,17 @@ internal class SumLine : Script
         {
             if (UseChannel)
             {
-                if (sumLine[i - 1] - upper[i - 2] > 0.00001) isGrow[i] = IsTrend;
-                else if (sumLine[i - 1] - lower[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+                if (sumLine[i - 1] - upper[i - 2] > 0.000001) isGrow[i] = IsTrend;
+                else if (sumLine[i - 1] - lower[i - 2] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
             else
             {
-                if (sumLine[i - 1] - ma[i - 1] > 0.00001) isGrow[i] = IsTrend;
-                else if (sumLine[i - 1] - ma[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+                if (sumLine[i - 1] - ma[i - 1] > 0.000001) isGrow[i] = IsTrend;
+                else if (sumLine[i - 1] - ma[i - 1] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
         }
-        Result =
-            new(ScriptType.OSC, isGrow, new double[][] { sumLine, upper, lower, ma }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [sumLine, upper, lower, ma], iBars.DateTime[^1], OnlyLimit);
     }
 }

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class Channel : Script
@@ -59,6 +57,7 @@ internal class Channel : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         double[] line;
         if (NameMA == NameMA.SMA) line = Indicators.SMA(iBars.Close, Period);
@@ -76,13 +75,13 @@ internal class Channel : Script
         for (int i = 2; i < isGrow.Length; i++)
         {
             if (isGrow[i - 1] != IsTrend &&
-                symbol.Bars.High[i - 1] - upper[i - 2] > 0.00001 &&
-                symbol.Bars.Close[i - 1] - lower[i - 2] > 0.00001) isGrow[i] = IsTrend;
+                symbol.Bars.High[i - 1] - upper[i - 2] > 0.000001 &&
+                symbol.Bars.Close[i - 1] - lower[i - 2] > 0.000001) isGrow[i] = IsTrend;
             else if (isGrow[i - 1] == IsTrend &&
-                symbol.Bars.Low[i - 1] - lower[i - 2] < -0.00001 &&
-                symbol.Bars.Close[i - 1] - upper[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+                symbol.Bars.Low[i - 1] - lower[i - 2] < -0.000001 &&
+                symbol.Bars.Close[i - 1] - upper[i - 2] < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.Line, isGrow, new double[][] { upper, lower }, iBars.DateTime[^1], true);
+        Result = new(ScriptType.Line, isGrow, [upper, lower], iBars.DateTime[^1], true);
     }
 }

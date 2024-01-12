@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class ATRS : Script
@@ -51,19 +49,20 @@ internal class ATRS : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var atr = Indicators.ATRLine(iBars.High, iBars.Low,
-            iBars.Close, Period, Mult, PeriodEx, Correction, symbol.Decimals);
+            iBars.Close, Period, Mult, PeriodEx, Correction, symbol.TickPrecision);
         atr = Indicators.Synchronize(atr, iBars, symbol.Bars);
 
         var pastStopATR = 0D;
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (Math.Abs(pastStopATR - atr[i - 1]) > 0.00001 || pastStopATR < 0.00001)
+            if (Math.Abs(pastStopATR - atr[i - 1]) > 0.000001 || pastStopATR < 0.000001)
             {
-                if (!isGrow[i - 1] && symbol.Bars.High[i] - atr[i - 1] > 0.00001 ||
-                    isGrow[i - 1] && symbol.Bars.Low[i] - atr[i - 1] < -0.00001)
+                if (!isGrow[i - 1] && symbol.Bars.High[i] - atr[i - 1] > 0.000001 ||
+                    isGrow[i - 1] && symbol.Bars.Low[i] - atr[i - 1] < -0.000001)
                 {
                     isGrow[i] = !isGrow[i - 1];
                     pastStopATR = atr[i - 1];
@@ -72,6 +71,6 @@ internal class ATRS : Script
             }
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.StopLine, isGrow, new double[][] { atr }, iBars.DateTime[^1]);
+        Result = new(ScriptType.StopLine, isGrow, [atr], iBars.DateTime[^1]);
     }
 }

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class RSI : Script
@@ -51,6 +49,7 @@ internal class RSI : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var rsi = Indicators.RSI(iBars.Close, Period);
         rsi = Indicators.Synchronize(rsi, iBars, symbol.Bars);
@@ -58,10 +57,10 @@ internal class RSI : Script
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (rsi[i - 1] - (50 + Level) > 0.00001) isGrow[i] = IsTrend;
-            else if (rsi[i - 1] - (50 - Level) < -0.00001) isGrow[i] = !IsTrend;
+            if (rsi[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
+            else if (rsi[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.OSC, isGrow, new double[][] { rsi }, iBars.DateTime[^1], 50, Level, OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [rsi], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

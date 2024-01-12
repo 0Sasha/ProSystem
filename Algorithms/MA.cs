@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class MA : Script
@@ -52,6 +50,7 @@ internal class MA : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         double[] ma;
         if (NameMA == NameMA.SMA) ma = Indicators.SMA(iBars.Close, Period);
@@ -65,10 +64,10 @@ internal class MA : Script
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 2; i < isGrow.Length; i++)
         {
-            if (ma[i - 1] - ma[i - 2] > 0.00001) isGrow[i] = IsTrend;
-            else if (ma[i - 1] - ma[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+            if (ma[i - 1] - ma[i - 2] > 0.000001) isGrow[i] = IsTrend;
+            else if (ma[i - 1] - ma[i - 2] < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.Line, isGrow, new double[][] { ma }, iBars.DateTime[^1], OnlyLimit);
+        Result = new(ScriptType.Line, isGrow, [ma], iBars.DateTime[^1], OnlyLimit);
     }
 }

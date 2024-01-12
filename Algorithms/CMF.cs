@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class CMF : Script
@@ -51,17 +49,18 @@ internal class CMF : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        var cmf = Indicators.CMF(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period, symbol.MinStep);
+        var cmf = Indicators.CMF(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period, symbol.TickSize);
         cmf = Indicators.Synchronize(cmf, iBars, symbol.Bars);
 
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (cmf[i - 1] - Level > 0.00001) isGrow[i] = IsTrend;
-            else if (cmf[i - 1] - -Level < -0.00001) isGrow[i] = !IsTrend;
+            if (cmf[i - 1] - Level > 0.000001) isGrow[i] = IsTrend;
+            else if (cmf[i - 1] - -Level < -0.000001) isGrow[i] = !IsTrend;
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.OSC, isGrow, new double[][] { cmf }, iBars.DateTime[^1], 0, Level, OnlyLimit);
+        Result = new(ScriptType.OSC, isGrow, [cmf], iBars.DateTime[^1], 0, Level, OnlyLimit);
     }
 }

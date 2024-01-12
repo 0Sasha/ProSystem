@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class PARS : Script
@@ -36,18 +34,19 @@ internal class PARS : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        var parStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, symbol.Decimals);
+        var parStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, symbol.TickPrecision);
         parStop = Indicators.Synchronize(parStop, iBars, symbol.Bars);
 
         var pastParStop = 0D;
         var isGrow = new bool[symbol.Bars.Close.Length];
         for (int i = 1; i < isGrow.Length; i++)
         {
-            if (Math.Abs(pastParStop - parStop[i - 1]) > 0.00001 || pastParStop < 0.00001)
+            if (Math.Abs(pastParStop - parStop[i - 1]) > 0.000001 || pastParStop < 0.000001)
             {
-                if (!isGrow[i - 1] && symbol.Bars.High[i] - parStop[i - 1] > 0.00001 ||
-                    isGrow[i - 1] && symbol.Bars.Low[i] - parStop[i - 1] < -0.00001)
+                if (!isGrow[i - 1] && symbol.Bars.High[i] - parStop[i - 1] > 0.000001 ||
+                    isGrow[i - 1] && symbol.Bars.Low[i] - parStop[i - 1] < -0.000001)
                 {
                     isGrow[i] = !isGrow[i - 1];
                     pastParStop = parStop[i - 1];
@@ -56,6 +55,6 @@ internal class PARS : Script
             }
             else isGrow[i] = isGrow[i - 1];
         }
-        Result = new(ScriptType.StopLine, isGrow, new double[][] { parStop }, iBars.DateTime[^1]);
+        Result = new(ScriptType.StopLine, isGrow, [parStop], iBars.DateTime[^1]);
     }
 }

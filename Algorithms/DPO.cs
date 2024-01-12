@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem.Algorithms;
+﻿namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class DPO : Script
@@ -58,9 +56,10 @@ internal class DPO : Script
 
     public override void Calculate(Security symbol)
     {
+        ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
         var oneLevel = PeriodEx < 1;
-        double[] upper = null, lower = null, signalLine = null;
+        double[] upper = [], lower = [], signalLine = [];
         double[] dpo = Indicators.DPO(iBars.Close, Period);
         if (!oneLevel)
         {
@@ -79,28 +78,27 @@ internal class DPO : Script
         {
             if (oneLevel)
             {
-                if (dpo[i - 1] > 0.00001) isGrow[i] = IsTrend;
-                else if (dpo[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+                if (dpo[i - 1] > 0.000001) isGrow[i] = IsTrend;
+                else if (dpo[i - 1] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
             else if (UseChannel)
             {
-                if (dpo[i - 1] - upper[i - 2] > 0.00001) isGrow[i] = IsTrend;
-                else if (dpo[i - 1] - lower[i - 2] < -0.00001) isGrow[i] = !IsTrend;
+                if (dpo[i - 1] - upper[i - 2] > 0.000001) isGrow[i] = IsTrend;
+                else if (dpo[i - 1] - lower[i - 2] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
             else
             {
-                if (dpo[i - 1] - signalLine[i - 1] > 0.00001) isGrow[i] = IsTrend;
-                else if (dpo[i - 1] - signalLine[i - 1] < -0.00001) isGrow[i] = !IsTrend;
+                if (dpo[i - 1] - signalLine[i - 1] > 0.000001) isGrow[i] = IsTrend;
+                else if (dpo[i - 1] - signalLine[i - 1] < -0.000001) isGrow[i] = !IsTrend;
                 else isGrow[i] = isGrow[i - 1];
             }
         }
 
-        if (oneLevel)
-            Result = new(ScriptType.OSC, isGrow, new double[][] { dpo }, iBars.DateTime[^1], 0, 0, OnlyLimit);
+        if (oneLevel) Result = new(ScriptType.OSC, isGrow, [dpo], iBars.DateTime[^1], 0, 0, OnlyLimit);
         else if (UseChannel)
-            Result = new(ScriptType.OSC, isGrow, new double[][] { dpo, upper, lower }, iBars.DateTime[^1], OnlyLimit);
-        else Result = new(ScriptType.OSC, isGrow, new double[][] { dpo, signalLine }, iBars.DateTime[^1], OnlyLimit);
+            Result = new(ScriptType.OSC, isGrow, [dpo, upper, lower], iBars.DateTime[^1], OnlyLimit);
+        else Result = new(ScriptType.OSC, isGrow, [dpo, signalLine], iBars.DateTime[^1], OnlyLimit);
     }
 }
