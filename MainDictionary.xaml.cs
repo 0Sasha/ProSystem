@@ -1,50 +1,44 @@
-﻿using System;
-using System.Windows;
-using System.Windows.Input;
+﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 namespace ProSystem;
 
 public partial class MainDictionary
 {
-    public static MainDictionary Dictionary { get; private set; }
+    public static MainDictionary Dictionary { get; private set; } = [];
+
     public MainDictionary()
     {
         InitializeComponent();
         Dictionary = this;
     }
 
-    private void AutoMinimize_Event(object sender, RoutedEventArgs e)
+    private void ChangeWindow(object sender, RoutedEventArgs e)
     {
-        var Window = (sender as Button).TemplatedParent as Window;
-        if (Window == null) return;
-        Window.WindowState = Window.WindowState == WindowState.Maximized ?
-            Window.WindowState = WindowState.Normal : Window.WindowState = WindowState.Maximized;
+        if (sender is Button { TemplatedParent: Window window })
+            window.WindowState =
+                window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
     }
 
-    private void Minimize_Event(object sender, RoutedEventArgs e)
+    private void MinimizeWindow(object sender, RoutedEventArgs e)
     {
-        var Window = (sender as Button).TemplatedParent as Window;
-        if (Window == null) return;
-        Window.WindowState = WindowState.Minimized;
+        if (sender is Button { TemplatedParent: Window window })
+            window.WindowState = WindowState.Minimized;
     }
 
-    private void CloseWindow_Event(object sender, RoutedEventArgs e)
+    private void CloseWindow(object sender, RoutedEventArgs e)
     {
-        var Window = (sender as Button).TemplatedParent as Window;
-        if (Window == null) return;
-        Window.Close();
+        if (sender is Button { TemplatedParent: Window window })
+            window.Close();
     }
 
-    private void TxtKeyDown(object sender, KeyEventArgs e)
+    private void HandleKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
         {
             Keyboard.ClearFocus();
-            try
-            {
-                if (sender is TextBox tbx) tbx.GetBindingExpression(TextBox.TextProperty).UpdateSource();
-            }
-            catch (Exception ex) { MainWindow.Window.AddInfo("TxtKeyDown: " + ex.Message); }
+            if (sender is TextBox box)
+                box.GetBindingExpression(TextBox.TextProperty).UpdateSource();
         }
     }
 }

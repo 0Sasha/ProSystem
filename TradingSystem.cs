@@ -1,20 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using ProSystem.Services;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using ProSystem.Services;
+
 namespace ProSystem;
 
 public delegate void AddInformation(string data, bool important = true, bool notify = false);
 
 public class TradingSystem
 {
-    private Thread stateChecker;
+    private Thread? stateChecker;
     private DateTime triggerRequestInfo;
     private DateTime triggerCheckState;
     private DateTime triggerRecalc;
@@ -22,9 +16,12 @@ public class TradingSystem
     private DateTime triggerCheckPortfolio;
 
     private readonly AddInformation AddInfo;
-    private readonly Func<NetworkCredential> GetCredential;
 
-    public Window Window { get; init; }
+    private DateTime ServerTime { get => Connector.ServerTime; }
+
+    public const int RecalcInterval = 30;
+
+    public MainWindow Window { get; init; }
     public Connector Connector { get; init; }
     public Portfolio Portfolio { get; init; }
     public Settings Settings { get; init; }
@@ -34,46 +31,37 @@ public class TradingSystem
     public bool ReadyToTrade { get; set; }
     public bool IsWorking { get; private set; }
 
-    public ObservableCollection<Tool> Tools { get; init; } = new();
-    public ObservableCollection<Trade> Trades { get; init; } = new();
-    public ObservableCollection<Order> Orders { get; init; } = new();
-    public ObservableCollection<Order> SystemOrders { get; init; } = new();
-    public ObservableCollection<Trade> SystemTrades { get; init; } = new();
+    public ObservableCollection<Tool> Tools { get; init; } = [];
+    public ObservableCollection<Trade> Trades { get; init; } = [];
+    public ObservableCollection<Order> Orders { get; init; } = [];
+    public ObservableCollection<Order> SystemOrders { get; init; } = [];
+    public ObservableCollection<Trade> SystemTrades { get; init; } = [];
 
-    public TradingSystem(Window window, AddInformation addInfo, Func<NetworkCredential> getCredential,
-        Type connectorType, Portfolio portfolio, Settings settings)
+    public TradingSystem(MainWindow window, Settings settings,
+        Portfolio portfolio, ObservableCollection<Tool> tools, ObservableCollection<Trade> trades)
     {
-        Window = window ?? throw new ArgumentNullException(nameof(window));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-        GetCredential = getCredential ?? throw new ArgumentNullException(nameof(getCredential));
+        Window = window;
+        Portfolio = portfolio;
+        Settings = settings;
+        Tools = tools;
+        Trades = trades;
+        AddInfo = window.AddInfo;
 
-        if (connectorType == typeof(TXmlConnector)) Connector = new TXmlConnector(this, addInfo);
-        else if (connectorType == typeof(BnbConnector)) Connector = new BnbConnector(this, addInfo);
-        else throw new ArgumentException("Unknown connector", nameof(connectorType));
+        if (settings.Connector == nameof(TXmlConnector)) Connector = new TXmlConnector(this, AddInfo);
+        else if (settings.Connector == nameof(BnbConnector)) Connector = new BnbConnector(this, AddInfo);
+        else throw new ArgumentException("Unknown connector", nameof(settings));
 
-        Portfolio = portfolio ?? throw new ArgumentNullException(nameof(portfolio));
-        Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        ScriptManager = new ScriptManager(Window, this, addInfo);
-        ToolManager = new ToolManager(Window, this, ScriptManager, addInfo);
-        PortfolioManager = new PortfolioManager(this, addInfo);
+        ScriptManager = new ScriptManager(Window, this, AddInfo);
+        ToolManager = new ToolManager(Window, this, ScriptManager, AddInfo);
+        PortfolioManager = new PortfolioManager(this, AddInfo);
     }
-
-    public TradingSystem(Window window, AddInformation addInfo, Func<NetworkCredential> getCredential,
-        Type connectorType, Portfolio portfolio, Settings settings,
-        IEnumerable<Tool> tools, IEnumerable<Trade> trades) :
-        this(window, addInfo, getCredential, connectorType, portfolio, settings)
-    {
-        Tools = new(tools);
-        Trades = new(trades);
-    }
-
 
     public void Start()
     {
         if (Connector.GetType() == typeof(TXmlConnector) && File.Exists("txmlconnector64.dll") ||
             Connector.GetType() == typeof(BnbConnector))
         {
-            if (!Connector.Initialized) Connector.Initialize(Settings.LogLevelConnector);
+            if (!Connector.Initialized) Connector.Initialize(Settings.DeepLog ? 3 : 2);
         }
         else
         {
@@ -99,45 +87,41 @@ public class TradingSystem
         await Connector.OrderPortfolioInfoAsync(Portfolio);
         if (!ReadyToTrade)
         {
-            await Connector.OrderPreTradingData();
-            await PrepareToolsAsync();
-
-            if (DateTime.Now < DateTime.Today.AddHours(7)) ClearObsoleteData();
-            if (Connector.Connection != ConnectionState.Connected) return;
-            ReadyToTrade = true;
-            AddInfo("System is ready to trade.", false);
+            if (await Connector.PrepareForTradingAsync() && await PrepareToolsAsync())
+            {
+                if (ServerTime < DateTime.Today.AddHours(7)) ClearObsoleteData();
+                if (Connector.Connection != ConnectionState.Connected) return;
+                ReadyToTrade = true;
+                AddInfo("System is ready to trade.", false);
+            }
+            else if (Connector.Connection == ConnectionState.Connected)
+                await Connector.DisconnectAsync();
         }
         else
         {
-            foreach (var tool in Tools) await ToolManager.RequestBarsAsync(tool);
+            foreach (var tool in Tools) await Connector.RequestBarsAsync(tool);
             AddInfo("PrepareForTrading: bars updated.", false);
         }
     }
 
-    private async Task PrepareToolsAsync()
+    private async Task<bool> PrepareToolsAsync()
     {
         foreach (var tool in Tools)
         {
-            if (Connector.Connection != ConnectionState.Connected) return;
+            if (Connector.Connection != ConnectionState.Connected) return false;
             ScriptManager.BringOrdersInLine(tool);
 
             if (tool.Active)
             {
-                if (tool.Security.Bars == null || tool.BasicSecurity != null && tool.BasicSecurity.Bars == null)
-                {
-                    await ToolManager.ChangeActivityAsync(tool);
-                    AddInfo("PrepareForTrading: " + tool.Name + " deactivated because there is no bars.");
-                }
-                else
-                {
-                    await Connector.SubscribeToTradesAsync(tool.Security);
-                    if (tool.BasicSecurity != null) await Connector.SubscribeToTradesAsync(tool.BasicSecurity);
-                }
+                if (!await Connector.SubscribeToTradesAsync(tool.Security)) return false;
+                if (tool.BasicSecurity != null &&
+                    !await Connector.SubscribeToTradesAsync(tool.BasicSecurity)) return false;
             }
 
-            await Connector.OrderSecurityInfoAsync(tool.Security);
-            await ToolManager.RequestBarsAsync(tool);
+            if (!await Connector.RequestBarsAsync(tool) ||
+                !await Connector.OrderSecurityInfoAsync(tool.Security)) return false;
         }
+        return true;
     }
 
 
@@ -145,15 +129,15 @@ public class TradingSystem
     {
         while (IsWorking)
         {
-            if (DateTime.Now > triggerCheckState)
+            if (ServerTime > triggerCheckState)
             {
-                triggerCheckState = DateTime.Now.AddSeconds(1);
+                triggerCheckState = ServerTime.AddSeconds(1);
                 try
                 {
-                    if (Connector.Connection == ConnectionState.Connected) await UpdateStateAsync();
+                    if (Connector.ReconnectTime) await ResetAsync();
+                    else if (Connector.Connection == ConnectionState.Connected) await UpdateStateAsync();
                     else if (Connector.Connection == ConnectionState.Connecting) await ReconnectAsync();
-                    else if (DateTime.Now > DateTime.Today.AddMinutes(400)) await ConnectAsync();
-                    else if (DateTime.Now.Hour == 1 && DateTime.Now.Minute == 0) await ResetAsync();
+                    else await ConnectAsync();
                 }
                 catch (Exception ex)
                 {
@@ -167,31 +151,29 @@ public class TradingSystem
 
     private async Task UpdateStateAsync()
     {
-        if (ReadyToTrade && DateTime.Now > triggerCheckPortfolio)
+        if (ReadyToTrade && ServerTime > triggerCheckPortfolio)
         {
-            triggerCheckPortfolio = DateTime.Now.AddSeconds(330 - DateTime.Now.Second);
+            triggerCheckPortfolio = ServerTime.AddSeconds(330 - ServerTime.Second);
             await PortfolioManager.CheckPortfolioAsync();
         }
 
-        if (ReadyToTrade && DateTime.Now > triggerRecalc) await RecalculateToolsAsync();
-        else if (DateTime.Now > triggerUpdateModels)
+        if (ReadyToTrade && ServerTime > triggerRecalc) await RecalculateToolsAsync();
+        else if (ServerTime > triggerUpdateModels)
         {
-            triggerUpdateModels = DateTime.Now.AddSeconds(Settings.ModelUpdateInterval);
+            triggerUpdateModels = ServerTime.AddSeconds(Settings.ModelUpdateInterval);
             foreach (var tool in Tools) if (tool.Active) ToolManager.UpdateView(tool, false);
         }
 
-        if (DateTime.Now > triggerRequestInfo)
+        if (ServerTime > triggerRequestInfo)
         {
-            var min = DateTime.Now.Minute;
+            var min = ServerTime.Minute;
             var minutes = min < 25 ? 25 - min : min < 55 ? 55 - min : 85 - min;
-            triggerRequestInfo = DateTime.Now.AddMinutes(minutes);
+            triggerRequestInfo = ServerTime.AddMinutes(minutes);
             await Connector.OrderPortfolioInfoAsync(Portfolio);
             foreach (var tool in Tools) await Connector.OrderSecurityInfoAsync(tool.Security);
         }
 
-        if (Settings.ScheduledConnection && DateTime.Now.Minute == 50 &&
-            DateTime.Now < DateTime.Today.AddMinutes(400)) await Connector.DisconnectAsync();
-        else if (!ReadyToTrade)
+        if (!ReadyToTrade)
         {
             await Task.Delay(5000);
             if (!ReadyToTrade && Connector.Connection == ConnectionState.Connected) _ = Task.Run(PrepareForTrading);
@@ -202,24 +184,24 @@ public class TradingSystem
     {
         if (Settings.ScheduledConnection)
         {
-            if (Connector.ServerAvailable || DateTime.Now > Connector.ReconnectionTrigger)
+            if (Connector.ServerAvailable || ServerTime > Connector.ReconnectTrigger)
             {
-                var cred = GetCredential();
+                var cred = Window.GetCredential();
                 if (cred.UserName.Length > 0 && cred.SecurePassword.Length > 0)
                     await Connector.ConnectAsync(cred.UserName, cred.SecurePassword);
             }
         }
-        else if (DateTime.Now.Minute is 0 or 30) Settings.ScheduledConnection = true;
+        else if (ServerTime.Minute is 0 or 30) Settings.ScheduledConnection = true;
     }
 
     private async Task ReconnectAsync()
     {
-        if (DateTime.Now > Connector.ReconnectionTrigger)
+        if (ServerTime > Connector.ReconnectTrigger)
         {
             await Connector.DisconnectAsync();
             if (!Settings.ScheduledConnection)
             {
-                var cred = GetCredential();
+                var cred = Window.GetCredential();
                 await Connector.ConnectAsync(cred.UserName, cred.SecurePassword);
             }
         }
@@ -227,30 +209,30 @@ public class TradingSystem
 
     private async Task ResetAsync()
     {
-        Connector.BackupServer = false;
-        Logger.Stop();
-        Logger.Start();
-        await FileManager.ArchiveFiles("Logs/Transaq", DateTime.Now.AddDays(-1).ToString("yyyyMMdd"),
-            DateTime.Now.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
-        await FileManager.ArchiveFiles("Data", ".xml", "Data", false);
+        if (Connector.Connection != ConnectionState.Disconnected)
+            await Connector.DisconnectAsync();
+        await Task.Delay(10000);
+        await Window.ResetAsync();
         PortfolioManager.UpdateEquity();
         PortfolioManager.UpdatePositions();
-        await Task.Delay(65000);
+        await Connector.ResetAsync();
+        await ConnectAsync();
+        await Task.Delay(120000);
     }
 
 
     private async Task RecalculateToolsAsync()
     {
-        triggerRecalc = DateTime.Now.AddSeconds(Settings.RecalcInterval);
+        triggerRecalc = ServerTime.AddSeconds(RecalcInterval);
         if (triggerRecalc.Second < 10) triggerRecalc = triggerRecalc.AddSeconds(10);
         else if (triggerRecalc.Second > 55) triggerRecalc = triggerRecalc.AddSeconds(-4);
 
-        triggerUpdateModels = DateTime.Now.AddSeconds(Settings.ModelUpdateInterval);
+        triggerUpdateModels = ServerTime.AddSeconds(Settings.ModelUpdateInterval);
         foreach (var tool in Tools)
         {
             if (tool.Active)
             {
-                if (DateTime.Now > tool.TimeNextRecalc) await ToolManager.CalculateAsync(tool);
+                if (ServerTime > tool.NextRecalc) await ToolManager.CalculateAsync(tool);
                 ToolManager.UpdateView(tool, false);
             }
         }
@@ -258,7 +240,7 @@ public class TradingSystem
 
     private void ClearObsoleteData()
     {
-        var old = Trades.ToArray().Where(x => x.DateTime.Date < DateTime.Today.AddDays(-Settings.ShelfLifeTrades));
+        var old = Trades.ToArray().Where(x => x.Time.Date < DateTime.Today.AddDays(-7));
         Window.Dispatcher.Invoke(() =>
         {
             foreach (var trade in old) Trades.Remove(trade);

@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace ProSystem.Services;
+﻿namespace ProSystem.Services;
 
 public interface IScriptManager
 {

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace ProSystem;
+﻿namespace ProSystem;
 
 public static class BarsExtensions
 {
@@ -12,15 +8,8 @@ public static class BarsExtensions
         if (firstBar < 0 || firstBar >= bars.DateTime.Length)
             throw new ArgumentException("The first bar is < 0 or >= length", nameof(firstBar));
 
-        return new(bars.TF)
-        {
-            DateTime = bars.DateTime[firstBar..],
-            Open = bars.Open[firstBar..],
-            High = bars.High[firstBar..],
-            Low = bars.Low[firstBar..],
-            Close = bars.Close[firstBar..],
-            Volume = bars.Volume[firstBar..]
-        };
+        return new(bars.DateTime[firstBar..], bars.Open[firstBar..], bars.High[firstBar..],
+            bars.Low[firstBar..], bars.Close[firstBar..], bars.Volume[firstBar..], bars.TF);
     }
 
     public static void Write(this Bars bars, string name)
@@ -44,10 +33,10 @@ public static class BarsExtensions
         if (sourceBars == null || sourceBars.DateTime == null) throw new ArgumentNullException(nameof(sourceBars));
         if (tf == sourceBars.TF) return sourceBars;
         if (tf < 5 || tf > 780 || tf % sourceBars.TF != 0)
-            throw new ArgumentException("Сжатие в заданный ТФ невозможно", nameof(sourceBars));
+            throw new ArgumentException("Tf is not correct", nameof(sourceBars));
 
-        List<DateTime> bDateTime = new();
-        List<double> bOpen = new(), bHigh = new(), bLow = new(), bClose = new(), bVolume = new();
+        List<DateTime> bDateTime = [];
+        List<double> bOpen = [], bHigh = [], bLow = [], bClose = [], bVolume = [];
 
         int countMarks = (int)Math.Ceiling(1440D / tf);
         TimeSpan timeSpanTF = TimeSpan.FromMinutes(tf);
@@ -61,9 +50,9 @@ public static class BarsExtensions
         TimeSpan endTimeBigBar = timeMarks.First(x => x > bars.DateTime[0].TimeOfDay);
         for (int i = 0, j; i < bars.DateTime.Length; i++)
         {
-            if (i + 1 == bars.DateTime.Length || bars.DateTime[i].Date != bars.DateTime[i + 1].Date) // Последний бар дня/истории
+            if (i + 1 == bars.DateTime.Length || bars.DateTime[i].Date != bars.DateTime[i + 1].Date)
             {
-                if (bars.DateTime[i].TimeOfDay >= endTimeBigBar) // Формирование доп. большого бара перед последним большим баром
+                if (bars.DateTime[i].TimeOfDay >= endTimeBigBar)
                 {
                     for (j = startBigBar + 1, min = bars.Low[startBigBar], max = bars.High[startBigBar],
                         sum = bars.Volume[startBigBar]; j < i; j++)
@@ -101,7 +90,7 @@ public static class BarsExtensions
                 startBigBar = i + 1;
                 endTimeBigBar = i + 1 < bars.Close.Length ? timeMarks.First(x => x > bars.DateTime[i + 1].TimeOfDay) : timeMarks[0];
             }
-            else if (bars.DateTime[i].TimeOfDay >= endTimeBigBar) // Открылся следующий большой бар, сжатие предыдущего
+            else if (bars.DateTime[i].TimeOfDay >= endTimeBigBar)
             {
                 endBigBar = i - 1;
                 for (j = startBigBar + 1, min = bars.Low[startBigBar], max = bars.High[startBigBar],
@@ -124,8 +113,7 @@ public static class BarsExtensions
             }
         }
 
-        return new Bars(bDateTime.ToArray(), bOpen.ToArray(),
-            bHigh.ToArray(), bLow.ToArray(), bClose.ToArray(), bVolume.ToArray(), tf);
+        return new Bars([.. bDateTime], [.. bOpen], [.. bHigh], [.. bLow], [.. bClose], [.. bVolume], tf);
     }
 
     private static Bars GetCopyAndCheck(Bars sourceBars)
@@ -142,7 +130,7 @@ public static class BarsExtensions
                     System.Threading.Thread.Sleep(1000);
                     bars = sourceBars.GetCopy();
                 }
-                else throw new ArgumentException("Несоответствие массивов DT/O/H/L/C/V: " +
+                else throw new ArgumentException("Arrays have different length: DT/O/H/L/C/V: " +
                     bars.DateTime.Length + "/" + bars.Open.Length + "/" + bars.High.Length + "/" +
                     bars.Low.Length + "/" + bars.Close.Length + "/" + bars.Volume.Length);
             }

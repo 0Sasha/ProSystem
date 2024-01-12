@@ -1,5 +1,4 @@
-﻿using System;
-namespace ProSystem.Services;
+﻿namespace ProSystem.Services;
 
 public interface INotifier
 {

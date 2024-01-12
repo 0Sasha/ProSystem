@@ -1,260 +1,218 @@
-﻿using System;
-using System.Linq;
+﻿using Newtonsoft.Json;
 using System.ComponentModel;
-using System.Collections.Generic;
-using static ProSystem.MainWindow;
 
 namespace ProSystem;
 
 [Serializable]
 public class Settings : INotifyPropertyChanged
 {
-    private int UpdInt = 5;
-    private int RecInt = 30;
+    private int modelUpdateInterval = 5;
+    private bool scheduledConnection = true;
 
-    private int ReqTM = 15;
-    private int SesTM = 180;
-    private bool SchedCon = true;
+    private int toleranceEquity = 40;
+    private int tolerancePosition = 3;
+    private int optShareBaseAssets = 90;
+    private int toleranceBaseAssets = 5;
+    private int initialLeverage = 1;
 
-    private int TolEq = 40;
-    private int TolPos = 3;
-    private int OptShBasAssets = 90;
-    private int TolBasAssets = 5;
+    private int maxShareInitReqsPosition = 10;
+    private int maxShareInitReqsTool = 25;
+    private int maxShareMinReqsPortfolio = 60;
+    private int maxShareInitReqsPortfolio = 85;
 
-    private int MaxShInRePos = 10;
-    private int MaxShInReTool = 25;
-    private int MaxShMinRePort = 60;
-    private int MaxShInRePort = 85;
+    [JsonIgnore]
+    [field: NonSerialized]
+    private AddInformation AddInfo = (_, _, _) => { };
 
-    public List<string> ToolsByPriority { get; set; } = new(); // Приоритетность инструментов
+    [field: NonSerialized]
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public List<string> ToolsByPriority { get; set; } = [];
+
     public int ModelUpdateInterval
     {
-        get => UpdInt;
+        get => modelUpdateInterval;
         set
         {
             if (value is < 1 or > 600)
             {
-                Window.AddInfo("ModelUpdateInterval должен быть от 1 до 600.");
-                if (UpdInt is < 1 or > 600) UpdInt = 5;
+                modelUpdateInterval = 5;
+                AddInfo("ModelUpdateInterval is 5");
             }
-            else UpdInt = value;
+            else modelUpdateInterval = value;
             Notify();
         }
-    } // Интервал обновления моделей
-    public int RecalcInterval
-    {
-        get => RecInt;
-        set
-        {
-            if (value is < 5 or > 120)
-            {
-                Window.AddInfo("RecalcInterval должен быть от 5 до 120.");
-                if (RecInt is < 5 or > 120) RecInt = 30;
-            }
-            else RecInt = value;
-            Notify();
-        }
-    } // Интервал пересчёта скриптов
+    }
+
     public bool ScheduledConnection
     {
-        get => SchedCon;
+        get => scheduledConnection;
         set
         {
-            SchedCon = value;
-            if (!SchedCon) Window.AddInfo("Подключение по расписанию отключено.");
+            scheduledConnection = value;
+            if (!scheduledConnection) AddInfo("Scheduled connection is disabled");
             Notify();
         }
-    } // Подключение по расписанию
+    }
 
-    public bool DisplayMessages { get; set; } // Отображение сообщений в информационной панели
-    public bool DisplaySentOrders { get; set; } // Отображение успешно отправленных заявок в информационной панели
-    public bool DisplayNewTrades { get; set; } // Отображение новых сделок в информационной панели
-    public bool DisplaySpecialInfo { get; set; } // Отображение особой информации в информационной панели
+    public bool DeepLog { get; set; }
 
-    public string LoginConnector { get; set; } // Логин для подключения к серверу
-    public short LogLevelConnector { get; set; } = 2; // Уровень логирования коннектора
-    public int RequestTM
-    {
-        get => ReqTM;
-        set
-        {
-            if (value is < 5 or > 30)
-            {
-                Window.AddInfo("RequestTM должен быть от 5 до 30.");
-                if (ReqTM is < 5 or > 30) ReqTM = 15;
-            }
-            else ReqTM = value;
-            Notify();
-        }
-    } // Таймаут на выполнение запроса (20 по умолчанию)
-    public int SessionTM
-    {
-        get => SesTM;
-        set
-        {
-            if (value is < 40 or > 300)
-            {
-                Window.AddInfo("SessionTM должен быть от 40 до 300.");
-                if (SesTM is < 40 or > 300) SesTM = 180;
-            }
-            else SesTM = value;
-            Notify();
-        }
-    } // Таймаут на переподключение к серверу без повторной закачки данных (120 по умолчанию)
+    public bool DisplaySentOrders { get; set; }
 
-    public string Email { get; set; } // Email для уведомлений
-    public string EmailPassword { get; set; }
+    public bool DisplayNewTrades { get; set; }
+
+    public bool DisplaySpecialInfo { get; set; }
+
+    public string Connector { get; set; } = nameof(BnbConnector);
+
+    public string LoginConnector { get; set; } = string.Empty;
+
+    public string Email { get; set; } = string.Empty;
+
+    public string EmailPassword { get; set; } = string.Empty;
 
     public int ToleranceEquity
     {
-        get => TolEq;
+        get => toleranceEquity;
         set
         {
-            if (value is < 5 or > 300)
-            {
-                Window.AddInfo("ToleranceEquity должно быть от 5% до 300%.");
-                if (TolEq is < 5 or > 300) TolEq = 40;
-            }
-            else TolEq = value;
-            if (TolEq > 50) Window.AddInfo("ToleranceEquity более 50% от среднего значения.");
+            if (value is < 5 or > 300) toleranceEquity = 40;
+            else toleranceEquity = value;
+            if (toleranceEquity > 50) AddInfo("ToleranceEquity is more than 50%");
             Notify();
         }
-    } // Допустимое отклонение стоимости портфеля в % от среднего значения
+    }
+
     public int TolerancePosition
     {
-        get => TolPos;
+        get => tolerancePosition;
         set
         {
-            if (value is < 1 or > 5)
-            {
-                Window.AddInfo("TolerancePosition должно быть от 1x до 5x.");
-                if (TolPos is < 1 or > 5) TolPos = 3;
-            }
-            else TolPos = value;
+            if (value is < 1 or > 5) tolerancePosition = 3;
+            else tolerancePosition = value;
             Notify();
         }
-    } // Допустимое отклонение объёма текущей позиции в X от рассчитанного объёма
+    }
 
     public int OptShareBaseAssets
     {
-        get => OptShBasAssets;
+        get => optShareBaseAssets;
         set
         {
             if (value is < 1 or > 150)
             {
-                Window.AddInfo("OptShareBaseBalances должна быть от 1% до 150%.");
-                if (OptShBasAssets is < 1 or > 150) OptShBasAssets = 90;
+                optShareBaseAssets = 90;
+                AddInfo("OptShareBaseAssets is 90%");
             }
-            else OptShBasAssets = value;
+            else optShareBaseAssets = value;
             Notify();
         }
-    } // Оптимальная доля базовых активов (балансов) в портфеле
+    }
+
     public int ToleranceBaseAssets
     {
-        get => TolBasAssets;
+        get => toleranceBaseAssets;
         set
         {
-            if (value is < 1 or > 150) Window.AddInfo("ToleranceBaseBalances должно быть от 1% до 150%.");
-            else TolBasAssets = value;
+            if (value is < 1 or > 150)
+            {
+                toleranceBaseAssets = 5;
+                AddInfo("ToleranceBaseAssets is 5");
+            }
+            else toleranceBaseAssets = value;
             Notify();
         }
-    } // Допустимое отклонение доли базовых активов (балансов) от оптимального значения
+    }
 
     public int MaxShareInitReqsPosition
     {
-        get => MaxShInRePos;
+        get => maxShareInitReqsPosition;
         set
         {
-            if (value is < 1 or > 50)
+            if (value is < 1 or > 75)
             {
-                Window.AddInfo("MaxShareInitReqsPosition должна быть от 1% до 50%.");
-                if (MaxShInRePos is < 1 or > 50) MaxShInRePos = 15;
+                maxShareInitReqsPosition = 15;
+                AddInfo("MaxShareInitReqsPosition is 15%");
             }
-            else MaxShInRePos = value;
-            if (MaxShInRePos > 15) Window.AddInfo("MaxShareInitReqsPosition более 15%.");
+            else maxShareInitReqsPosition = value;
+            if (maxShareInitReqsPosition > 15) AddInfo("MaxShareInitReqsPosition is more than 15%.");
             Notify();
         }
-    } // Максимальная доля начальных требований позиции (без учёта смещения баланса)
+    }
+
     public int MaxShareInitReqsTool
     {
-        get => MaxShInReTool;
+        get => maxShareInitReqsTool;
         set
         {
             if (value is < 1 or > 150)
             {
-                Window.AddInfo("MaxShareInitReqsTool должна быть от 1% до 150%.");
-                if (MaxShInReTool is < 1 or > 150) MaxShInReTool = 25;
+                maxShareInitReqsTool = 25;
+                AddInfo("MaxShareInitReqsTool is 25%");
             }
-            else MaxShInReTool = value;
-            if (MaxShInReTool > 35) Window.AddInfo("MaxShareInitReqsTool более 35%.");
+            else maxShareInitReqsTool = value;
+            if (maxShareInitReqsTool > 35) AddInfo("MaxShareInitReqsTool is more than 35%.");
             Notify();
         }
-    } // Максимальная доля начальных требований инструмента (с учётом смещения баланса)
+    }
 
     public int MaxShareMinReqsPortfolio
     {
-        get => MaxShMinRePort;
+        get => maxShareMinReqsPortfolio;
         set
         {
             if (value is < 10 or > 95)
             {
-                Window.AddInfo("MaxShareMinReqsPortfolio должна быть от 10% до 95%.");
-                if (MaxShMinRePort is < 10 or > 95) MaxShMinRePort = 60;
+                maxShareMinReqsPortfolio = 60;
+                AddInfo("MaxShareMinReqsPortfolio is 60%");
             }
-            else MaxShMinRePort = value;
-            if (MaxShMinRePort > 70) Window.AddInfo("MaxShareMinReqsPortfolio более 70%.");
+            else maxShareMinReqsPortfolio = value;
+            if (maxShareMinReqsPortfolio > 70) AddInfo("MaxShareMinReqsPortfolio is more than 70%.");
             Notify();
         }
-    } // Максимальная доля минимальных требований портфеля
+    }
+
     public int MaxShareInitReqsPortfolio
     {
-        get => MaxShInRePort;
+        get => maxShareInitReqsPortfolio;
         set
         {
             if (value is < 10 or > 200)
             {
-                Window.AddInfo("MaxShareInitReqsPortfolio должна быть от 10% до 200%.");
-                if (MaxShInRePort is < 10 or > 200) MaxShInRePort = 85;
+                maxShareInitReqsPortfolio = 85;
+                AddInfo("MaxShareInitReqsPortfolio is 85%");
             }
-            else MaxShInRePort = value;
-            if (MaxShInRePort > 95) Window.AddInfo("MaxShareInitReqsPortfolio более 95%.");
+            else maxShareInitReqsPortfolio = value;
+            if (maxShareInitReqsPortfolio > 95) AddInfo("MaxShareInitReqsPortfolio is more than 95%.");
             Notify();
         }
-    } // Максимальная доля начальных требований портфеля
+    }
 
-    public int ShelfLifeTrades { get; set; } = 60; // Срок хранения всех сделок (в днях)
-    public int ShelfLifeOrdersScripts { get; set; } = 90; // Срок хранения заявок скриптов (в днях)
-    public int ShelfLifeTradesScripts { get; set; } = 180; // Срок хранения сделок скриптов (в днях)
+    public int InitialLeverage
+    {
+        get => initialLeverage;
+        set
+        {
+            if (value is < 1 or > 3)
+            {
+                initialLeverage = 1;
+                AddInfo("InitialLeverage is 1");
+            }
+            else initialLeverage = value;
+            Notify();
+        }
+    }
 
-    [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
-
-    private void Notify(string propertyName = "") =>
+    private void Notify(string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    public Settings() { }
-
-    public void Check(IEnumerable<Tool> tools)
+    public void Prepare(IList<Tool> tools, AddInformation addInfo)
     {
-        ModelUpdateInterval = UpdInt;
-        RecalcInterval = RecInt;
-        RequestTM = ReqTM;
-        SessionTM = SesTM;
-
-        ToleranceEquity = TolEq;
-        TolerancePosition = TolPos;
-        OptShareBaseAssets = OptShBasAssets;
-        ToleranceBaseAssets = TolBasAssets;
-
-        MaxShareInitReqsPosition = MaxShInRePos;
-        MaxShareInitReqsTool = MaxShInReTool;
-        MaxShareMinReqsPortfolio = MaxShMinRePort;
-        MaxShareInitReqsPortfolio = MaxShInRePort;
-
-        if (tools.Count() != ToolsByPriority.Count || tools.Where(x => !ToolsByPriority.Contains(x.Name)).Any())
+        AddInfo = addInfo;
+        if (tools.Count != ToolsByPriority.Count || tools.Where(x => !ToolsByPriority.Contains(x.Name)).Any())
         {
-            ToolsByPriority.Clear();
-            foreach (Tool tool in tools) ToolsByPriority.Add(tool.Name);
-            Window.AddInfo("ToolsByPriority по умолчанию.");
+            ToolsByPriority = tools.Select(t => t.Name).ToList();
+            AddInfo("ToolsByPriority are by default.");
         }
     }
 }

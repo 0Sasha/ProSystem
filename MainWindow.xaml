@@ -7,7 +7,7 @@
         xmlns:local="clr-namespace:ProSystem"
         mc:Ignorable="d"
         Closing="ClosingMainWindow" Style="{StaticResource MainWindowStyle}"
-        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="1050" FontSize="14">
+        Title="ProSystem" Height="950" Width="1500" MinHeight="500" MinWidth="800" FontSize="14">
     <Window.Resources>
         <Style x:Key="Narrow" TargetType="ListViewItem" BasedOn="{StaticResource typViewItem}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -15,34 +15,37 @@
             <Setter Property="Height" Value="18"/>
         </Style>
         <DataTemplate x:Key="SaldoIn">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=SaldoIn, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="PL">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=PL, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=PL, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="Saldo">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Saldo, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Saldo, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="UnrealPL">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=UnrealPL, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=UnrealPL, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="FinRes">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=FinRes, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=FinRes, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="InitReqs">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=InitReqs, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=InitReqs, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="MinReqs">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MinReqs, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=MinReqs, StringFormat=N2, ConverterCulture=ru}"/>
+        </DataTemplate>
+        <DataTemplate x:Key="Free">
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Free, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="VarMargin">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=VarMargin, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=VarMargin, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="Average">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=AverageEquity, StringFormat=N0, ConverterCulture=ru}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=AverageEquity, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="LastTrade">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.LastTrade.Price, StringFormat=### ### ###.##}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.LastTrade.Price, StringFormat=N2}"/>
         </DataTemplate>
         <DataTemplate x:Key="InitReqLong">
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.InitReqLong, StringFormat=N2}"/>
@@ -60,35 +63,24 @@
         <TabControl Name="MainTabs" BorderBrush="{StaticResource txtBorder}">
             <TabItem Header="Main" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
                 <Grid Margin="0,1">
-                    <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="240" Height="180" VerticalAlignment="Top">
+                    <Grid HorizontalAlignment="Left" Margin="10,10,0,0" Width="240" Height="570" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Connector" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <ComboBox Name="BoxConnectors" HorizontalAlignment="Left" Margin="90,0,0,0" VerticalAlignment="Top" Width="150" Height="24"/>
+                        <ComboBox Name="BoxConnectors" IsEnabled="False" HorizontalAlignment="Left" Margin="90,0,0,0" VerticalAlignment="Top" Width="150" Height="24"/>
                         <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Login" VerticalAlignment="Top" FontWeight="Bold"/>
                         <TextBox Name="TxtLog" HorizontalAlignment="Left" Margin="90,30,0,0" VerticalAlignment="Top" Width="150" Height="24" TextAlignment="Left"/>
                         <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Password" VerticalAlignment="Top" FontWeight="Bold"/>
                         <PasswordBox Name="TxtPas" HorizontalAlignment="Left" Margin="90,60,0,0" VerticalAlignment="Top" Width="150" Height="24" HorizontalContentAlignment="Left"/>
                         <Button Name="ConnectBtn" Content="Connect" HorizontalAlignment="Left" Margin="90,90,0,0" VerticalAlignment="Top"
                                 Click="ChangeСonnection" Width="150" Height="24"/>
+
+                        <CheckBox Name="ScheduleCheck" Content="Scheduled connection" HorizontalAlignment="Left" Margin="0,133,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="BackupServerCheck" Content="Backup server address" HorizontalAlignment="Left" Margin="0,163,0,0" VerticalAlignment="Top"/>
+
+                        <CheckBox Name="DisplaySentOrdersCheck" Content="Display sent orders" HorizontalAlignment="Left" Margin="0,203,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="DisplayNewTradesCheck" Content="Display new trades" HorizontalAlignment="Left" Margin="0,233,0,0" VerticalAlignment="Top"/>
+                        <CheckBox Name="DisplaySpecialInfoCheck" Content="Display special information" HorizontalAlignment="Left" Margin="0,263,0,0" VerticalAlignment="Top"/>
                     </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="10,200,0,0" Width="240" Height="180" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Connector settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Logging level" VerticalAlignment="Top"/>
-                        <TextBox Name="ConnectorLogLevelTxt" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Request timeout" VerticalAlignment="Top"/>
-                        <TextBox Name="RequestTxt" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="1,93,0,0" Text="Session timeout" VerticalAlignment="Top"/>
-                        <TextBox Name="SessionTxt" HorizontalAlignment="Left" Margin="200,90,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                    </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="270,10,0,0" Width="240" Height="180" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="General settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Model update interval" VerticalAlignment="Top"/>
-                        <TextBox Name="IntervalUpdateTxt" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Recalculation interval" VerticalAlignment="Top"/>
-                        <TextBox Name="IntervalRecalcTxt" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                        <CheckBox Name="ScheduleCheck" Content="Scheduled connection" HorizontalAlignment="Left" Margin="0,93,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="BackupServerCheck" Content="Backup server address" HorizontalAlignment="Left" Margin="0,123,0,0" VerticalAlignment="Top"/>
-                    </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="530,10,0,0" Width="490" Height="570" VerticalAlignment="Top">
+                    <Grid HorizontalAlignment="Left" Margin="270,10,0,0" Width="490" Height="570" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Average equity for 5 days" VerticalAlignment="Top"/>
@@ -154,23 +146,6 @@
                             </ListView.ContextMenu>
                         </ListView>
                     </Grid>
-
-                    <Grid HorizontalAlignment="Left" Margin="10,390,0,0" Width="240" Height="180" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Information panel settings" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <CheckBox Name="DisplayMessagesCheck" Content="Display messages" HorizontalAlignment="Left" Margin="0,30,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="DisplaySentOrdersCheck" Content="Display sent orders" HorizontalAlignment="Left" Margin="0,60,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="DisplayNewTradesCheck" Content="Display new trades" HorizontalAlignment="Left" Margin="0,90,0,0" VerticalAlignment="Top"/>
-                        <CheckBox Name="DisplaySpecialInfoCheck" Content="Display special information" HorizontalAlignment="Left" Margin="0,120,0,0" VerticalAlignment="Top"/>
-                    </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="270,200,0,0" Width="240" Height="180" VerticalAlignment="Top">
-                        <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Data management" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Shelf life trades" VerticalAlignment="Top"/>
-                        <TextBox Name="ShelflifeTradesTxt" HorizontalAlignment="Left" Margin="200,30,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,63,0,0" Text="Shelf life orders scripts" VerticalAlignment="Top"/>
-                        <TextBox Name="ShelflifeOrdersScriptsTxt" HorizontalAlignment="Left" Margin="200,60,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                        <TextBlock HorizontalAlignment="Left" Margin="0,93,0,0" Text="Shelf life trades scripts" VerticalAlignment="Top"/>
-                        <TextBox Name="ShelflifeTradesScriptsTxt" HorizontalAlignment="Left" Margin="200,90,0,0" VerticalAlignment="Top" Height="24" Width="40"/>
-                    </Grid>
                 </Grid>
             </TabItem>
             <TabItem Header="Portfolio" Width="100" Height="28" VerticalAlignment="Top" Margin="28,0,-28,0">
@@ -189,22 +164,18 @@
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Sender}" Width="120">Sender</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Price}" Width="60">Price</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BuySell}" Width="25">B/S</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Quantity}" Width="25">Vol</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Balance}" Width="25">Bal</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Status}" Width="100">Status</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Side}" Width="30">Side</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Quantity}" Width="35">Qty</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Balance}" Width="35">Bal</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Type}" Width="70">Type</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=InitType}" Width="70">InitType</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Status}" Width="80">Status</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Time, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">Time</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=AcceptTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">Accept time</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=DateTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">DateTime change</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=WithdrawTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">Withdraw time</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Condition}" Width="100">Condition</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=ConditionValue}" Width="0">Condition value</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=ValidAfter, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="0">Valid after</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=ValidBefore, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="0">Valid before</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=ChangeTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">ChangeTime</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=TrID}" Width="80">TrID</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Id}" Width="100">Id</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Signal}" Width="140">Signal</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Note}" Width="80">Note</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=TrID}" Width="80">TrID</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderNo}" Width="80">OrderNo</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -220,13 +191,14 @@
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Price}" Width="60">Price</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BuySell}" Width="25">B/S</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Side}" Width="25">Side</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Quantity}" Width="25">Vol</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=DateTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">DateTime</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=SenderOrder}" Width="90">Sender</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=SignalOrder}" Width="140">Signal</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=NoteOrder}" Width="80">Note</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=TradeNo}" Width="80">TradeNo</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Time, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">DateTime</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderSender}" Width="90">Sender</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderSignal}" Width="140">Signal</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderNote}" Width="80">Note</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Commission}" Width="80">Commission</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Id}" Width="80">Id</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -239,10 +211,9 @@
                     <ListView Grid.Row="1" Margin="0,3" Name="PortfolioView" Grid.ColumnSpan="2" ItemContainerStyle="{StaticResource Narrow}">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=MarketName}" Width="100">Market</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=ShortName}" Width="180">Name</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="70">Seccode</GridViewColumn>
-                                <GridViewColumn CellTemplate="{StaticResource SaldoIn}" Width="150">Incoming position</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource SaldoIn}" Width="120">Incoming position</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource FinRes}" Width="95">FinRes</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource VarMargin}" Width="95">VarMargin</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource PL}" Width="150">P/L</GridViewColumn>
@@ -251,6 +222,7 @@
                                 <GridViewColumn CellTemplate="{StaticResource UnrealPL}" Width="95">Unreal P/L</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource InitReqs}" Width="95">Requirements</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource MinReqs}" Width="95">MinReqs</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource Free}" Width="95">Free</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -267,8 +239,8 @@
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Width="60">Name</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ShortName}" Width="90">Security</GridViewColumn>
-                                <GridViewColumn CellTemplate="{StaticResource LastTrade}" Width="70">Last trade</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ShortName}" Width="90">Security name</GridViewColumn>
+                                <GridViewColumn CellTemplate="{StaticResource LastTrade}" Width="80">Last trade</GridViewColumn>
                                 <GridViewColumn Width="60">State
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
@@ -276,23 +248,27 @@
                                         </DataTemplate>
                                     </GridViewColumn.CellTemplate>
                                 </GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Scripts.Length}" Width="45">Scripts</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Scripts.Length}" Width="20">Scripts</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Bars.Close.Length}" Width="50">Bars</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Seccode}" Width="60">Seccode</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Currency}" Width="40">Cur</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Board}" Width="45">Board</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MinStep}" Width="50">Step</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MinStepCost}" Width="40">Cost</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.LotSize}" Width="30">Lot</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.ShortName}" Width="100">Basic security</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Seccode}" Width="70">Seccode</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Currency}" Width="50">Currency</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Market}" Width="50">Market</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.TickSize}" Width="60">TickSize</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.TickPrecision}" Width="30">TickPrecision</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.TickCost}" Width="40">TickCost</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.LotSize}" Width="50">LotSize</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.LotPrecision}" Width="30">LotPrecision</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MinQty}" Width="40">MinQty</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MinPrice}" Width="60">MinPrice</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.MaxPrice}" Width="60">MaxPrice</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Seccode}" Width="100">Basic seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=BasicSecurity.Bars.Close.Length}" Width="70">Basic bars</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource InitReqLong}"  Width="100">InitReqLong</GridViewColumn>
                                 <GridViewColumn CellTemplate="{StaticResource InitReqShort}"  Width="100">InitReqShort</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Security.RiskrateLong}" Width="50">RiskL</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ReserateLong}" Width="50">ResL</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Security.RiskrateShort}" Width="50">RiskS</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.ReserateShort}" Width="50">ResS</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Notional}" Width="50">Notional</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Security.Deposit}" Width="50">Deposit</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -353,22 +329,18 @@
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Sender}" Width="120">Sender</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Price}" Width="60">Price</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BuySell}" Width="25">B/S</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Side}" Width="25">Side</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Quantity}" Width="25">Vol</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Balance}" Width="25">Bal</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Type}" Width="70">Type</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=InitType}" Width="70">InitType</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Status}" Width="100">Status</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Time, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">Time</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=AcceptTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">Accept time</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=DateTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">DateTime change</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=WithdrawTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">Withdraw time</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=Condition}" Width="100">Condition</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=ConditionValue}" Width="0">Condition value</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=ValidAfter, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="0">Valid after</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=ValidBefore, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="0">Valid before</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=ChangeTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">ChangeTime</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Signal}" Width="140">Signal</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Note}" Width="80">Note</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=TrID}" Width="80">TrID</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderNo}" Width="80">OrderNo</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Id}" Width="80">Id</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -382,14 +354,14 @@
                             <GridView>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Seccode}" Width="60">Seccode</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Price}" Width="60">Price</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=BuySell}" Width="25">B/S</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Side}" Width="25">Side</GridViewColumn>
                                 <GridViewColumn DisplayMemberBinding="{Binding Path=Quantity}" Width="25">Vol</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=DateTime, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">DateTime</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=SenderOrder}" Width="90">Sender</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=SignalOrder}" Width="140">Signal</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=NoteOrder}" Width="80">Note</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=TradeNo}" Width="80">TradeNo</GridViewColumn>
-                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderNo}" Width="80">OrderNo</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Time, StringFormat={}{0:d/MM/yy HH:mm:ss}}" Width="125">DateTime</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderSender}" Width="90">Sender</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderSignal}" Width="140">Signal</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderNote}" Width="80">Note</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=Id}" Width="80">Id</GridViewColumn>
+                                <GridViewColumn DisplayMemberBinding="{Binding Path=OrderId}" Width="80">OrderId</GridViewColumn>
                             </GridView>
                         </ListView.View>
                         <ListView.ContextMenu>
@@ -404,9 +376,6 @@
         <Menu VerticalAlignment="Top" HorizontalAlignment="Left" Height="28" Width="30" Margin="0,2" FontSize="14">
             <MenuItem HorizontalAlignment="Left" Height="28" Width="30">
                 <MenuItem Header="Save data" Click="SaveData"></MenuItem>
-                <MenuItem Header="Show used memory" Click="ShowUsedMemory"></MenuItem>
-                <MenuItem Header="Clear memory" Click="ClearMemory"></MenuItem>
-                <MenuItem Header="Take login details" Click="TakeLoginDetails"></MenuItem>
                 <Separator Background="{StaticResource txtBorder}"/>
                 <MenuItem Header="Resize control panel" Click="ResizeControlPanel"></MenuItem>
                 <MenuItem Header="Test">

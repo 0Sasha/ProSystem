@@ -1,59 +1,76 @@
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace ProSystem;
 
 public partial class NewTool : Window
 {
-    private Security TrSec = null;
-    private Security BsSec = null;
-    private readonly Tool SelectedTool = null;
-    private readonly List<Script> Scripts = new();
+    private Security? traded = null;
+    private Security? basic = null;
+    private readonly Tool? SelectedTool = null;
+    private readonly List<Script> Scripts = [];
     private readonly MainWindow Window;
 
-    private readonly string[] algorithms = new string[]
-    {
-        "RSI", "StochRSI", "MFI", "DeMarker", "Stochastic",
-        "CMO", "CMF", "RVI", "CCI", "DPO", "FRC", "OBV", "AD", "SumLine",
-        "CHO", "ROC", "MACD", "MA", "Channel", "CrossMA",
-        "ATRS", "PARS"
-    };
+    private readonly string[] Algorithms =
+    [
+        "RSI",
+        "StochRSI",
+        "MFI",
+        "DeMarker",
+        "Stochastic",
+        "CMO",
+        "CMF",
+        "RVI",
+        "CCI",
+        "DPO",
+        "FRC",
+        "OBV",
+        "AD",
+        "SumLine",
+        "CHO",
+        "ROC",
+        "MACD",
+        "MA",
+        "Channel",
+        "CrossMA",
+        "ATRS",
+        "PARS"
+    ];
 
-    private Security TradedSecurity
+    private Security? TradedSecurity
     {
-        get => TrSec;
+        get => traded;
         set
         {
-            TrSec = value;
-            if (TrSec == null)
+            traded = value;
+            if (traded == null)
             {
                 TradedSec.Text = "";
                 TradedBoard.Text = "";
             }
             else
             {
-                TradedSec.Text = TrSec.Seccode;
-                TradedBoard.Text = TrSec.Board;
+                TradedSec.Text = traded.Seccode;
+                TradedBoard.Text = traded.Board;
             }
         }
     }
-    private Security BasicSecurity
+    private Security? BasicSecurity
     {
-        get => BsSec;
+        get => basic;
         set
         {
-            BsSec = value;
-            if (BsSec == null)
+            basic = value;
+            if (basic == null)
             {
                 BasicSec.Text = "";
                 BasicBoard.Text = "";
             }
             else
             {
-                BasicSec.Text = BsSec.Seccode;
-                BasicBoard.Text = BsSec.Board;
+                BasicSec.Text = basic.Seccode;
+                BasicBoard.Text = basic.Board;
             }
         }
     }
@@ -67,66 +84,66 @@ public partial class NewTool : Window
         InitializeComponent();
         Window = window;
 
-        string[] MyMarkets = new string[Markets.Count];
-        for (int i = 0; i < Markets.Count; i++) MyMarkets[i] = Markets[i].Name;
-
-        System.Array.Sort(algorithms);
-        BoxMarkets.ItemsSource = MyMarkets;
-        BoxScripts.ItemsSource = algorithms;
+        Array.Sort(Algorithms);
+        BoxMarkets.ItemsSource = Markets.Select(m => m.Name);
+        BoxScripts.ItemsSource = Algorithms;
         ScriptsView.ItemsSource = Scripts;
     }
-    public NewTool(MainWindow window, Tool MyTool)
+
+    public NewTool(MainWindow window, Tool tool)
     {
         InitializeComponent();
         Window = window;
-        SelectedTool = MyTool;
+        SelectedTool = tool;
 
-        string[] MyMarkets = new string[Markets.Count];
-        for (int i = 0; i < Markets.Count; i++) MyMarkets[i] = Markets[i].Name;
-
-        BoxMarkets.ItemsSource = MyMarkets;
-        BoxScripts.ItemsSource = algorithms;
+        Array.Sort(Algorithms);
+        BoxMarkets.ItemsSource = Markets.Select(m => m.Name);
+        BoxScripts.ItemsSource = Algorithms;
 
         ToolName.Text = SelectedTool.Name;
-        Scripts = SelectedTool.Scripts.ToList();
+        Scripts = [.. SelectedTool.Scripts];
         ScriptsView.ItemsSource = Scripts;
 
         TradedSecurity = SelectedTool.Security;
         BasicSecurity = SelectedTool.BasicSecurity;
 
-        SecuritiesView.ItemsSource = new System.Collections.Generic.List<Security>() { SelectedTool.Security };
+        SecuritiesView.ItemsSource = new List<Security>() { SelectedTool.Security };
         SecuritiesView.SelectedItem = SecuritiesView.Items[0];
     }
 
-    private void SearchSecChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private void SearchSecChanged(object sender, TextChangedEventArgs e)
     {
         try
         {
-            SecuritiesView.ItemsSource = Securities.Where(x => 
+            SecuritiesView.ItemsSource = Securities.Where(x =>
                 (x.Market == null || x.Market == Markets.Single(y => y.Name == BoxMarkets.Text).ID) &&
                 (x.ShortName != null && x.ShortName.Contains(SearchSec.Text) || x.Seccode.Contains(SearchSec.Text)));
         }
         catch { }
     }
-    private void SelectionScriptChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) =>
+
+    private void SelectionScriptChanged(object sender, SelectionChangedEventArgs e) =>
         ScriptName.Text = ToolName.Text + "_" + BoxScripts.SelectedItem;
 
     private void SelectTraded(object sender, RoutedEventArgs e)
     {
         if (SecuritiesView.SelectedItem != null) TradedSecurity = SecuritiesView.SelectedItem as Security;
     }
+
     private void SelectBasic(object sender, RoutedEventArgs e)
     {
         if (SecuritiesView.SelectedItem != null) BasicSecurity = SecuritiesView.SelectedItem as Security;
     }
+
     private void RemoveTraded(object sender, RoutedEventArgs e) => TradedSecurity = null;
+
     private void RemoveBasic(object sender, RoutedEventArgs e) => BasicSecurity = null;
 
     private void AddScript(object sender, RoutedEventArgs e)
     {
         if (Scripts.SingleOrDefault(x => x.Name == ScriptName.Text) == null && BoxScripts.SelectedItem != null)
         {
-            Script newScript = BoxScripts.SelectedItem.ToString() switch
+            Script? newScript = BoxScripts.SelectedItem.ToString() switch
             {
                 "ATRS" => new Algorithms.ATRS(ScriptName.Text),
                 "PARS" => new Algorithms.PARS(ScriptName.Text),
@@ -158,6 +175,7 @@ public partial class NewTool : Window
             ScriptsView.Items.Refresh();
         }
     }
+
     private void RemoveScript(object sender, RoutedEventArgs e)
     {
         if (ScriptsView.SelectedIndex > -1)
@@ -177,7 +195,7 @@ public partial class NewTool : Window
                 var name = ToolName.Text;
                 Close();
                 Window.Dispatcher.Invoke(() => Window.SaveTool(new Tool(name,
-                    Securities.Single(x => x == TradedSecurity), BasicSecurity, Scripts.ToArray())));
+                    Securities.Single(x => x == TradedSecurity), BasicSecurity, [.. Scripts])));
             }
         }
         else
@@ -210,7 +228,7 @@ public partial class NewTool : Window
             else if (SelectedTool.BasicSecurity == null || SelectedTool.BasicSecurity.Seccode != BasicSecurity.Seccode)
                 SelectedTool.BasicSecurity = Securities.Single(x => x == BasicSecurity);
 
-            if (SelectedTool.Scripts.Length != Scripts.Count) SelectedTool.Scripts = Scripts.ToArray();
+            if (SelectedTool.Scripts.Length != Scripts.Count) SelectedTool.Scripts = [.. Scripts];
             else
             {
                 for (int i = 0; i < SelectedTool.Scripts.Length; i++)

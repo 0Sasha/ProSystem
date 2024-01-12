@@ -1,189 +1,188 @@
-﻿using System;
+﻿using ProSystem.Services;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Net;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using ProSystem.Services;
 
 namespace ProSystem;
 
 public partial class MainWindow : Window
 {
-    private readonly CultureInfo IC = CultureInfo.InvariantCulture;
-    
-    public static MainWindow Window { get; private set; }
-    public ISerializer Serializer { get; set; }
-    public INotifier Notifier { get; set; }
+    private readonly string DataDirectory = "Data";
 
-    public TradingSystem TradingSystem { get; private set; }
+    public Logger Logger { get; init; }
+    public Serializer Serializer { get; init; }
+    public INotifier Notifier { get; init; }
+
+    public Settings Settings { get; init; }
+    public Portfolio Portfolio { get; init; }
+    public ObservableCollection<Tool> Tools { get; init; }
+    public ObservableCollection<Trade> Trades { get; init; }
+
+    public TradingSystem TradingSystem { get; init; }
     public Connector Connector { get => TradingSystem.Connector; }
-    public Settings Settings { get => TradingSystem.Settings; }
-    public Portfolio Portfolio { get => TradingSystem.Portfolio; }
-    public ObservableCollection<Tool> Tools { get => TradingSystem.Tools; }
     public IToolManager ToolManager { get => TradingSystem.ToolManager; }
 
     public MainWindow()
     {
-        Window = this;
         InitializeComponent();
-        Logger.Start(true);
 
-        Serializer = new DCSerializer("Data", (info) => AddInfo(info, true, true));
-        RestoreInfo();
+        Logger = new(AddInfo);
+        Serializer = new JsonSerializer(DataDirectory, AddInfo);
 
-        TradingSystem = new(this, AddInfo, GetCredential,
-            typeof(TXmlConnector), GetPortfolio(), GetSettings(), GetTools(), GetTrades());
+        Settings = Serializer.TryDeserialize<Settings>();
+        Portfolio = Serializer.TryDeserialize<Portfolio>();
+        Tools = Serializer.TryDeserialize<ObservableCollection<Tool>>(nameof(Tools));
+        Trades = Serializer.TryDeserialize<ObservableCollection<Trade>>(nameof(Trades));
 
-        Settings.Check(TradingSystem.Tools);
-        if (Settings.EmailPassword != null) Notifier = new EmailNotifier(587,
-            "smtp.gmail.com", Settings.Email, Settings.EmailPassword, (info) => AddInfo(info));
+        Settings.Prepare(Tools, AddInfo);
+        Notifier = new EmailNotifier(Settings, AddInfo);
+        PrepareCommonControls(Settings.Connector);
 
-        BindData();
-        RestoreToolTabsAndInitialize();
-
+        TradingSystem = new(this, Settings, Portfolio, Tools, Trades);
+        BindTradingSystem(TradingSystem);
         TradingSystem.Start();
     }
 
-    private Settings GetSettings()
-    {
-        try
-        {
-            return (Settings)Serializer.Deserialize("Settings", typeof(Settings));
-        }
-        catch (Exception ex)
-        {
-            AddInfo("Serializer: " + ex.Message);
-            return new Settings();
-        }
-    }
-
-    private Tool[] GetTools()
-    {
-        try
-        {
-            return (Tool[])Serializer.Deserialize("Tools", typeof(Tool[]));
-        }
-        catch (Exception ex)
-        {
-            AddInfo("Serializer: " + ex.Message);
-            return Array.Empty<Tool>();
-        }
-    }
-
-    private Portfolio GetPortfolio()
-    {
-        try
-        {
-            return (Portfolio)Serializer.Deserialize("Portfolio", typeof(Portfolio));
-        }
-        catch (Exception ex)
-        {
-            AddInfo("Serializer: " + ex.Message);
-            return new();
-        }
-    }
-
-    private Trade[] GetTrades()
-    {
-        try
-        {
-            return (Trade[])Serializer.Deserialize("Trades", typeof(Trade[]));
-        }
-        catch (Exception ex)
-        {
-            AddInfo("Serializer: " + ex.Message);
-            return Array.Empty<Trade>();
-        }
-    }
-
-    private NetworkCredential GetCredential() =>
+    public NetworkCredential GetCredential() =>
         Dispatcher.Invoke(() => new NetworkCredential(TxtLog.Text, TxtPas.SecurePassword));
-    
 
-    private void RestoreInfo()
+    public async Task SaveTool(Tool tool, bool newTool = true)
     {
-        if (File.Exists(Serializer.DataDirectory + "/Info.txt"))
+        if (newTool)
+        {
+            Tools.Add(tool);
+            ToolManager.Initialize(tool);
+            TabsTools.Items.Add(tool.Tab);
+            TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
+            ToolsByPriorityView.Items.Refresh();
+            tool.PropertyChanged += UpdateTool;
+        }
+        else
+        {
+            tool.MainModel?.Series.Clear();
+            tool.MainModel?.Series.Add(new OxyPlot.Series.CandleStickSeries { });
+            tool.MainModel?.Annotations.Clear();
+
+            TradingSystem.ToolManager.UpdateControlPanel(tool, true);
+        }
+
+        if (TradingSystem.Connector.Connection == ConnectionState.Connected)
+        {
+            await TradingSystem.Connector.RequestBarsAsync(tool);
+            await TradingSystem.Connector.OrderSecurityInfoAsync(tool.Security);
+            _ = Task.Run(() =>
+            {
+                Thread.Sleep(4000);
+                TradingSystem.ToolManager.UpdateView(tool, true);
+            });
+        }
+        else AddInfo("SaveTool: отсутствует соединение.");
+        AddInfo("Saved tool: " + tool.Name);
+    }
+
+    public async Task ResetAsync()
+    {
+        Logger.Stop();
+        Logger.Start();
+        await FileManager.ArchiveFiles(DataDirectory, ".json", "Data", false);
+    }
+
+    private void PrepareCommonControls(string connector)
+    {
+        TxtBox.Text += RestoreInfo();
+        BoxConnectors.ItemsSource = new[] { connector };
+        BoxConnectors.SelectedIndex = 0;
+        ComboBoxDistrib.ItemsSource = new[] { "All tools", "First part", "Second part" };
+        ComboBoxDistrib.SelectedIndex = 0;
+    }
+
+    private string RestoreInfo()
+    {
+        if (File.Exists(DataDirectory + "/Info.txt"))
         {
             try
             {
-                var info = File.ReadAllText(Serializer.DataDirectory + "/Info.txt");
-                if (info != "") TxtBox.Text = "Начало фрагмента.\n" + info + "\nКонец фрагмента.";
+                var info = File.ReadAllText(DataDirectory + "/Info.txt");
+                if (info != string.Empty) return "\nStart...\n" + info + "\nEnd...";
             }
-            catch (Exception ex) { AddInfo("Исключение чтения Info." + ex.Message); }
+            catch (Exception ex) { AddInfo("RestoreInfo: " + ex.Message); }
         }
+        return string.Empty;
     }
 
-    private void BindData()
+    private void BindTradingSystem(TradingSystem tradingSystem)
     {
-        BindData(TradingSystem.Settings);
-        BindData(TradingSystem.Portfolio);
+        BindSettings(tradingSystem.Settings);
+        BindPortfolio(tradingSystem.Portfolio);
 
-        ToolsView.ItemsSource = TradingSystem.Tools;
-        OrdersView.ItemsSource = TradingSystem.Orders;
-        TradesView.ItemsSource = TradingSystem.Trades;
-        PortfolioView.ItemsSource = TradingSystem.Portfolio.AllPositions;
-        ToolsByPriorityView.ItemsSource = TradingSystem.Settings.ToolsByPriority;
+        ToolsView.ItemsSource = tradingSystem.Tools;
+        ComboBoxTool.ItemsSource = tradingSystem.Tools;
+        OrdersView.ItemsSource = tradingSystem.Orders;
+        TradesView.ItemsSource = tradingSystem.Trades;
+        PortfolioView.ItemsSource = tradingSystem.Portfolio.AllPositions;
+        ToolsByPriorityView.ItemsSource = tradingSystem.Settings.ToolsByPriority;
+        BackupServerCheck.SetBinding(ToggleButton.IsCheckedProperty, new Binding()
+        {
+            Source = tradingSystem.Connector,
+            Path = new PropertyPath(nameof(Connector.BackupServer)),
+            Mode = BindingMode.TwoWay
+        });
 
-        ComboBoxTool.ItemsSource = TradingSystem.Tools;
-        ComboBoxDistrib.ItemsSource = new string[] { "All tools", "First part", "Second part" };
-        ComboBoxDistrib.SelectedIndex = 1;
-        BoxConnectors.ItemsSource = new string[] { nameof(TXmlConnector) };
-        BoxConnectors.SelectedIndex = 0;
-        BackupServerCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+        tradingSystem.Portfolio.PropertyChanged += UpdatePortfolio;
+        tradingSystem.Portfolio.PropertyChanged += SaveData;
+        tradingSystem.Tools.CollectionChanged += UpdateTools;
+        tradingSystem.Orders.CollectionChanged += UpdateOrders;
+        tradingSystem.Trades.CollectionChanged += UpdateTrades;
+        tradingSystem.Connector.PropertyChanged += UpdateConnection;
+        foreach (var tool in tradingSystem.Tools) tool.PropertyChanged += UpdateTool;
+
+        RestoreToolTabsAndInitialize();
+    }
+
+    private void BindSettings(Settings settings)
+    {
+        ScheduleCheck.SetBinding(ToggleButton.IsCheckedProperty,
             new Binding()
             {
-                Source = TradingSystem.Connector,
-                Path = new PropertyPath(nameof(Connector.BackupServer)),
+                Source = settings,
+                Path = new PropertyPath(nameof(Settings.ScheduledConnection)),
                 Mode = BindingMode.TwoWay
             });
 
-        TradingSystem.Portfolio.PropertyChanged += UpdatePortfolio;
-        TradingSystem.Portfolio.PropertyChanged += SaveData;
-        TradingSystem.Tools.CollectionChanged += UpdateTools;
-        TradingSystem.Orders.CollectionChanged += UpdateOrders;
-        TradingSystem.Trades.CollectionChanged += UpdateTrades;
-        Connector.PropertyChanged += UpdateConnection;
-        foreach (var tool in TradingSystem.Tools) tool.PropertyChanged += UpdateTool;
-    }
+        DisplaySentOrdersCheck.SetBinding(ToggleButton.IsCheckedProperty,
+            new Binding()
+            {
+                Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplaySentOrders)),
+                Mode = BindingMode.TwoWay
+            });
+        DisplayNewTradesCheck.SetBinding(ToggleButton.IsCheckedProperty,
+            new Binding()
+            {
+                Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplayNewTrades)),
+                Mode = BindingMode.TwoWay
+            });
+        DisplaySpecialInfoCheck.SetBinding(ToggleButton.IsCheckedProperty,
+            new Binding()
+            {
+                Source = settings,
+                Path = new PropertyPath(nameof(Settings.DisplaySpecialInfo)),
+                Mode = BindingMode.TwoWay
+            });
 
-    private void BindData(Settings settings)
-    {
-        IntervalUpdateTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.ModelUpdateInterval)), Mode = BindingMode.TwoWay });
-        IntervalRecalcTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.RecalcInterval)), Mode = BindingMode.TwoWay });
-        ScheduleCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings,
-                Path = new PropertyPath(nameof(Settings.ScheduledConnection)), Mode = BindingMode.TwoWay });
-
-        DisplaySentOrdersCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings,
-                Path = new PropertyPath(nameof(Settings.DisplaySentOrders)), Mode = BindingMode.TwoWay });
-        DisplayNewTradesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings,
-                Path = new PropertyPath(nameof(Settings.DisplayNewTrades)), Mode = BindingMode.TwoWay });
-        DisplayMessagesCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings,
-                Path = new PropertyPath(nameof(Settings.DisplayMessages)), Mode = BindingMode.TwoWay });
-        DisplaySpecialInfoCheck.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
-            new Binding() { Source = settings,
-                Path = new PropertyPath(nameof(Settings.DisplaySpecialInfo)), Mode = BindingMode.TwoWay });
-
-        TxtLog.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.LoginConnector)), Mode = BindingMode.TwoWay });
-        ConnectorLogLevelTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.LogLevelConnector)), Mode = BindingMode.TwoWay });
-        RequestTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.RequestTM)), Mode = BindingMode.TwoWay });
-        SessionTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.SessionTM)), Mode = BindingMode.TwoWay });
+        TxtLog.SetBinding(TextBox.TextProperty, new Binding()
+        {
+            Source = settings,
+            Path = new PropertyPath(nameof(Settings.LoginConnector)),
+            Mode = BindingMode.TwoWay
+        });
 
         ToleranceEquityTxt.SetBinding(TextBox.TextProperty, new Binding()
         {
@@ -242,16 +241,9 @@ public partial class MainWindow : Window
             Mode = BindingMode.TwoWay,
             StringFormat = "#'%'"
         });
-
-        ShelflifeTradesTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.ShelfLifeTrades)), Mode = BindingMode.TwoWay });
-        ShelflifeOrdersScriptsTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.ShelfLifeOrdersScripts)), Mode = BindingMode.TwoWay });
-        ShelflifeTradesScriptsTxt.SetBinding(TextBox.TextProperty, new Binding() { Source = settings,
-            Path = new PropertyPath(nameof(Settings.ShelfLifeTradesScripts)), Mode = BindingMode.TwoWay });
     }
 
-    private void BindData(Portfolio portfolio)
+    private void BindPortfolio(Portfolio portfolio)
     {
         AverageEquityTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
@@ -313,9 +305,9 @@ public partial class MainWindow : Window
         }
     }
 
-    public void AddInfo(string data, bool important = true, bool notify = false)
+    internal void AddInfo(string data, bool important = true, bool notify = false)
     {
-        if (data == null || data == "")
+        if (data == string.Empty)
         {
             data = "AddInfo: data was empty";
             important = true;
@@ -326,45 +318,11 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
-                TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss", IC) + ": " + data);
+                TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss") + ": " + data);
                 TxtBox.ScrollToEnd();
             });
         }
         if (notify) Notifier.Notify(data);
-    }
-
-    public async Task SaveTool(Tool tool, bool newTool = true)
-    {
-        if (newTool)
-        {
-            Tools.Add(tool);
-            ToolManager.Initialize(tool);
-            TabsTools.Items.Add(tool.Tab);
-            TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
-            ToolsByPriorityView.Items.Refresh();
-            tool.PropertyChanged += UpdateTool;
-        }
-        else
-        {
-            tool.MainModel.Series.Clear();
-            tool.MainModel.Series.Add(new OxyPlot.Series.CandleStickSeries { });
-            tool.MainModel.Annotations.Clear();
-
-            TradingSystem.ToolManager.UpdateControlPanel(tool, true);
-        }
-
-        if (Window.TradingSystem.Connector.Connection == ConnectionState.Connected)
-        {
-            await TradingSystem.ToolManager.RequestBarsAsync(tool);
-            await TradingSystem.Connector.OrderSecurityInfoAsync(tool.Security);
-            _ = Task.Run(() =>
-            {
-                System.Threading.Thread.Sleep(4000);
-                TradingSystem.ToolManager.UpdateView(tool, true);
-            });
-        }
-        else AddInfo("SaveTool: отсутствует соединение.");
-        AddInfo("Saved tool: " + tool.Name);
     }
 
     #region Menu
@@ -373,16 +331,16 @@ public partial class MainWindow : Window
         AddInfo("SaveData: Сериализация", false);
         try
         {
-            Serializer.Serialize(TradingSystem.Tools, "Tools");
-            Serializer.Serialize(TradingSystem.Portfolio, "Portfolio");
-            Serializer.Serialize(TradingSystem.Settings, "Settings");
-            Serializer.Serialize(TradingSystem.Trades, "Trades");
-            if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(Serializer.DataDirectory + "/Info.txt", TxtBox.Text));
+            Serializer.Serialize(TradingSystem.Tools, nameof(TradingSystem.Tools));
+            Serializer.Serialize(TradingSystem.Portfolio, nameof(TradingSystem.Portfolio));
+            Serializer.Serialize(TradingSystem.Settings, nameof(TradingSystem.Settings));
+            Serializer.Serialize(TradingSystem.Trades, nameof(TradingSystem.Trades));
+            if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(DataDirectory + "/Info.txt", TxtBox.Text));
             return true;
         }
         catch (Exception ex) { AddInfo("SaveData: " + ex.Message); return false; }
     }
-    private void SaveData(object sender, RoutedEventArgs e)
+    private void SaveData(object? sender, RoutedEventArgs e)
     {
         Task.Run(() =>
         {
@@ -390,59 +348,43 @@ public partial class MainWindow : Window
             else AddInfo("Данные не сохранены.");
         });
     }
-    private void SaveData(object sender, PropertyChangedEventArgs e)
+    private void SaveData(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TradingSystem.Portfolio.InitReqs)) Task.Run(() => SaveData());
     }
-    private void ShowUsedMemory(object sender, RoutedEventArgs e) =>
-        AddInfo("Использование памяти: " + (GC.GetTotalMemory(false) / 1000000).ToString(IC) + " МБ");
-    private void ClearMemory(object sender, RoutedEventArgs e) => GC.Collect();
-    private void TakeLoginDetails(object sender, RoutedEventArgs e)
-    {
-        if (!File.Exists("Data/mail.txt"))
-        {
-            AddInfo("mail.txt не найден");
-            return;
-        }
-        try
-        {
-            string[] details = File.ReadAllLines("Data/mail.txt");
-            Settings.Email = details[0];
-            Settings.EmailPassword = details[1];
-            (Notifier as EmailNotifier).Email = Settings.Email;
-            (Notifier as EmailNotifier).Password = Settings.EmailPassword;
-            Notifier.Notify("Test notify");
-            AddInfo("Тестовое уведомление отправлено.");
-        }
-        catch (Exception ex) { AddInfo("TakeLoginDetails: " + ex.Message); }
-    }
-    private void ResizeControlPanel(object sender, RoutedEventArgs e)
+    private void ResizeControlPanel(object? sender, RoutedEventArgs e)
     {
         if (TabsTools.SelectedIndex > -1)
         {
-            ColumnDefinition Column = (TabsTools.SelectedContent as Grid).ColumnDefinitions[1];
+            ColumnDefinition Column = ((Grid)TabsTools.SelectedContent).ColumnDefinitions[1];
             if (Column.ActualWidth < 200) Column.Width = new GridLength(200);
             else Column.Width = new GridLength(100);
         }
     }
-    private void NotifierTest(object sender, RoutedEventArgs e)
+    private void NotifierTest(object? sender, RoutedEventArgs e)
     {
         try { Notifier.Notify("Test data"); }
         catch (Exception ex) { AddInfo("NotifierTest: " + ex.Message); }
     }
-    private void Test(object sender, RoutedEventArgs e)
+    private void Test(object? sender, RoutedEventArgs e)
     {
+        try
+        {
+
+
+        }
+        catch { }
 
     }
     #endregion
 
     #region Context menu
-    private void AddToolContext(object sender, RoutedEventArgs e)
+    private void AddToolContext(object? sender, RoutedEventArgs e)
     {
         NewTool NewTool = new(this);
         NewTool.Show();
     }
-    private void OpenTabToolContext(object sender, RoutedEventArgs e)
+    private void OpenTabToolContext(object? sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
@@ -450,7 +392,7 @@ public partial class MainWindow : Window
             MainTabs.SelectedIndex = 3;
         }
     }
-    private async void ChangeToolContext(object sender, RoutedEventArgs e)
+    private async void ChangeToolContext(object? sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
@@ -460,8 +402,8 @@ public partial class MainWindow : Window
             NewTool.Show();
         }
     }
-    private void UpdateToolbarContext(object sender, RoutedEventArgs e) => ToolsView.Items.Refresh();
-    private void ReloadBarsToolContext(object sender, RoutedEventArgs e)
+    private void UpdateToolbarContext(object? sender, RoutedEventArgs e) => ToolsView.Items.Refresh();
+    private void ReloadBarsToolContext(object? sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
@@ -472,16 +414,16 @@ public partial class MainWindow : Window
             Task.Run(() => ToolManager.ReloadBarsAsync(Tools[i]));
         }
     }
-    private void WriteSourceBarsToolContext(object sender, RoutedEventArgs e)
+    private void WriteSourceBarsToolContext(object? sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
             int i = Tools.IndexOf(Tools.Single(x => x == ToolsView.SelectedItem));
-            Tools[i].Security.SourceBars.Write(Tools[i].Security.ShortName);
-            Tools[i].BasicSecurity?.SourceBars.Write(Tools[i].BasicSecurity.ShortName);
+            Tools[i].Security?.SourceBars?.Write(Tools[i].Security.Seccode);
+            Tools[i].BasicSecurity?.SourceBars?.Write(Tools[i].Name + " basic");
         }
     }
-    private async void RemoveToolContext(object sender, RoutedEventArgs e)
+    private async void RemoveToolContext(object? sender, RoutedEventArgs e)
     {
         if (ToolsView.SelectedItem != null)
         {
@@ -504,9 +446,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ChangePriorityTool(object sender, RoutedEventArgs e)
+    private void ChangePriorityTool(object? sender, RoutedEventArgs e)
     {
-        string header = (string)(sender as MenuItem).Header;
+        ArgumentNullException.ThrowIfNull(sender, nameof(sender));
+        var header = (string)((MenuItem)sender).Header;
         int i = ToolsByPriorityView.SelectedIndex;
         int n = int.Parse(header[^1].ToString());
 
@@ -533,21 +476,21 @@ public partial class MainWindow : Window
         ToolsByPriorityView.Items.Refresh();
     }
 
-    private async void CancelOrderContext(object sender, RoutedEventArgs e)
+    private async void CancelOrderContext(object? sender, RoutedEventArgs e)
     {
         if (TradingSystem.Connector.Connection == ConnectionState.Connected && OrdersView.SelectedItem != null)
         {
-            Order SelectedOrder = (Order)OrdersView.SelectedItem;
-            if (SelectedOrder.Status is "active" or "watching") await Task.Run(async () =>
+            Order order = (Order)OrdersView.SelectedItem;
+            if (Connector.OrderIsActive(order)) await Task.Run(async () =>
             {
-                if (!await TradingSystem.Connector.CancelOrderAsync(SelectedOrder)) AddInfo("Ошибка отмены заявки.");
+                if (!await Connector.CancelOrderAsync(order)) AddInfo("Ошибка отмены заявки.");
             });
             else AddInfo("Заявка не активна.");
         }
     }
-    private void RemoveOrderContext(object sender, RoutedEventArgs e)
+    private void RemoveOrderContext(object? sender, RoutedEventArgs e)
     {
-        if ((MainTabs.SelectedItem as TabItem).Header.ToString() == "Portfolio")
+        if (((TabItem)MainTabs.SelectedItem).Header.ToString() == "Portfolio")
         {
             if (OrdersView.SelectedItem != null)
             {
@@ -568,11 +511,7 @@ public partial class MainWindow : Window
                     {
                         foreach (Script MyScript in MyTool.Scripts)
                         {
-                            if (MyScript.Orders.Contains(MyOrder))
-                            {
-                                MyScript.Orders.Remove(MyOrder);
-                                return;
-                            }
+                            if (MyScript.Orders.Remove(MyOrder)) return;
                         }
                         AddInfo("Не найдена заявка для удаления.");
                     }
@@ -593,9 +532,9 @@ public partial class MainWindow : Window
             }
         }
     }
-    private void RemoveTradeContext(object sender, RoutedEventArgs e)
+    private void RemoveTradeContext(object? sender, RoutedEventArgs e)
     {
-        if ((MainTabs.SelectedItem as TabItem).Header.ToString() == "Portfolio")
+        if (((TabItem)MainTabs.SelectedItem).Header.ToString() == "Portfolio")
         {
             if (TradesView.SelectedItem != null)
             {
@@ -605,13 +544,13 @@ public partial class MainWindow : Window
         else if (TradesInfo.SelectedItem != null)
         {
             Trade MyTrade = (Trade)TradesInfo.SelectedItem;
-            if (MyTrade.SenderOrder == "System") TradingSystem.SystemTrades.Remove(MyTrade);
+            if (MyTrade.OrderSender == "System") TradingSystem.SystemTrades.Remove(MyTrade);
             else if (MyTrade.Seccode != null)
             {
                 try
                 {
                     Tools.Single(x => x.Security.Seccode == MyTrade.Seccode).Scripts.Single
-                        (x => x.Name == MyTrade.SenderOrder).Trades.Remove(MyTrade);
+                        (x => x.Name == MyTrade.OrderSender).Trades.Remove(MyTrade);
                 }
                 catch (Exception ex) { AddInfo("Исключение во время попытки удаления сделки: " + ex.Message); }
             }
@@ -619,9 +558,9 @@ public partial class MainWindow : Window
             {
                 foreach (Tool MyTool in Tools)
                 {
-                    if (MyTool.Scripts.SingleOrDefault(x => x.Name == MyTrade.SenderOrder) != null)
+                    if (MyTool.Scripts.SingleOrDefault(x => x.Name == MyTrade.OrderSender) != null)
                     {
-                        if (MyTool.Scripts.Single(x => x.Name == MyTrade.SenderOrder).Trades.Remove(MyTrade)) return;
+                        if (MyTool.Scripts.Single(x => x.Name == MyTrade.OrderSender).Trades.Remove(MyTrade)) return;
                         else break;
                     }
                 }
@@ -629,18 +568,18 @@ public partial class MainWindow : Window
             }
         }
     }
-    private void UpdatePortfolioViewContext(object sender, RoutedEventArgs e)
+    private void UpdatePortfolioViewContext(object? sender, RoutedEventArgs e)
     {
         OrdersView.Items.Refresh();
         TradesView.Items.Refresh();
         Task.Run(() => TradingSystem.PortfolioManager.UpdatePositions());
     }
 
-    private void ClearInfo(object sender, RoutedEventArgs e) => TxtBox.Clear();
+    private void ClearInfo(object? sender, RoutedEventArgs e) => TxtBox.Clear();
     #endregion
 
     #region View
-    private void UpdateConnection(object sender, PropertyChangedEventArgs e)
+    private void UpdateConnection(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(Connector.Connection))
         {
@@ -672,43 +611,45 @@ public partial class MainWindow : Window
             });
         }
     }
-    private void UpdatePortfolio(object sender, PropertyChangedEventArgs e)
+    private void UpdatePortfolio(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TradingSystem.Portfolio.Positions))
         {
-            Window.Dispatcher.Invoke(() =>
+            Dispatcher.Invoke(() =>
             {
-                Window.PortfolioView.ItemsSource = Portfolio.AllPositions;
-                Window.PortfolioView.ScrollIntoView(this);
+                PortfolioView.ItemsSource = Portfolio.AllPositions;
+                PortfolioView.ScrollIntoView(this);
             });
         }
     }
-    private void UpdateTool(object sender, PropertyChangedEventArgs e)
+    private void UpdateTool(object? sender, PropertyChangedEventArgs e)
     {
+        ArgumentNullException.ThrowIfNull(sender);
         if (e.PropertyName == nameof(Tool.ShowBasicSecurity))
-            Task.Run(() => TradingSystem.ToolManager.UpdateView(sender as Tool, true));
+            Task.Run(() => TradingSystem.ToolManager.UpdateView((Tool)sender, true));
         else if (e.PropertyName is nameof(Tool.TradeShare) or nameof(Tool.UseShiftBalance))
-            TradingSystem.ToolManager.UpdateControlPanel(sender as Tool, false);
+            TradingSystem.ToolManager.UpdateControlPanel((Tool)sender, false);
     }
-    private void UpdateTools(object sender, NotifyCollectionChangedEventArgs e)
+    private void UpdateTools(object? sender, NotifyCollectionChangedEventArgs e)
     {
         ToolsView.Items.Refresh();
         Task.Run(() => SaveData());
     }
-    private void UpdateOrders(object sender, NotifyCollectionChangedEventArgs e)
+    private void UpdateOrders(object? sender, NotifyCollectionChangedEventArgs e)
     {
         OrdersView.Items.Refresh();
         if (OrdersView.Items.Count > 0) OrdersView.ScrollIntoView(OrdersView.Items[^1]);
     }
-    private void UpdateTrades(object sender, NotifyCollectionChangedEventArgs e)
+    private void UpdateTrades(object? sender, NotifyCollectionChangedEventArgs e)
     {
         TradesView.Items.Refresh();
         if (TradesView.Items.Count > 0) TradesView.ScrollIntoView(TradesView.Items[^1]);
     }
 
-    private async void ChangeСonnection(object sender, RoutedEventArgs e)
+    private async void ChangeСonnection(object? sender, RoutedEventArgs e)
     {
-        var button = sender as Button;
+        ArgumentNullException.ThrowIfNull(sender);
+        var button = (Button)sender;
         button.IsEnabled = false;
         if (Connector.Connection is ConnectionState.Connected or ConnectionState.Connecting)
             await Connector.DisconnectAsync();
@@ -717,7 +658,7 @@ public partial class MainWindow : Window
         else AddInfo("Type login and password");
         button.IsEnabled = true;
     }
-    private async void ClosingMainWindow(object sender, CancelEventArgs e)
+    private async void ClosingMainWindow(object? sender, CancelEventArgs e)
     {
         var Res = MessageBox.Show("Are you sure you want to exit?",
             "Closing", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -730,32 +671,37 @@ public partial class MainWindow : Window
         await TradingSystem.StopAsync();
         Logger.Stop();
     }
-    private async void ChangeActivityTool(object sender, RoutedEventArgs e)
+    private async void ChangeActivityTool(object? sender, RoutedEventArgs e)
     {
-        var button = sender as Button;
+        ArgumentNullException.ThrowIfNull(sender);
+        var button = (Button)sender;
         button.IsEnabled = false;
-        await ToolManager.ChangeActivityAsync(button.DataContext as Tool);
+        await ToolManager.ChangeActivityAsync((Tool)button.DataContext);
         button.IsEnabled = true;
     }
-    private void ComboBoxToolChanged(object sender, SelectionChangedEventArgs e)
+    private void ComboBoxToolChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (e.AddedItems.Count > 0) ComboBoxScript.ItemsSource = (e.AddedItems[0] as Tool).Scripts;
+        if (e.AddedItems.Count > 0)
+        {
+            var added = e.AddedItems[0];
+            if (added != null) ComboBoxScript.ItemsSource = ((Tool)added).Scripts;
+        }
     }
 
-    private void ShowScriptInfo(object sender, RoutedEventArgs e)
+    private void ShowScriptInfo(object? sender, RoutedEventArgs e)
     {
         if (ComboBoxTool.SelectedIndex > -1 && ComboBoxScript.SelectedIndex > -1)
         {
-            OrdersInfo.ItemsSource = (ComboBoxTool.SelectedItem as Tool)
-                .Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).Orders;
+            OrdersInfo.ItemsSource = ((Tool)ComboBoxTool.SelectedItem)
+                .Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem)?.Orders;
             OrdersInfo.Items.Refresh();
 
-            TradesInfo.ItemsSource = (ComboBoxTool.SelectedItem as Tool)
-                .Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem).Trades;
+            TradesInfo.ItemsSource = ((Tool)ComboBoxTool.SelectedItem)
+                .Scripts.SingleOrDefault(x => x == (Script)ComboBoxScript.SelectedItem)?.Trades;
             TradesInfo.Items.Refresh();
         }
     }
-    private void ShowSystemInfo(object sender, RoutedEventArgs e)
+    private void ShowSystemInfo(object? sender, RoutedEventArgs e)
     {
         OrdersInfo.ItemsSource = TradingSystem.SystemOrders;
         OrdersInfo.Items.Refresh();
@@ -763,9 +709,11 @@ public partial class MainWindow : Window
         TradesInfo.ItemsSource = TradingSystem.SystemTrades;
         TradesInfo.Items.Refresh();
     }
-    private void ShowDistributionInfo(object sender, RoutedEventArgs e)
+    private void ShowDistributionInfo(object? sender, RoutedEventArgs? e)
     {
         if (Tools.Count < 1 || Portfolio.Saldo < 1 || Portfolio.Positions == null) return;
+        ArgumentNullException.ThrowIfNull(OnlyPosCheckBox.IsChecked);
+        ArgumentNullException.ThrowIfNull(ExcludeBaseCheckBox.IsChecked);
 
         DistributionPlot.Model = Tools.GetPlot(Portfolio.Positions, Portfolio.Saldo,
             (string)ComboBoxDistrib.SelectedItem, (bool)OnlyPosCheckBox.IsChecked,
@@ -776,7 +724,7 @@ public partial class MainWindow : Window
         PortfolioPlot.Controller ??= Plot.GetController();
     }
 
-    private void ResizeInfoPanel(object sender, RoutedEventArgs e)
+    private void ResizeInfoPanel(object? sender, RoutedEventArgs e)
     {
         if ((int)RowInfo.Height.Value == 2) RowInfo.Height = new GridLength(0.5, GridUnitType.Star);
         else if ((int)RowInfo.Height.Value == 1) RowInfo.Height = new GridLength(2, GridUnitType.Star);

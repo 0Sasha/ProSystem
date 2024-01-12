@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace ProSystem;
+﻿namespace ProSystem;
 
 public static class Indicators
 {
@@ -391,8 +389,8 @@ public static class Indicators
         double[] DeMarker = new double[High.Length];
         for (int i = 1; i < High.Length; i++)
         {
-            if (High[i] - High[i - 1] > 0.00001) DeMax[i] = High[i] - High[i - 1];
-            if (Low[i] - Low[i - 1] < -0.00001) DeMin[i] = Low[i - 1] - Low[i];
+            if (High[i] - High[i - 1] > 0.000001) DeMax[i] = High[i] - High[i - 1];
+            if (Low[i] - Low[i - 1] < -0.000001) DeMin[i] = Low[i - 1] - Low[i];
 
             SumMax += DeMax[i];
             SumMin += DeMin[i];

@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Threading;
 using System.Xml;
 
@@ -26,24 +21,28 @@ internal class TXmlConnector : Connector
         DtdProcessing = DtdProcessing.Parse
     };
     private readonly StringComparison SC = StringComparison.Ordinal;
+    private readonly Thread MainThread;
 
     private int waitingTimeMs = 18000;
-    private Thread mainThread;
     private bool isWorking;
 
     public virtual double USDRUB { get; set; }
     public virtual double EURRUB { get; set; }
-    public List<ClientAccount> Clients { get; } = new();
+    public override bool ReconnectTime => base.ReconnectTime || ServerTime.Hour == 6 && ServerTime.Minute is 40 or 41;
+    public override DateTime ServerTime { get => DateTime.UtcNow.AddHours(3); }
+    public List<ClientAccount> Clients { get; } = [];
 
     public TXmlConnector(TradingSystem tradingSystem, AddInformation addInfo) : base(tradingSystem, addInfo)
     {
         DataProcessor = new(this, tradingSystem, addInfo);
         CallBackTXml = CallBack;
+        MainThread = new(ProcessData) { IsBackground = true, Name = "DataProcessor" };
     }
 
     private bool CallBack(IntPtr data)
     {
-        DataQueue.Enqueue(Marshal.PtrToStringUTF8(data));
+        var strData = Marshal.PtrToStringUTF8(data);
+        if (strData != null) DataQueue.Enqueue(strData);
         FreeMemory(data);
         return true;
     }
@@ -52,7 +51,7 @@ internal class TXmlConnector : Connector
     {
         while (isWorking)
         {
-            string data = null;
+            var data = string.Empty;
             try
             {
                 while (!DataQueue.IsEmpty)
@@ -79,35 +78,24 @@ internal class TXmlConnector : Connector
     #region High level methods
     public override async Task<bool> ConnectAsync(string login, SecureString password)
     {
-        if (string.IsNullOrEmpty(login)) throw new ArgumentNullException(nameof(login));
-        if (password == null) throw new ArgumentNullException(nameof(password));
+        ArgumentException.ThrowIfNullOrEmpty(login, nameof(login));
         if (!Initialized) throw new Exception("Connector is not initialized.");
 
         Securities.Clear(); Markets.Clear();
         TimeFrames.Clear(); Clients.Clear();
         TradingSystem.Portfolio.Positions.Clear();
         TradingSystem.Portfolio.MoneyPositions.Clear();
-        TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Orders.Clear());
+        TradingSystem.Window.Dispatcher.Invoke(TradingSystem.Orders.Clear);
 
-        var settings = TradingSystem.Settings;
-        waitingTimeMs = settings.RequestTM * 1000 + 3000;
-        ReconnectionTrigger = DateTime.Now.AddSeconds(settings.SessionTM);
+        waitingTimeMs = 18000;
         Connection = ConnectionState.Connecting;
 
-        // Частота обращений коннектора к серверу Transaq в миллисекундах. Минимум 10.
-        var delay = "20";
-        // Таймаут информирования о текущих показателях единого портфеля минимум один раз в N секунд.
-        var limits = settings.SessionTM.ToString();
-        // Таймаут информирования о текущей стоимости позиций один раз в N секунд за исключением позиций FORTS.
-        var equity = "0";
         var host = !BackupServer ? "tr1.finam.ru" : "tr2.finam.ru";
-        var port = "3900";
 
         var firstPart = "<command id=\"connect\"><login>" + login + "</login><password>";
-        var lastPart = "</password><host>" + host + "</host><port>" + port + "</port><rqdelay>" + delay +
-            "</rqdelay><session_timeout>" + settings.SessionTM + "</session_timeout><request_timeout>" +
-            settings.RequestTM + "</request_timeout><push_u_limits>" + limits +
-            "</push_u_limits><push_pos_equity>" + equity + "</push_pos_equity></command>";
+        var lastPart = "</password><host>" + host + "</host><port>3900</port><rqdelay>20</rqdelay>" +
+            "<session_timeout>180</session_timeout><request_timeout>15</request_timeout>" +
+            "<push_u_limits>180</push_u_limits><push_pos_equity>0</push_pos_equity></command>";
 
         var res = await SendCommandAsync(firstPart, lastPart, password);
         if (res.StartsWith("<result success=\"true\"", SC) || res.Contains("уже устанавливается")) return true;
@@ -135,80 +123,95 @@ internal class TXmlConnector : Connector
         return result;
     }
 
+    public override async Task ResetAsync()
+    {
+        await base.ResetAsync();
+        await FileManager.ArchiveFiles("Logs/Transaq", ServerTime.AddDays(-1).ToString("yyyyMMdd"),
+            ServerTime.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
+        var time = ServerTime.Date.AddMinutes(400) - ServerTime;
+        if (time.TotalMinutes > 0)
+        {
+            AddInfo("Reset: waiting " + time, false);
+            await Task.Delay(time);
+        }
+    }
+
     public override async Task<bool> SendOrderAsync(Security symbol, OrderType type, bool isBuy,
-        double price, int quantity, string signal, Script sender = null, string note = null)
+        double price, double quantity, string signal, Script? sender = null, string? note = null)
     {
         var senderName = sender != null ? sender.Name : "System";
-        if (symbol == null) throw new ArgumentNullException(nameof(symbol));
-        if (price < 0.00000001)
-            throw new ArgumentOutOfRangeException(nameof(price), "Price <= 0. Sender: " + senderName);
-        if (quantity < 1)
-            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity < 1. Sender: " + senderName);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(price, nameof(price));
+        ArgumentOutOfRangeException.ThrowIfLessThan(quantity, 1, nameof(quantity));
 
-        price = Math.Round(price, symbol.Decimals);
-        var buySell = isBuy ? "B" : "S";
-        var credit = ""; // UseCredit ? "<usecredit/>" : 
-        string id, market, condition;
+        price = Math.Round(price, symbol.TickPrecision);
+        var side = isBuy ? "B" : "S";
+        string id, market = "", condition = "None";
 
-        if (type == OrderType.Limit)
-        {
-            id = "neworder";
-            market = "";
-            condition = "None";
-        }
+        if (type == OrderType.Limit) id = "neworder";
         else if (type == OrderType.Conditional)
         {
             id = "newcondorder";
-            market = "";
             condition = isBuy ? "BidOrLast" : "AskOrLast";
         }
         else if (type == OrderType.Market)
         {
             id = "neworder";
             market = "<bymarket/>";
-            condition = "None";
         }
         else throw new ArgumentException("Unknown type of the order", nameof(type));
 
         var command = "<command id=\"" + id + "\">" +
             "<security><board>" + symbol.Board + "</board><seccode>" + symbol.Seccode + "</seccode></security>" +
             "<union>" + TradingSystem.Portfolio.Union + "</union><price>" + price.ToString(IC) + "</price>" +
-            "<quantity>" + quantity + "</quantity><buysell>" + buySell + "</buysell>" + market +
-            (type != OrderType.Conditional ? credit + "</command>" :
+            "<quantity>" + quantity + "</quantity><buysell>" + side + "</buysell>" + market +
+            (type != OrderType.Conditional ? "</command>" :
             "<cond_type>" + condition + "</cond_type><cond_value>" + price.ToString(IC) + "</cond_value>" +
-            "<validafter>0</validafter><validbefore>till_canceled</validbefore>" + credit + "</command>");
+            "<validafter>0</validafter><validbefore>till_canceled</validbefore></command>");
 
         using XmlReader xr = XmlReader.Create(new StringReader(await SendCommandAsync(command)), XS);
         xr.Read();
-        if (xr.GetAttribute("success") == "true")
+        var success = xr.GetAttribute("success");
+        if (success == "true")
         {
-            int trId = int.Parse(xr.GetAttribute("transactionid"), IC);
-            var order = new Order(trId, senderName, signal, note);
+            var order = new Order(0, symbol.Seccode, "Sent", ServerTime, side)
+            {
+                TrID = xr.GetIntAttribute("transactionid"),
+                InitType = type,
+                Sender = senderName,
+                Signal = signal,
+                Note = note
+            };
+
             await TradingSystem.Window.Dispatcher.InvokeAsync(() =>
             {
                 if (sender != null) sender.Orders.Add(order);
                 else TradingSystem.SystemOrders.Add(order);
             }, DispatcherPriority.Send);
 
-            AddInfo("SendOrder: order is sent: " + senderName + "/" + symbol.Seccode + "/" +
-                buySell + "/" + price + "/" + quantity + "/" + trId, TradingSystem.Settings.DisplaySentOrders);
+            AddInfo("SendOrder: order is sent: " + order.Sender + "/" + order.Seccode + "/" + order.Side + "/" +
+                order.Price + "/" + order.Quantity + "/" + order.TrID, TradingSystem.Settings.DisplaySentOrders);
 
-            xr.Close();
+            _ = Task.Run(() =>
+            {
+                Thread.Sleep(3000);
+                TradingSystem.Window.Dispatcher.Invoke(() =>
+                {
+                    if (!TradingSystem.Orders.ToArray().Any(o => o.TrID == order.TrID))
+                        TradingSystem.Orders.Add(order);
+                }, DispatcherPriority.Send);
+            });
             return true;
         }
-        else if (xr.GetAttribute("success") == "false")
+        else if (success == "false")
         {
-            xr.ReadToFollowing("message");
-            xr.Read();
-            AddInfo("SendOrder: order of " + senderName + " is not accepted: " + xr.Value, true,
-                xr.Value.Contains("Недостаток обеспечения"));
+            AddInfo("SendOrder: order of " + senderName +
+                " is not accepted: " + xr.GetNextString("message"), true);
         }
         else
         {
             xr.Read();
             AddInfo("SendOrder: order of " + senderName + " is not accepted: " + xr.Value);
         }
-        xr.Close();
         return false;
     }
 
@@ -225,7 +228,7 @@ internal class TXmlConnector : Connector
             if (xr.Value.Contains("Неверное значение параметра"))
             {
                 activeOrder.Status = activeOrder.Status == "active" ? "cancelled" : "disabled";
-                activeOrder.DateTime = DateTime.Now.AddDays(-2);
+                activeOrder.ChangeTime = ServerTime.AddDays(-2);
                 AddInfo("CancelOrder: " + activeOrder.Sender + ": active order is not actual. Status is updated.");
             }
             else AddInfo("CancelOrder: " + activeOrder.Sender + ": error: " + xr.Value);
@@ -238,7 +241,7 @@ internal class TXmlConnector : Connector
     }
 
     public override async Task<bool> ReplaceOrderAsync(Order activeOrder, Security symbol, OrderType type,
-        double price, int quantity, string signal, Script sender = null, string note = null)
+        double price, double quantity, string signal, Script? sender = null, string? note = null)
     {
         var senderName = sender != null ? sender.Name : "System";
         AddInfo("ReplaceOrder: replacement by " + senderName, false);
@@ -260,7 +263,7 @@ internal class TXmlConnector : Connector
                 }
             }
             return await SendOrderAsync(symbol, type,
-                activeOrder.BuySell == "B", price, quantity, signal, sender, note);
+                activeOrder.Side == "B", price, quantity, signal, sender, note);
         }
         return false;
     }
@@ -287,15 +290,15 @@ internal class TXmlConnector : Connector
         AddInfo("SubUnsub: " + result);
         return false;
     }
-    
-    public override async Task<bool> OrderHistoricalDataAsync(Security symbol, TimeFrame tf, int count)
+
+    protected override async Task<bool> OrderHistoricalDataAsync(Security security, TimeFrame tf, int count, int _)
     {
-        var command = "<command id=\"gethistorydata\"><security><board>" + symbol.Board +
-            "</board><seccode>" + symbol.Seccode +"</seccode></security><period>" +
+        var command = "<command id=\"gethistorydata\"><security><board>" + security.Board +
+            "</board><seccode>" + security.Seccode + "</seccode></security><period>" +
             tf.ID + "</period><count>" + count + "</count><reset>true</reset></command>";
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
-        AddInfo("OrderHistoricalData: " + result);
+        AddInfo("OrderHistoricalData: " + result + " command: " + command);
         return false;
     }
 
@@ -311,44 +314,10 @@ internal class TXmlConnector : Connector
     }
 
 
-    public override bool SecurityIsBidding(Security security)
+    public override async Task<bool> PrepareForTradingAsync()
     {
-        if (DateTime.Now < DateTime.Today.AddHours(1) ||
-            DateTime.Now > DateTime.Today.AddMinutes(839).AddSeconds(55) &&
-            DateTime.Now < DateTime.Today.AddMinutes(845)) return false;
-
-        if (DateTime.Now > DateTime.Today.AddMinutes(1129).AddSeconds(55) &&
-            DateTime.Now < DateTime.Today.AddMinutes(1145))
-            return security.LastTrade.DateTime > DateTime.Today.AddMinutes(1130);
-
-        return security.LastTrade.DateTime.AddHours(1) > DateTime.Now;
-    }
-
-    public override bool CheckRequirements(Security security)
-    {
-        if (security.Market != "4")
-        {
-            AddInfo(security.Seccode + ": unexpected market: " + security.Market, notify: true);
-            return false;
-        }
-
-        if (security.InitReqLong < 100 || security.InitReqShort < 100 ||
-            security.SellDeposit < 100 || security.InitReqLong < security.SellDeposit / 2)
-        {
-            AddInfo(security.Seccode + ": reqs are out of norm: " +
-                security.InitReqLong + "/" + security.InitReqShort + " SellDep: " + security.SellDeposit, true, true);
-            Task.Run(async () => await OrderSecurityInfoAsync(security));
-            return false;
-        }
-        return true;
-    }
-
-
-    public override async Task<bool> OrderPreTradingData()
-    {
-        await OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), new("1", 60), 1);
-        await OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), new("1", 60), 1);
-        return true;
+        return await OrderHistoricalDataAsync(new("CETS", "USD000UTSTOM"), 1, count: 1) &&
+            await OrderHistoricalDataAsync(new("CETS", "EUR_RUB__TOM"), 1, count: 1);
     }
 
     public override async Task<bool> OrderSecurityInfoAsync(Security symbol) =>
@@ -380,6 +349,70 @@ internal class TXmlConnector : Connector
         AddInfo("GetClnSecPermissions: " + result);
         return false;
     }
+
+    public override async Task WaitForCertaintyAsync(Tool tool)
+    {
+        var undefined = TradingSystem.Orders.ToArray()
+            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "forwarding" or "inactive"));
+        if (undefined.Any())
+        {
+            AddInfo(tool.Name + ": uncertain order status: " + undefined.First().Status);
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(300);
+                if (!undefined.Where(x => x.Status is "forwarding" or "inactive").Any()) return;
+            }
+            AddInfo(tool.Name + ": failed to get certain order status");
+        }
+
+        var lastTrade = TradingSystem.Trades.ToArray().LastOrDefault(x => x.Seccode == tool.Security.Seccode);
+        if (lastTrade != null && lastTrade.Time.AddSeconds(2) > ServerTime) await Task.Delay(1500);
+    }
+
+
+    public override bool SecurityIsBidding(Security security)
+    {
+        if (ServerTime < DateTime.Today.AddHours(1) ||
+            ServerTime > DateTime.Today.AddMinutes(839).AddSeconds(55) &&
+            ServerTime < DateTime.Today.AddMinutes(845)) return false;
+
+        if (ServerTime > DateTime.Today.AddMinutes(1129).AddSeconds(55) &&
+            ServerTime < DateTime.Today.AddMinutes(1145)) return security.LastTrade.Time.AddSeconds(5) > ServerTime;
+
+        return security.LastTrade.Time.AddHours(1) > ServerTime;
+    }
+
+    protected override bool CheckRequirements(Security security)
+    {
+        if (security.Market != "4")
+        {
+            AddInfo(security.Seccode + ": unexpected market: " + security.Market, notify: true);
+            return false;
+        }
+
+        if (security.TickSize < 0.000001 || security.TickCost < 0.000001 || security.TickPrecision < -0.000001 ||
+            security.LotSize < 0.000001 || security.LotPrecision < -0.000001)
+        {
+            AddInfo("CheckRequirements: " + security.Seccode + ": properties are incorrect", notify: true);
+            return false;
+        }
+
+        if (security.InitReqLong < 100 || security.InitReqShort < 100 ||
+            security.Deposit < 100 || security.InitReqLong < security.Deposit / 2)
+        {
+            AddInfo(security.Seccode + ": reqs are out of norm: " +
+                security.InitReqLong + "/" + security.InitReqShort + " SellDep: " + security.Deposit, true, true);
+            Task.Run(async () => await OrderSecurityInfoAsync(security));
+            return false;
+        }
+        return true;
+    }
+
+    public override bool OrderIsActive(Order order) => order.Status is "active" or "watching";
+
+    public override bool OrderIsExecuted(Order order) => order.Status == "matched";
+
+    public override bool OrderIsTriggered(Order order) => order.Status == "active";
     #endregion
 
     #region Underlying methods
@@ -397,8 +430,7 @@ internal class TXmlConnector : Connector
             if (SetCallback(CallBackTXml))
             {
                 isWorking = true;
-                mainThread = new(ProcessData) { IsBackground = true, Name = "DataProcessor" };
-                mainThread.Start();
+                MainThread.Start();
                 Initialized = true;
                 return true;
             }
@@ -429,7 +461,7 @@ internal class TXmlConnector : Connector
             Initialized = false;
             return true;
         }
-        
+
         AddInfo("Uninitialization failed: server is connected.");
         return false;
     }
@@ -471,7 +503,7 @@ internal class TXmlConnector : Connector
         Marshal.FreeHGlobal(last);
         return result;
     }
-    
+
     private async Task<string> SendCommandAsync(IntPtr command, string strCommand)
     {
         var result = "Empty";

@@ -1,4 +1,4 @@
-﻿using System;
+﻿using Newtonsoft.Json;
 using System.ComponentModel;
 
 namespace ProSystem;
@@ -6,55 +6,33 @@ namespace ProSystem;
 [Serializable]
 public class Position : INotifyPropertyChanged
 {
-    private string market;
-    private string marketName;
     private string seccode;
-    private string shortName;
+    private string? shortName;
     private double saldoIn;
     private double saldo;
     private double pl;
-    private double amount;
-    private double equity;
+    private double unrealPL;
+    private double initReqs;
+    private double minReqs;
 
-    public string Market
-    {
-        get => market;
-        set
-        {
-            if (value == null || value == "") throw new ArgumentNullException(nameof(Market));
-            market = value;
-            NotifyChange(nameof(Market));
-        }
-    }
-
-    public string MarketName
-    {
-        get => marketName;
-        set
-        {
-            if (value == null || value == "") throw new ArgumentNullException(nameof(MarketName));
-            marketName = value;
-            NotifyChange(nameof(MarketName));
-        }
-    }
+    [field: NonSerialized] public event PropertyChangedEventHandler? PropertyChanged;
 
     public string Seccode
     {
         get => seccode;
         set
         {
-            if (value == null || value == "") throw new ArgumentNullException(nameof(Seccode));
+            ArgumentException.ThrowIfNullOrEmpty(value, nameof(Seccode));
             seccode = value;
             NotifyChange(nameof(Seccode));
         }
     }
 
-    public string ShortName
+    public string? ShortName
     {
         get => shortName;
         set
         {
-            if (value == null || value == "") throw new ArgumentNullException(nameof(ShortName));
             shortName = value;
             NotifyChange(nameof(ShortName));
         }
@@ -68,7 +46,7 @@ public class Position : INotifyPropertyChanged
             saldoIn = value;
             NotifyChange(nameof(SaldoIn));
         }
-    } // Входящая позиция
+    }
 
     public double Saldo
     {
@@ -78,7 +56,7 @@ public class Position : INotifyPropertyChanged
             saldo = value;
             NotifyChange(nameof(Saldo));
         }
-    } // Текущая позиция
+    }
 
     public double PL
     {
@@ -88,46 +66,47 @@ public class Position : INotifyPropertyChanged
             pl = value;
             NotifyChange(nameof(PL));
         }
-    } // Прибыль/убыток
-
-    public double Amount
-    {
-        get => amount;
-        set
-        {
-            amount = value;
-            NotifyChange(nameof(Amount));
-        }
-    } // Текущая оценка стоимости позиции в валюте инструмента (за исключением FORTS)
-
-    public double Equity
-    {
-        get => equity;
-        set
-        {
-            equity = value;
-            NotifyChange(nameof(Equity));
-        }
-    } // Текущая оценка стоимости позиции в рублях (за исключением FORTS)
-
-    public Position() { }
-
-    public Position(string seccode, double saldo)
-    {
-        Seccode = seccode;
-        Saldo = saldo;
     }
 
-    public Position(string seccode, string shortName, string market, string marketName)
+    public double UnrealPL
     {
-        Seccode = seccode;
-        ShortName = shortName;
-        Market = market;
-        MarketName = marketName;
+        get => unrealPL;
+        set
+        {
+            unrealPL = value;
+            NotifyChange(nameof(UnrealPL));
+        }
     }
 
-    [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
+    public double InitReqs
+    {
+        get => initReqs;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value, nameof(InitReqs));
+            initReqs = value;
+            NotifyChange(nameof(InitReqs));
+        }
+    }
 
-    private void NotifyChange(string propertyName = null) =>
+    public double MinReqs
+    {
+        get => minReqs;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value, nameof(MinReqs));
+            minReqs = value;
+            NotifyChange(nameof(MinReqs));
+        }
+    }
+
+    [JsonConstructor]
+    public Position(string seccode)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(seccode, nameof(seccode));
+        this.seccode = seccode;
+    }
+
+    private void NotifyChange(string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

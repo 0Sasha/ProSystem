@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.IO;
 using System.Xml;
 
 namespace ProSystem;
@@ -19,14 +14,12 @@ internal class TXmlDataProcessor : DataProcessor
     };
     private readonly string DTForm = "dd.MM.yyyy HH:mm:ss";
 
-    private static bool Scheduled { get => (int)DateTime.Now.TimeOfDay.TotalMinutes is 50 or 400; }
-
     public TXmlDataProcessor(TXmlConnector connector, TradingSystem tradingSystem, AddInformation addInfo) :
-        base(tradingSystem, addInfo) => Connector = connector ?? throw new ArgumentNullException(nameof(connector));
+        base(tradingSystem, addInfo) => Connector = connector;
 
     public void ProcessData(string data)
     {
-        using XmlReader xr = XmlReader.Create(new StringReader(data), XS);
+        using var xr = XmlReader.Create(new StringReader(data), XS);
         xr.Read();
         if (xr.Name == "alltrades")
         {
@@ -34,36 +27,23 @@ internal class TXmlDataProcessor : DataProcessor
             {
                 if (!xr.ReadToFollowing("time")) break;
                 xr.Read();
-                var trade = new Trade(DateTime.ParseExact(xr.Value, DTForm, IC));
+                var time = DateTime.ParseExact(xr.Value, DTForm, IC);
 
-                if (!xr.ReadToFollowing("price"))
-                {
-                    AddInfo("alltrades: no price");
-                    continue;
-                }
+                if (!xr.ReadToFollowing("price")) throw new ArgumentException("No price");
                 xr.Read();
-                trade.Price = double.Parse(xr.Value, IC);
+                var price = double.Parse(xr.Value, IC);
 
-                if (!xr.ReadToFollowing("quantity"))
-                {
-                    AddInfo("alltrades: no quantity");
-                    continue;
-                }
+                if (!xr.ReadToFollowing("quantity")) throw new ArgumentException("No quantity");
                 xr.Read();
-                trade.Quantity = int.Parse(xr.Value, IC);
+                var quantity = int.Parse(xr.Value, IC);
 
-                if (!xr.ReadToFollowing("seccode"))
-                {
-                    AddInfo("alltrades: no seccode");
-                    continue;
-                }
+                if (!xr.ReadToFollowing("seccode")) throw new ArgumentException("No seccode");
                 xr.Read();
-                trade.Seccode = xr.Value;
-                UpdateLastBar(trade);
+
+                UpdateLastBar(new(xr.Value, time, price, quantity));
             }
         }
         else ProcessSections(xr, xr.Name);
-        xr.Close();
     }
 
     private void ProcessSections(XmlReader xr, string section)
@@ -81,8 +61,7 @@ internal class TXmlDataProcessor : DataProcessor
         else if (section == "markets") ProcessMarkets(xr);
         else if (section == "candlekinds") ProcessTimeFrames(xr);
         else if (section == "error" && xr.Read()) AddInfo(xr.Value);
-        else if (section == "messages" && xr.ReadToFollowing("text") && xr.Read())
-            AddInfo(xr.Value, TradingSystem.Settings.DisplayMessages);
+        else if (section == "messages" && xr.ReadToFollowing("text") && xr.Read()) AddInfo(xr.Value, false);
         //else if (section is not "marketord" and not "pits" and not "boards" and not "union" 
         //    and not "overnight" and not "news_header") AddInfo("ProcessData: unknown section: " + section);
     }
@@ -101,24 +80,25 @@ internal class TXmlDataProcessor : DataProcessor
             .SingleOrDefault(t => t.Security.Seccode == sec || t.BasicSecurity?.Seccode == sec);
         if (tool != null)
         {
-            var security = tool.Security.Seccode == sec ? tool.Security : tool.BasicSecurity;
-            var tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Seconds / 60;
+            var security = tool.BasicSecurity;
+            if (security == null || tool.Security.Seccode == sec) security = tool.Security;
+            var tf = Connector.TimeFrames.Single(x => x.ID == xr.GetAttribute("period")).Minutes;
             ProcessBars(xr, tool, security, tf);
         }
         else
         {
             xr.Read();
-            if (sec == "USD000UTSTOM") Connector.USDRUB = double.Parse(xr.GetAttribute("close"), IC);
-            else if (sec == "EUR_RUB__TOM") Connector.EURRUB = double.Parse(xr.GetAttribute("close"), IC);
+            if (sec == "USD000UTSTOM") Connector.USDRUB = xr.GetDoubleAttribute("close");
+            else if (sec == "EUR_RUB__TOM") Connector.EURRUB = xr.GetDoubleAttribute("close");
             else AddInfo("ProcessBars: unknown asset: " + sec);
         }
     }
 
     private void ProcessBars(XmlReader xr, Tool tool, Security security, int tf)
     {
-        List<DateTime> dateTime = new();
-        List<double> open = new(), high = new(),
-            low = new(), close = new(), volume = new();
+        List<DateTime> dateTime = [];
+        List<double> open = [], high = [],
+            low = [], close = [], volume = [];
 
         bool filter = true;
         int startHour = 9;
@@ -129,24 +109,23 @@ internal class TXmlDataProcessor : DataProcessor
 
         while (xr.Read())
         {
-            if (filter && xr.HasAttributes &&
-                DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC).Hour < startHour) continue;
+            if (filter && xr.HasAttributes && xr.GetDateTimeAttribute("date").Hour < startHour) continue;
 
             if (xr.HasAttributes)
             {
-                dateTime.Add(DateTime.ParseExact(xr.GetAttribute("date"), DTForm, IC));
-                open.Add(double.Parse(xr.GetAttribute("open"), IC));
-                high.Add(double.Parse(xr.GetAttribute("high"), IC));
-                low.Add(double.Parse(xr.GetAttribute("low"), IC));
-                close.Add(double.Parse(xr.GetAttribute("close"), IC));
-                volume.Add(double.Parse(xr.GetAttribute("volume"), IC));
+                dateTime.Add(xr.GetDateTimeAttribute("date"));
+                open.Add(xr.GetDoubleAttribute("open"));
+                high.Add(xr.GetDoubleAttribute("high"));
+                low.Add(xr.GetDoubleAttribute("low"));
+                close.Add(xr.GetDoubleAttribute("close"));
+                volume.Add(xr.GetDoubleAttribute("volume"));
             }
             else if (xr.NodeType == XmlNodeType.EndElement)
             {
                 if (dateTime.Count > 1)
                 {
-                    var newBars = new Bars(dateTime.ToArray(), open.ToArray(),
-                        high.ToArray(), low.ToArray(), close.ToArray(), volume.ToArray(), tf);
+                    var newBars = new Bars([.. dateTime], [.. open],
+                        [.. high], [.. low], [.. close], [.. volume], tf);
                     UpdateBars(security, newBars, tool.BaseTF);
                 }
                 return;
@@ -161,106 +140,67 @@ internal class TXmlDataProcessor : DataProcessor
         {
             if (!xr.HasAttributes && !xr.ReadToFollowing("order")) return;
 
-            // Первичная идентификация
-            int trID = int.Parse(xr.GetAttribute("transactionid"), IC);
-            var orders = TradingSystem.Orders.ToArray();
-            if (orders.Where(x => x.TrID == trID).Count() > 1)
+            var trId = xr.GetIntAttribute("transactionid");
+            var id = xr.GetNextLong("orderno");
+            var seccode = xr.GetNextString("seccode");
+            var status = xr.GetNextString("status");
+            var side = xr.GetNextString("buysell");
+            var newOrder = new Order(id, seccode, status, Connector.ServerTime, side) { TrID = trId };
+
+            xr.Read();
+            xr.Read();
+            if (xr.Name == "time") newOrder.Time = xr.GetNextDateTime("time");
+            else if (xr.Name == "accepttime") newOrder.Time = xr.GetNextDateTime("accepttime");
+
+            newOrder.Balance = xr.GetNextDouble("balance");
+            newOrder.Price = xr.GetNextDouble("price");
+            newOrder.Quantity = xr.GetNextDouble("quantity");
+            newOrder.Type = xr.GetNextString("condition");
+            newOrder.InitType = newOrder.Type == "None" ? OrderType.Limit : OrderType.Conditional;
+
+            var result = xr.GetNextString("result");
+            if (result != string.Empty)
             {
-                AddInfo("ProcessOrders: Найдено несколько заявок с одинаковым TrID. Удаление лишних.", notify: true);
+                AddInfo(newOrder.Seccode + "/" + newOrder.TrID + ": OrderReply: " + result,
+                    !result.StartsWith("{37}") && !result.StartsWith("{42}"));
+            }
+
+            var orders = TradingSystem.Orders.ToArray();
+            if (orders.Where(x => x.TrID == newOrder.TrID).Count() > 1)
+            {
+                AddInfo("ProcessOrders: Extra orders with the same TrID are going to be deleted", notify: true);
                 TradingSystem.Window.Dispatcher.Invoke(() =>
                 {
-                    while (orders.Where(x => x.TrID == trID).Count() > 1)
+                    while (orders.Where(x => x.TrID == newOrder.TrID).Count() > 1)
                     {
-                        TradingSystem.Orders.Remove(orders.First(x => x.TrID == trID));
-                        orders = TradingSystem.Orders.ToArray();
+                        TradingSystem.Orders.Remove(orders.First(x => x.TrID == newOrder.TrID));
+                        orders = [.. TradingSystem.Orders];
                     }
                 });
             }
 
-            var order = orders.SingleOrDefault(x => x.TrID == trID); // Проверка наличия заявки с данным TrID
-            order ??= new Order(trID); // Создание новой заявки с данным TrID
+            Order? oldOrder = null;
+            if (newOrder.Id != 0) oldOrder = orders.SingleOrDefault(x => x.Id == newOrder.Id);
+            oldOrder ??= orders.SingleOrDefault(x => x.TrID == newOrder.TrID);
 
-            // Вторичная идентификация
-            if (!GoToTheValue(xr, "orderno")) continue;
-            if (xr.Value == "0") order.OrderNo = 0;
-            else if (orders.SingleOrDefault(x => x.OrderNo == long.Parse(xr.Value, IC)) == null)
-                order.OrderNo = long.Parse(xr.Value, IC);
-            else // Заявка с данным биржевым номером уже есть в коллекции, обновление TrID и её фиксация
+            if (oldOrder == null) TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Orders.Add(newOrder));
+            else
             {
-                orders.Single(x => x.OrderNo == long.Parse(xr.Value, IC)).TrID = trID;
-                order = orders.Single(x => x.TrID == trID); // Фиксация существующей заявки
-            }
-
-            if (!GoToTheValue(xr, "seccode")) continue;
-            order.Seccode = xr.Value;
-
-            if (!GoToTheValue(xr, "status")) continue;
-            order.Status = xr.Value;
-
-            if (!GoToTheValue(xr, "buysell")) continue;
-            order.BuySell = xr.Value;
-
-            xr.Read();
-            xr.Read();
-            if (xr.Name == "time")
-            {
-                xr.Read();
-                order.Time = DateTime.ParseExact(xr.Value, DTForm, IC);
-                xr.Read();
-                xr.Read();
-                if (xr.Name == "accepttime")
+                oldOrder.TrID = newOrder.TrID;
+                oldOrder.Id = newOrder.Id;
+                oldOrder.Seccode = newOrder.Seccode;
+                oldOrder.Side = newOrder.Side;
+                oldOrder.Time = newOrder.Time;
+                oldOrder.Balance = newOrder.Balance;
+                oldOrder.Price = newOrder.Price;
+                oldOrder.Quantity = newOrder.Quantity;
+                oldOrder.Type = newOrder.Type;
+                if (oldOrder.Status != newOrder.Status)
                 {
-                    xr.Read();
-                    order.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+                    oldOrder.Status = newOrder.Status;
+                    oldOrder.ChangeTime = newOrder.ChangeTime;
                 }
             }
-            else if (xr.Name == "accepttime")
-            {
-                xr.Read();
-                order.AcceptTime = DateTime.ParseExact(xr.Value, DTForm, IC);
-            }
-            else if (order.Status == "active" && order.OrderNo == 0) { }
-
-            if (!GoToTheValue(xr, "balance")) continue;
-            order.Balance = int.Parse(xr.Value, IC);
-
-            if (!GoToTheValue(xr, "price")) continue;
-            order.Price = double.Parse(xr.Value, IC);
-
-            if (!GoToTheValue(xr, "quantity")) continue;
-            order.Quantity = int.Parse(xr.Value, IC);
-
-            if (!GoToTheValue(xr, "withdrawtime")) continue;
-            if (xr.Value != "0") order.WithdrawTime = DateTime.ParseExact(xr.Value, DTForm, IC);
-
-            if (!GoToTheValue(xr, "condition")) continue;
-            order.Condition = xr.Value;
-            if (order.Condition != "None")
-            {
-                if (!GoToTheValue(xr, "conditionvalue")) continue;
-                order.ConditionValue = double.Parse(xr.Value, IC);
-
-                if (!GoToTheValue(xr, "validafter")) continue;
-                if (xr.Value != "0") order.ValidAfter = DateTime.ParseExact(xr.Value, DTForm, IC);
-
-                if (!GoToTheValue(xr, "validbefore")) continue;
-                if (xr.Value != "" && xr.Value != "0") order.ValidBefore = DateTime.ParseExact(xr.Value, DTForm, IC);
-            }
-
-            if (!GoToTheValue(xr, "result")) continue;
-            if (xr.HasValue)
-            {
-                if (xr.Value.StartsWith("{37}", OC) || xr.Value.StartsWith("{42}", OC))
-                    AddInfo(order.Seccode + "/" + order.TrID + ": OrderReply: " + xr.Value, false);
-                else AddInfo(order.Seccode + "/" + order.TrID + ": OrderReply: " + xr.Value);
-            }
-
-            int i = Array.FindIndex(TradingSystem.Orders.ToArray(), x => x.TrID == order.TrID);
-            TradingSystem.Window.Dispatcher.Invoke(() =>
-            {
-                if (i > -1) TradingSystem.Orders[i] = order;
-                else TradingSystem.Orders.Add(order);
-            });
         }
     }
 
@@ -278,12 +218,12 @@ internal class TXmlDataProcessor : DataProcessor
                 var pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
                 if (pos == null)
                 {
-                    pos = CreatePosition(xr.Value);
+                    pos = new(xr.Value)
+                    {
+                        ShortName = Connector.Securities.Single(x => x.Seccode == xr.Value).ShortName
+                    };
                     portfolio.Positions.Add(pos);
                 }
-
-                if (!GoToTheValue(xr, "market")) continue;
-                pos.Market = xr.Value;
 
                 if (subsection == "forts_position")
                 {
@@ -304,11 +244,11 @@ internal class TXmlDataProcessor : DataProcessor
                     if (!GoToTheValue(xr, "saldo")) continue;
                     pos.Saldo = int.Parse(xr.Value, IC);
 
-                    if (!GoToTheValue(xr, "amount")) continue;
-                    pos.Amount = double.Parse(xr.Value, IC);
+                    //if (!GoToTheValue(xr, "amount")) continue;
+                    //pos.Amount = double.Parse(xr.Value, IC);
 
-                    if (!GoToTheValue(xr, "equity")) continue;
-                    pos.Equity = double.Parse(xr.Value, IC);
+                    //if (!GoToTheValue(xr, "equity")) continue;
+                    //pos.Equity = double.Parse(xr.Value, IC);
                 }
             }
             else if (subsection == "united_limits")
@@ -328,8 +268,8 @@ internal class TXmlDataProcessor : DataProcessor
                 if (!GoToTheValue(xr, "finres")) return;
                 portfolio.FinRes = double.Parse(xr.Value, IC);
 
-                if (!GoToTheValue(xr, "go")) return;
-                portfolio.GO = double.Parse(xr.Value, IC);
+                //if (!GoToTheValue(xr, "go")) return;
+                //portfolio.GO = double.Parse(xr.Value, IC);
                 return;
             }
             else if (subsection == "money_position")
@@ -339,7 +279,7 @@ internal class TXmlDataProcessor : DataProcessor
                 var pos = portfolio.MoneyPositions.SingleOrDefault(x => x.ShortName == xr.Value);
                 if (pos == null)
                 {
-                    pos = new() { ShortName = xr.Value };
+                    pos = new(xr.Value) { ShortName = xr.Value };
                     portfolio.MoneyPositions.Add(pos);
                 }
 
@@ -363,34 +303,36 @@ internal class TXmlDataProcessor : DataProcessor
         while (xr.Read())
         {
             if (!GoToTheValue(xr, "tradeno", false)) return;
-            if (trades.SingleOrDefault(x => x.TradeNo == long.Parse(xr.Value, IC)) != null) continue;
-            var trade = new Trade(long.Parse(xr.Value, IC));
+            if (trades.SingleOrDefault(x => x.Id == long.Parse(xr.Value, IC)) != null) continue;
+            var id = long.Parse(xr.Value, IC);
 
             if (!GoToTheValue(xr, "orderno")) continue;
-            trade.OrderNo = long.Parse(xr.Value, IC);
+            var orderId = long.Parse(xr.Value, IC);
 
             if (!GoToTheValue(xr, "seccode")) continue;
-            trade.Seccode = xr.Value;
+            var seccode = xr.Value;
 
             if (!GoToTheValue(xr, "buysell")) continue;
-            trade.BuySell = xr.Value;
+            var side = xr.Value;
 
             if (!GoToTheValue(xr, "time")) continue;
-            trade.DateTime = DateTime.ParseExact(xr.Value, DTForm, IC);
+            var time = DateTime.ParseExact(xr.Value, DTForm, IC);
 
             if (!GoToTheValue(xr, "price")) continue;
-            trade.Price = double.Parse(xr.Value, IC);
+            var price = double.Parse(xr.Value, IC);
 
             if (!GoToTheValue(xr, "quantity")) continue;
-            trade.Quantity = int.Parse(xr.Value, IC);
+            var quantity = int.Parse(xr.Value, IC);
 
+            var trade = new Trade(id, orderId, seccode, side, time, price, quantity, 0);
             TradingSystem.Window.Dispatcher.Invoke(() => trades.Add(trade));
+
             var display = TradingSystem.Settings.DisplayNewTrades && trades.Count > 1 &&
-                (trades[^2].Seccode != trade.Seccode || trades[^2].BuySell != trade.BuySell ||
-                trades[^2].DateTime < trade.DateTime.AddMinutes(-30));
+                (trades[^2].Seccode != trade.Seccode || trades[^2].Side != trade.Side ||
+                trades[^2].Time < trade.Time.AddMinutes(-30));
 
             AddInfo("New trade: " + trade.Seccode + "/" +
-                trade.BuySell + "/" + trade.Price + "/" + trade.Quantity, display);
+                trade.Side + "/" + trade.Price + "/" + trade.Quantity, display);
         }
     }
 
@@ -403,11 +345,10 @@ internal class TXmlDataProcessor : DataProcessor
             if (xr.GetAttribute("recover") != "true")
             {
                 Connector.Connection = ConnectionState.Connected;
-                AddInfo("Connected", !Scheduled);
+                AddInfo("Connected", !Connector.ReconnectTime);
             }
             else
             {
-                Connector.ReconnectionTrigger = DateTime.Now.AddSeconds(TradingSystem.Settings.SessionTM);
                 Connector.Connection = ConnectionState.Connecting;
                 AddInfo("Recover connection");
             }
@@ -420,7 +361,7 @@ internal class TXmlDataProcessor : DataProcessor
             if (xr.GetAttribute("recover") != "true")
             {
                 Connector.Connection = ConnectionState.Disconnected;
-                AddInfo("Disconnected", !Scheduled);
+                AddInfo("Disconnected", !Connector.ReconnectTime);
             }
             else
             {
@@ -470,7 +411,7 @@ internal class TXmlDataProcessor : DataProcessor
             var pos = portfolio.Positions.SingleOrDefault(x => x.Seccode == xr.Value);
             if (pos == null)
             {
-                pos = CreatePosition(xr.Value);
+                pos = new(xr.Value) { ShortName = Connector.Securities.Single(x => x.Seccode == xr.Value).ShortName };
                 portfolio.Positions.Add(pos);
             }
 
@@ -497,11 +438,11 @@ internal class TXmlDataProcessor : DataProcessor
             if (xr.Name.Length > 0) property = xr.Name;
             else if (xr.HasValue)
             {
-                if (property == "buy_deposit") tool.Security.BuyDeposit = double.Parse(xr.Value, IC);
-                else if (property == "sell_deposit") tool.Security.SellDeposit = double.Parse(xr.Value, IC);
+                if (property == "sell_deposit") tool.Security.Deposit = double.Parse(xr.Value, IC);
                 else if (property == "minprice") tool.Security.MinPrice = double.Parse(xr.Value, IC);
                 else if (property == "maxprice") tool.Security.MaxPrice = double.Parse(xr.Value, IC);
-                else if (property == "point_cost") tool.Security.PointCost = double.Parse(xr.Value, IC);
+                else if (property == "point_cost")
+                    tool.Security.TickCost = GetTickCost(double.Parse(xr.Value, IC), tool.Security);
             }
         }
     }
@@ -520,13 +461,13 @@ internal class TXmlDataProcessor : DataProcessor
         tool.Security.RiskrateLong = double.Parse(xr.Value, IC);
 
         if (!GoToTheValue(xr, "reserate_long")) return;
-        tool.Security.ReserateLong = double.Parse(xr.Value, IC);
+        tool.Security.RiskrateLong += double.Parse(xr.Value, IC);
 
         if (!GoToTheValue(xr, "riskrate_short")) return;
         tool.Security.RiskrateShort = double.Parse(xr.Value, IC);
 
         if (!GoToTheValue(xr, "reserate_short")) return;
-        tool.Security.ReserateShort = double.Parse(xr.Value, IC);
+        tool.Security.RiskrateShort += double.Parse(xr.Value, IC);
 
         Task.Run(() => UpdateRequirements(tool.Security));
     }
@@ -539,34 +480,28 @@ internal class TXmlDataProcessor : DataProcessor
             if (xr.Name != "security" && !xr.ReadToFollowing("security")) return;
             if (xr.GetAttribute("active") == "false") continue;
 
-            if (!GoToTheValue(xr, "seccode")) continue;
-            Connector.Securities.Add(new Security(xr.Value));
-
-            var name = "";
+            var seccode = xr.GetNextString("seccode");
             while (xr.Read())
-            {
-                if (xr.NodeType == XmlNodeType.EndElement)
-                {
-                    if (xr.Name == "security") break;
-                    continue;
-                }
-                if (xr.NodeType == XmlNodeType.Element)
-                {
-                    name = xr.Name;
-                    continue;
-                }
+                if (xr.Name is "board" or "currency") break;
 
-                if (name == "currency") Connector.Securities[^1].Currency = xr.Value;
-                else if (name == "board") Connector.Securities[^1].Board = xr.Value;
-                else if (name == "shortname") Connector.Securities[^1].ShortName = xr.Value;
-                else if (name == "decimals") Connector.Securities[^1].Decimals = int.Parse(xr.Value, IC);
-                else if (name == "market") Connector.Securities[^1].Market = xr.Value;
-                else if (name == "minstep") Connector.Securities[^1].MinStep = double.Parse(xr.Value, IC);
-                else if (name == "lotsize") Connector.Securities[^1].LotSize = int.Parse(xr.Value, IC);
-                else if (name == "point_cost") Connector.Securities[^1].PointCost = double.Parse(xr.Value, IC);
-            }
+            var security = new Security(seccode)
+            {
+                Currency = xr.Name == "currency" ? xr.GetNextString("currency") : null,
+                Board = xr.GetNextString("board"),
+                ShortName = xr.GetNextString("shortname"),
+                TickPrecision = xr.GetNextInt("decimals"),
+                Market = xr.GetNextString("market"),
+                TickSize = xr.GetNextDouble("minstep"),
+                LotSize = xr.GetNextInt("lotsize")
+            };
+
+            security.TickCost = GetTickCost(xr.GetNextDouble("point_cost"), security);
+            Connector.Securities.Add(security);
         }
     }
+
+    private static double GetTickCost(double pointCost, Security security) =>
+        pointCost * security.TickSize * Math.Pow(10, security.TickPrecision) / 100;
 
     private void ProcessClients(XmlReader xr)
     {
@@ -574,7 +509,7 @@ internal class TXmlDataProcessor : DataProcessor
         if (xr.GetAttribute("remove") == "false")
         {
             if (Connector.Clients.SingleOrDefault(x => x.ID == xr.GetAttribute("id")) == null)
-                id = xr.GetAttribute("id");
+                id = xr.GetStringAttribute("id");
             else
             {
                 AddInfo("ProcessClients: client already exists");
@@ -602,7 +537,7 @@ internal class TXmlDataProcessor : DataProcessor
             var id = xr.Value;
 
             if (!GoToTheValue(xr, "period")) return;
-            var period = int.Parse(xr.Value, IC);
+            var period = int.Parse(xr.Value, IC) / 60;
 
             if (!GoToTheValue(xr, "name")) return;
             Connector.TimeFrames.Add(new TimeFrame(id, period, xr.Value));
@@ -611,10 +546,10 @@ internal class TXmlDataProcessor : DataProcessor
 
     private void ProcessMarkets(XmlReader xr)
     {
-        string id = null;
+        string id = "id";
         while (xr.Read())
         {
-            if (xr.HasAttributes) id = xr.GetAttribute("id");
+            if (xr.HasAttributes) id = xr.GetStringAttribute("id");
             else if (xr.HasValue) Connector.Markets.Add(new Market(id, xr.Value));
         }
     }
@@ -631,42 +566,21 @@ internal class TXmlDataProcessor : DataProcessor
         return true;
     }
 
-    private Position CreatePosition(string seccode)
-    {
-        var sec = Connector.Securities.SingleOrDefault(x => x.Seccode == seccode);
-        if (sec != null)
-        {
-            var market = Connector.Markets.SingleOrDefault(x => x.ID == sec.Market);
-            if (market != null) return new(seccode, sec.ShortName, sec.Market, market.Name);
-            else throw new ArgumentException("Market is not found", nameof(seccode));
-        }
-        else throw new ArgumentException("Security with this seccode is not found", nameof(seccode));
-    }
-
     private static void UpdateRequirements(Security security)
     {
         for (int i = 0; security.Bars == null && i < 20; i++) Thread.Sleep(250);
         if (security.Bars == null) throw new ArgumentException("There is no bars");
-        if (security.MinStep < 0.00000001) throw new ArgumentException("MinStep is <= 0");
-        if (security.PointCost < 0.00000001) throw new ArgumentException("PointCost is <= 0");
-        if (security.Decimals < -0.00000001) throw new ArgumentException("Decimals is < 0");
-        if (security.RiskrateLong < 0.00000001) throw new ArgumentException("RiskrateLong is <= 0");
-        if (security.RiskrateShort < 0.00000001) throw new ArgumentException("RiskrateShort is <= 0");
-        if (security.ReserateLong < -0.00000001) throw new ArgumentException("ReserateLong is < 0");
-        if (security.ReserateShort < -0.00000001) throw new ArgumentException("ReserateShort is < 0");
+        if (security.TickSize < 0.000001) throw new ArgumentException("TickSize is <= 0");
+        if (security.TickCost < 0.000001) throw new ArgumentException("TickCost is <= 0");
+        if (security.TickPrecision < -0.000001) throw new ArgumentException("TickPrecision is < 0");
+        if (security.RiskrateLong < 0.000001) throw new ArgumentException("RiskrateLong is <= 0");
+        if (security.RiskrateShort < 0.000001) throw new ArgumentException("RiskrateShort is <= 0");
 
-        security.LastTrade ??= new()
-        {
-            Price = security.Bars.Close[^1],
-            DateTime = security.Bars.DateTime[^1]
-        };
-        security.MinStepCost = security.PointCost * security.MinStep * Math.Pow(10, security.Decimals) / 100;
-
-        var lastPrice = security.LastTrade.DateTime > security.Bars.DateTime[^1] ?
+        var lastPrice = security.LastTrade.Time > security.Bars.DateTime[^1] ?
             security.LastTrade.Price : security.Bars.Close[^1];
-        var value = lastPrice * security.MinStepCost / security.MinStep * security.LotSize / 100;
+        var value = lastPrice * security.TickCost / security.TickSize * security.LotSize / 100;
 
-        security.InitReqLong = Math.Round((security.RiskrateLong + security.ReserateLong) * value, 2);
-        security.InitReqShort = Math.Round((security.RiskrateShort + security.ReserateShort) * value, 2);
+        security.InitReqLong = Math.Round(security.RiskrateLong * value, 2);
+        security.InitReqShort = Math.Round(security.RiskrateShort * value, 2);
     }
 }

@@ -1,24 +1,17 @@
-﻿using System;
-using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Globalization;
 
 namespace ProSystem;
 
-abstract class DataProcessor
+public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation addInfo)
 {
-    protected readonly AddInformation AddInfo;
-    protected readonly TradingSystem TradingSystem;
+    protected readonly AddInformation AddInfo = addInfo;
+    protected readonly TradingSystem TradingSystem = tradingSystem;
     protected readonly CultureInfo IC = CultureInfo.InvariantCulture;
     protected readonly StringComparison OC = StringComparison.Ordinal;
 
-    public DataProcessor(TradingSystem tradingSystem, AddInformation addInfo)
-    {
-        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-    }
+    private DateTime ServerTime { get => TradingSystem.Connector.ServerTime; }
 
-    protected static void UpdateBars(Security security, Bars newBars, int baseTF)
+    protected void UpdateBars(Security security, Bars newBars, int baseTF)
     {
         if (newBars.TF <= 0) throw new ArgumentException("TF <= 0", nameof(newBars));
         if (baseTF <= 0) throw new ArgumentException("baseTF <= 0", nameof(baseTF));
@@ -41,26 +34,26 @@ abstract class DataProcessor
 
             if (y > -1) // Есть общие бары
             {
-                security.SourceBars.DateTime = security.SourceBars.DateTime[..y].Concat(dateTime).ToArray();
-                security.SourceBars.Open = security.SourceBars.Open[..y].Concat(open).ToArray();
-                security.SourceBars.High = security.SourceBars.High[..y].Concat(high).ToArray();
-                security.SourceBars.Low = security.SourceBars.Low[..y].Concat(low).ToArray();
-                security.SourceBars.Close = security.SourceBars.Close[..y].Concat(close).ToArray();
-                security.SourceBars.Volume = security.SourceBars.Volume[..y].Concat(volume).ToArray();
+                security.SourceBars.DateTime = [.. security.SourceBars.DateTime[..y], .. dateTime];
+                security.SourceBars.Open = [.. security.SourceBars.Open[..y], .. open];
+                security.SourceBars.High = [.. security.SourceBars.High[..y], .. high];
+                security.SourceBars.Low = [.. security.SourceBars.Low[..y], .. low];
+                security.SourceBars.Close = [.. security.SourceBars.Close[..y], .. close];
+                security.SourceBars.Volume = [.. security.SourceBars.Volume[..y], .. volume];
             }
             else security.SourceBars = newBars; // Отсутствует общий бар
         }
         else if (dateTime[^1] < security.SourceBars.DateTime[0]) // Полученные данные глубже исходных
         {
-            if (dateTime[^1].AddDays(5) < security.SourceBars.DateTime[0])
-                throw new ArgumentException("Received bars are too deep: " + security.Seccode);
+            if (dateTime[^1].AddDays(7) < security.SourceBars.DateTime[0])
+                AddInfo("Received bars are too deep: " + security.Seccode, true, true);
 
-            security.SourceBars.DateTime = dateTime.Concat(security.SourceBars.DateTime).ToArray();
-            security.SourceBars.Open = open.Concat(security.SourceBars.Open).ToArray();
-            security.SourceBars.High = high.Concat(security.SourceBars.High).ToArray();
-            security.SourceBars.Low = low.Concat(security.SourceBars.Low).ToArray();
-            security.SourceBars.Close = close.Concat(security.SourceBars.Close).ToArray();
-            security.SourceBars.Volume = volume.Concat(security.SourceBars.Volume).ToArray();
+            security.SourceBars.DateTime = [.. dateTime, .. security.SourceBars.DateTime];
+            security.SourceBars.Open = [.. open, .. security.SourceBars.Open];
+            security.SourceBars.High = [.. high, .. security.SourceBars.High];
+            security.SourceBars.Low = [.. low, .. security.SourceBars.Low];
+            security.SourceBars.Close = [.. close, .. security.SourceBars.Close];
+            security.SourceBars.Volume = [.. volume, .. security.SourceBars.Volume];
         }
         else if (dateTime[0] < security.SourceBars.DateTime[0])
         {
@@ -82,21 +75,26 @@ abstract class DataProcessor
     {
         var tool = TradingSystem.Tools
             .Single(x => x.Security.Seccode == lastTrade.Seccode || x.BasicSecurity?.Seccode == lastTrade.Seccode);
-        var security = tool.Security.Seccode == lastTrade.Seccode ? tool.Security : tool.BasicSecurity;
+        
+        var security = tool.BasicSecurity;
+        if (security == null || tool.Security.Seccode == lastTrade.Seccode) security = tool.Security;
+        ArgumentNullException.ThrowIfNull(security.Bars);
+        
+        var prevTradeTime = security.LastTrade.Time;
         security.LastTrade = lastTrade;
 
         var bars = security.Bars;
-        if (lastTrade.DateTime < bars.DateTime[^1].AddMinutes(bars.TF))
+        if (lastTrade.Time < bars.DateTime[^1].AddMinutes(bars.TF))
         {
             bars.Close[^1] = lastTrade.Price;
             if (lastTrade.Price > bars.High[^1]) bars.High[^1] = lastTrade.Price;
             else if (lastTrade.Price < bars.Low[^1]) bars.Low[^1] = lastTrade.Price;
             bars.Volume[^1] += lastTrade.Quantity;
         }
-        else if (DateTime.Now > security.LastTrDT)
+        else if (ServerTime > prevTradeTime)
         {
-            var startTime = DateTime.Now.Date == bars.DateTime[^1].Date ?
-                bars.DateTime[^1].AddMinutes(bars.TF) : DateTime.Now.Date.AddHours(DateTime.Now.Hour);
+            var startTime = ServerTime.Date == bars.DateTime[^1].Date ?
+                bars.DateTime[^1].AddMinutes(bars.TF) : ServerTime.Date.AddHours(ServerTime.Hour);
             var price = lastTrade.Price;
             AddNewBar(tool, security, true, true, startTime, price, price, price, price, lastTrade.Quantity);
         }
@@ -107,7 +105,10 @@ abstract class DataProcessor
     {
         var tool = TradingSystem.Tools
             .Single(x => x.Security.Seccode == lastTrade.Seccode || x.BasicSecurity?.Seccode == lastTrade.Seccode);
-        var security = tool.Security.Seccode == lastTrade.Seccode ? tool.Security : tool.BasicSecurity;
+
+        var security = tool.BasicSecurity;
+        if (security == null || tool.Security.Seccode == lastTrade.Seccode) security = tool.Security;
+        ArgumentNullException.ThrowIfNull(security.Bars);
         security.LastTrade = lastTrade;
 
         var bars = security.Bars;
@@ -127,15 +128,17 @@ abstract class DataProcessor
     private void AddNewBar(Tool tool, Security security, bool delay, bool requestBars,
         DateTime startTime, double open, double high, double low, double close, double volume)
     {
-        security.LastTrDT = DateTime.Now.AddSeconds(10);
-        tool.TimeNextRecalc = DateTime.Now.AddSeconds(30);
+        ArgumentNullException.ThrowIfNull(security.Bars);
 
-        security.Bars.DateTime = security.Bars.DateTime.Concat(new[] { startTime }).ToArray();
-        security.Bars.Open = security.Bars.Open.Concat(new[] { open }).ToArray();
-        security.Bars.High = security.Bars.High.Concat(new[] { high }).ToArray();
-        security.Bars.Low = security.Bars.Low.Concat(new[] { low }).ToArray();
-        security.Bars.Close = security.Bars.Close.Concat(new[] { close }).ToArray();
-        security.Bars.Volume = security.Bars.Volume.Concat(new[] { volume }).ToArray();
+        security.LastTrade.Time = ServerTime.AddSeconds(10);
+        tool.NextRecalc = ServerTime.AddSeconds(30);
+
+        security.Bars.DateTime = [.. security.Bars.DateTime, .. new[] { startTime }];
+        security.Bars.Open = [.. security.Bars.Open, .. new[] { open }];
+        security.Bars.High = [.. security.Bars.High, .. new[] { high }];
+        security.Bars.Low = [.. security.Bars.Low, .. new[] { low }];
+        security.Bars.Close = [.. security.Bars.Close, .. new[] { close }];
+        security.Bars.Volume = [.. security.Bars.Volume, .. new[] { volume }];
 
         Task.Run(() => RecalculateAsync(tool, security, delay, requestBars));
     }
@@ -145,8 +148,8 @@ abstract class DataProcessor
         if (delay) await Task.Delay(250);
 
         var lastExecuted = TradingSystem.Orders.ToArray()
-            .LastOrDefault(x => x.Seccode == tool.Security.Seccode && x.Status == "matched");
-        if (lastExecuted != null && lastExecuted.DateTime.AddSeconds(3) > DateTime.Now)
+            .LastOrDefault(x => x.Seccode == tool.Security.Seccode && TradingSystem.Connector.OrderIsExecuted(x));
+        if (lastExecuted != null && lastExecuted.ChangeTime.AddSeconds(3) > ServerTime)
         {
             AddInfo(tool.Name + ": an order is executed during the bar opening. Waiting.", false);
             await Task.Delay(2000);
@@ -154,8 +157,8 @@ abstract class DataProcessor
         else if (tool.Security.Seccode == security.Seccode)
         {
             var active = TradingSystem.Orders.ToArray()
-                .Where(x => x.Seccode == security.Seccode && (x.Status is "active" or "watching")).ToArray();
-            if (active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.00000001))
+                .Where(x => x.Seccode == security.Seccode && TradingSystem.Connector.OrderIsActive(x)).ToArray();
+            if (active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.000001))
             {
                 AddInfo(tool.Name + ": active order price equals bar opening. Waiting.", false);
                 await Task.Delay(2000);
@@ -163,7 +166,7 @@ abstract class DataProcessor
         }
 
         await TradingSystem.ToolManager.CalculateAsync(tool);
-        tool.MainModel.InvalidatePlot(true);
-        if (requestBars) await TradingSystem.ToolManager.RequestBarsAsync(tool);
+        tool.MainModel?.InvalidatePlot(true);
+        if (requestBars) await TradingSystem.Connector.RequestBarsAsync(tool);
     }
 }

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace ProSystem.Services;
+﻿namespace ProSystem.Services;
 
 internal class PortfolioManager : IPortfolioManager
 {
@@ -12,21 +6,19 @@ internal class PortfolioManager : IPortfolioManager
     private readonly TradingSystem TradingSystem;
 
     private Settings Settings { get => TradingSystem.Settings; }
-
     private Connector Connector { get => TradingSystem.Connector; }
-
     private Portfolio Portfolio { get => TradingSystem.Portfolio; }
 
     public PortfolioManager(TradingSystem tradingSystem, AddInformation addInfo)
     {
-        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
+        TradingSystem = tradingSystem;
+        AddInfo = addInfo;
     }
 
 
     public bool CheckEquity()
     {
-        var range = Portfolio.AverageEquity / 100 * Settings.ToleranceEquity;
+        var range = Portfolio.AverageEquity / 100D * Settings.ToleranceEquity;
         if (Portfolio.Saldo < Portfolio.AverageEquity - range || Portfolio.Saldo > Portfolio.AverageEquity + range)
         {
             AddInfo("Portfolio saldo is out of scope", notify: true);
@@ -38,7 +30,7 @@ internal class PortfolioManager : IPortfolioManager
     public void UpdateEquity()
     {
         Portfolio.Equity[DateTime.Today.AddDays(-1)] = (int)Portfolio.Saldo;
-        Portfolio.NotifyChange(nameof(Portfolio.Equity));
+        Portfolio.NotifyChange(nameof(Portfolio.AverageEquity));
     }
 
     public void UpdatePositions()
@@ -51,8 +43,8 @@ internal class PortfolioManager : IPortfolioManager
 
     public async Task CheckPortfolioAsync()
     {
-        if (DateTime.Now > DateTime.Today.AddMinutes(840) &&
-            DateTime.Now < DateTime.Today.AddMinutes(845) || !CheckEquity()) return;
+        if (Connector.ServerTime > DateTime.Today.AddMinutes(840) &&
+            Connector.ServerTime < DateTime.Today.AddMinutes(845) || !CheckEquity()) return;
 
         if (RequirementsAreNormal())
         {
@@ -106,14 +98,18 @@ internal class PortfolioManager : IPortfolioManager
                     sumPotInitReqs += inReqs;
                 }
                 else sumPotInitReqs +=
-                        tool.NumberOfLots * Math.Max(tool.Security.InitReqLong, tool.Security.InitReqShort);
+                        tool.HardQty * Math.Max(tool.Security.InitReqLong, tool.Security.InitReqShort);
 
                 if (tool.UseShiftBalance)
                 {
-                    sumReqsBaseAssets += tool.BaseBalance *
-                        (tool.Security.LastTrade.Price / tool.Security.MinStep * tool.Security.MinStepCost);
+                    if (tool.Security.LastTrade.Price > 0.000001)
+                    {
+                        sumReqsBaseAssets += tool.BaseBalance *
+                            (tool.Security.LastTrade.Price / tool.Security.TickSize * tool.Security.TickCost);
+                    }
+                    else AddInfo("CheckPortfolioAsync: there is no last trade: " + tool.Security.Seccode, true, true);
 
-                    var inReqsBaseAssets = tool.BaseBalance > 0 ?
+                    var inReqsBaseAssets = tool.BaseBalance > 0.000001 ?
                         tool.BaseBalance * tool.Security.InitReqLong :
                         -tool.BaseBalance * tool.Security.InitReqShort;
 
@@ -284,7 +280,7 @@ internal class PortfolioManager : IPortfolioManager
 
     private async Task<bool> ClosePositionByMarketAsync(Position position)
     {
-        var symbol = Connector.Securities.Single(x => x.Seccode == position.Seccode && x.Market == position.Market);
+        var symbol = Connector.Securities.Single(x => x.Seccode == position.Seccode);
         if (await Connector.SendOrderAsync(symbol, OrderType.Market,
             (int)position.Saldo < 0, 100, (int)Math.Abs(position.Saldo), "ClosePositionByMarket"))
         {
@@ -300,14 +296,13 @@ internal class PortfolioManager : IPortfolioManager
 
     private async Task<bool> CancelActiveOrdersAsync(string seccode)
     {
-        var active = TradingSystem.Orders.ToArray()
-            .Where(x => x.Seccode == seccode && x.Status is "active" or "watching");
+        var active = TradingSystem.Orders.ToArray().Where(x => x.Seccode == seccode && Connector.OrderIsActive(x));
         if (!active.Any()) return true;
 
         foreach (var order in active) await Connector.CancelOrderAsync(order);
         for (int i = 0; i < 10; i++)
         {
-            if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
+            if (!active.Where(Connector.OrderIsActive).Any()) return true;
             await Task.Delay(500);
         }
         return false;

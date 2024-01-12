@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace ProSystem.Services;
+﻿namespace ProSystem.Services;
 
 public interface IToolManager
 {
@@ -12,11 +10,7 @@ public interface IToolManager
 
     public Task CalculateAsync(Tool tool);
 
-    public Task RequestBarsAsync(Tool tool);
-
     public Task ReloadBarsAsync(Tool tool);
-
-    public void UpdateBars(Tool tool, bool updateBasicSecurity);
 
     public void UpdateView(Tool tool, bool updateScriptView);
 }

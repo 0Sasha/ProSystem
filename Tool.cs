@@ -1,6 +1,6 @@
-﻿using OxyPlot;
+﻿using Newtonsoft.Json;
+using OxyPlot;
 using OxyPlot.Axes;
-using System;
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -10,32 +10,57 @@ namespace ProSystem;
 [Serializable]
 public class Tool : INotifyPropertyChanged
 {
-    private bool showBasicSec;
     private bool stopTrading = true;
     private bool tradeShare = true;
+    private bool showBasicSec = false;
     private bool useNormalization = false;
     private bool useShiftBalance = false;
 
-    private int waitingLimit = 60;
     private double shareOfFunds = 5;
-    private int minNumberLots = 0;
-    private int maxNumberLots = 2;
-    private int numberLots = 1;
-    private int baseBalance = 0;
+    private double minQty = 0;
+    private double maxQty = 2;
+    private double hardQty = 1;
+    private double baseBalance = 0;
 
-    [NonSerialized] private TabItem tab;
-    [NonSerialized] private PlotModel plot;
-    [NonSerialized] private PlotModel miniPlot;
-    [NonSerialized] private PlotController controller;
-    [NonSerialized] private Border borderState;
-    [NonSerialized] private Brush brushState = Theme.Red;
-    [NonSerialized] private TextBlock blockInfo;
-    [NonSerialized] private TextBlock mainBlockInfo;
-    [NonSerialized] internal int IsOccupied;
+    [JsonIgnore]
+    [NonSerialized]
+    private TabItem? tab;
+
+    [JsonIgnore]
+    [NonSerialized]
+    private PlotModel? plot;
+
+    [JsonIgnore]
+    [NonSerialized]
+    private PlotModel? miniPlot;
+
+    [JsonIgnore]
+    [NonSerialized]
+    private PlotController controller = Plot.GetController();
+
+    [JsonIgnore]
+    [NonSerialized]
+    private Border borderState = new();
+
+    [JsonIgnore]
+    [NonSerialized]
+    private Brush brushState = Theme.Red;
+
+    [JsonIgnore]
+    [NonSerialized]
+    private TextBlock blockInfo = new();
+
+    [JsonIgnore]
+    [NonSerialized]
+    private TextBlock mainBlockInfo = new();
+
+    [JsonIgnore]
+    [NonSerialized]
+    internal int IsOccupied;
 
     public string Name { get; set; }
     public bool Active { get; set; }
-    public int BaseTF { get; set; } = 30;
+    public int BaseTF { get; set; }
     public bool ShowBasicSecurity
     {
         get => showBasicSec;
@@ -49,76 +74,90 @@ public class Tool : INotifyPropertyChanged
         }
     }
     public Security Security { get; set; }
-    public Security BasicSecurity { get; set; }
+    public Security? BasicSecurity { get; set; }
     public Script[] Scripts { get; set; }
 
-    public TabItem Tab
+    [JsonIgnore]
+    public TabItem? Tab
     {
         get => tab;
         set { tab = value; NotifyChange(); }
     }
-    public PlotModel MainModel
+
+    [JsonIgnore]
+    public PlotModel? MainModel
     {
         get => plot;
         set { plot = value; NotifyChange(); }
     }
-    public PlotModel Model
+
+    [JsonIgnore]
+    public PlotModel? Model
     {
         get => miniPlot;
         set { miniPlot = value; NotifyChange(); }
     }
+
+    [JsonIgnore]
     public PlotController Controller
     {
         get => controller;
         set { controller = value; NotifyChange(); }
     }
+
+    [JsonIgnore]
     public Border BorderState
     {
         get => borderState;
         set { borderState = value; NotifyChange(); }
     }
+
+    [JsonIgnore]
     public Brush BrushState
     {
         get => brushState;
         set { brushState = value; NotifyChange(); }
-    } 
+    }
+
+    [JsonIgnore]
     public TextBlock BlockInfo
     {
         get => blockInfo;
         set { blockInfo = value; NotifyChange(); }
     }
+
+    [JsonIgnore]
     public TextBlock MainBlockInfo
     {
         get => mainBlockInfo;
         set { mainBlockInfo = value; NotifyChange(); }
     }
 
-    public int WaitingLimit
-    {
-        get => waitingLimit;
-        set { waitingLimit = value; NotifyChange(); }
-    }
     public double ShareOfFunds
     {
         get => shareOfFunds;
-        set { shareOfFunds = value > 15 ? 5 : value; NotifyChange(); }
+        set
+        {
+            shareOfFunds = value > 85 ? 5 : value;
+            NotifyChange();
+        }
     }
-    public int MinNumberOfLots
+    public double MinQty
     {
-        get => minNumberLots;
-        set { minNumberLots = value; NotifyChange(); }
+        get => minQty;
+        set { minQty = value; NotifyChange(); }
     }
-    public int MaxNumberOfLots
+    public double MaxQty
     {
-        get => maxNumberLots;
-        set { maxNumberLots = value; NotifyChange(); }
+        get => maxQty;
+        set { maxQty = value; NotifyChange(); }
     }
-    public int NumberOfLots
+    public double HardQty
     {
-        get => numberLots;
-        set { numberLots = value; NotifyChange(); }
+        get => hardQty;
+        set { hardQty = value; NotifyChange(); }
     }
-    public int BaseBalance
+    public double BaseBalance
     {
         get => baseBalance;
         set { baseBalance = value; NotifyChange(); }
@@ -158,26 +197,32 @@ public class Tool : INotifyPropertyChanged
         }
     }
 
-    public DateTime TimeLastRecalc { get; set; }
-    public DateTime TimeNextRecalc { get; set; }
+    public DateTime LastRecalc { get; set; }
+    public DateTime NextRecalc { get; set; }
     public DateTime TriggerPosition { get; set; }
 
-    [field: NonSerialized] public EventHandler<AxisChangedEventArgs> Handler { get; set; }
-    [field: NonSerialized] public EventHandler<AxisChangedEventArgs> MiniHandler { get; set; }
+    [JsonIgnore]
+    [field: NonSerialized]
+    public EventHandler<AxisChangedEventArgs>? Handler { get; set; }
 
-    [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
+    [JsonIgnore]
+    [field: NonSerialized]
+    public EventHandler<AxisChangedEventArgs>? MiniHandler { get; set; }
 
-    internal void NotifyChange(string propertyName = "") =>
+    [field: NonSerialized]
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    internal void NotifyChange(string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    public Tool() { }
-
-    public Tool(string name, Security security, Security basicSecurity, Script[] scripts)
+    [JsonConstructor]
+    public Tool(string name, Security security, Security? basicSecurity, Script[] scripts)
     {
-        Name = string.IsNullOrEmpty(name) ? throw new ArgumentNullException(nameof(name)) : name;
-        Security = security ?? throw new ArgumentNullException(nameof(security));
+        ArgumentException.ThrowIfNullOrEmpty(nameof(name), name);
+        Name = name;
+        Security = security;
         BasicSecurity = basicSecurity;
-        Scripts = scripts ?? throw new ArgumentNullException(nameof(scripts));
-        Controller = Plot.GetController();
+        Scripts = scripts;
+        BaseTF = 30;
     }
 }

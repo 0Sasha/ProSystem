@@ -10,20 +10,20 @@ public class ToolState
     public double AveragePrice { get; set; }
     public double ATR { get; set; }
 
-    public int Balance { get; set; }
-    public int RealBalance { get; set; }
+    public double Balance { get; set; }
+    public double RealBalance { get; set; }
 
     public double LongReqs { get; set; }
     public double ShortReqs { get; set; }
 
-    public int LongVolume { get; set; }
-    public int ShortVolume { get; set; }
+    public double LongVolume { get; set; }
+    public double ShortVolume { get; set; }
 
     public double LongRealVolume { get; set; }
     public double ShortRealVolume { get; set; }
 
-    public int LongOrderVolume { get; set; }
-    public int ShortOrderVolume { get; set; }
+    public double LongOrderVolume { get; set; }
+    public double ShortOrderVolume { get; set; }
 
     public ToolState(bool readyToTrade, bool isLogging, bool isBidding)
     {

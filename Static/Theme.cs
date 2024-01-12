@@ -23,10 +23,10 @@ internal static class Theme
 
     private static readonly OxyColor almostBlackOxy = (OxyColor)converter.
         ConvertBack(new Color() { R = 50, G = 50, B = 50, A = 255 }, typeof(OxyColor), null, null);
-    
+
     private static readonly OxyColor darkGrayOxy = (OxyColor)converter.
         ConvertBack(new Color() { R = 90, G = 90, B = 90, A = 255 }, typeof(OxyColor), null, null);
-    
+
     private static readonly OxyColor orangeOxy =
         (OxyColor)converter.ConvertBack(Orange, typeof(OxyColor), null, null);
 
@@ -38,17 +38,19 @@ internal static class Theme
     public static OxyColor RedBar { get; } = redOxy;
     public static OxyColor FadedBar { get; } = OxyColors.LightGray;
     public static OxyColor Gridline { get; } = almostBlackOxy;
-    public static OxyColor[] Indicators { get; } = new OxyColor[]
-    {
-        greenOxy, redOxy,
-        orangeOxy, OxyColors.SkyBlue
-    };
+    public static OxyColor[] Indicators { get; } =
+    [
+        greenOxy,
+        redOxy,
+        orangeOxy,
+        OxyColors.SkyBlue
+    ];
 
     public static OxyColor LongPosition { get; } = greenOxy;
     public static OxyColor ShortPosition { get; } = orangeOxy;
     public static OxyColor MaxVolume { get; } = darkGrayOxy;
 
-    public static void Color(PlotModel model)
+    public static void Color(this PlotModel model)
     {
         model.Background = Back;
         model.PlotAreaBackground = Back;
@@ -59,7 +61,7 @@ internal static class Theme
         model.SelectionColor = Text;
     }
 
-    public static void Color(Axis axis, bool mainModel = true)
+    public static void Color(this Axis axis, bool mainModel = true)
     {
         axis.TextColor = Front;
         axis.TitleColor = Front;
@@ -71,7 +73,7 @@ internal static class Theme
         axis.ExtraGridlineColor = mainModel ? Gridline : OxyColors.LightGray;
     }
 
-    public static void Color(CandleStickSeries candles)
+    public static void Color(this CandleStickSeries candles)
     {
         candles.Color = Front;
         candles.TextColor = Text;

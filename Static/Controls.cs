@@ -1,7 +1,5 @@
 ﻿using OxyPlot.SkiaSharp.Wpf;
 using OxyPlot.Wpf;
-using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -12,7 +10,6 @@ internal static class Controls
 {
     public static TabItem GetTab(Tool tool)
     {
-        if (tool == null) throw new ArgumentNullException(nameof(tool));
         return new()
         {
             Name = tool.Name,
@@ -93,10 +90,6 @@ internal static class Controls
     public static void UpdateControlPanel(Tool tool, bool updateScriptPanel,
         RoutedEventHandler changeActivityTool, SelectionChangedEventHandler updateViewTool)
     {
-        if (tool == null) throw new ArgumentNullException(nameof(tool));
-        if (changeActivityTool == null) throw new ArgumentNullException(nameof(changeActivityTool));
-        if (updateViewTool == null) throw new ArgumentNullException(nameof(updateViewTool));
-
         UpdateMainControlPanel(tool, changeActivityTool, updateViewTool);
         if (updateScriptPanel) UpdateScriptControlPanel(tool);
     }
@@ -104,12 +97,15 @@ internal static class Controls
     private static void UpdateMainControlPanel(Tool tool,
         RoutedEventHandler changeActivityTool, SelectionChangedEventHandler updateViewTool)
     {
+        var grid = ((tool.Tab?.Content as Grid)?.Children[1] as Grid)?
+            .Children[0] as Grid ?? throw new ArgumentException("Grid is not found", nameof(tool));
+
         Button activeButton = new()
         {
             DataContext = tool,
             Content = tool.Active ? "Deactivate tool" : "Activate tool",
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(5, 5, 0, 0),
             Width = 90,
             Height = 20
@@ -118,8 +114,8 @@ internal static class Controls
 
         ComboBox baseTFBox = new()
         {
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(45, 30, 0, 0),
             Width = 50,
             ItemsSource = new int[] { 1, 5, 15, 30, 60, 120, 240, 360, 720 }
@@ -132,8 +128,8 @@ internal static class Controls
         scripts.Add("Nothing");
         ComboBox scriptsBox = new()
         {
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(105, 30, 0, 0),
             Width = 90,
             ItemsSource = scripts,
@@ -147,12 +143,11 @@ internal static class Controls
             Margin = new Thickness(0, 55, 0, 0),
             Height = 10,
             BorderThickness = new Thickness(0),
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
+            VerticalAlignment = VerticalAlignment.Top,
             Background = Theme.Orange
         };
         tool.BorderState = borderState;
 
-        var grid = ((tool.Tab.Content as Grid).Children[1] as Grid).Children[0] as Grid;
         grid.Children.Clear();
         grid.Children.Add(activeButton);
         grid.Children.Add(GetTextBlock("BaseTF", 5, 33));
@@ -165,8 +160,6 @@ internal static class Controls
         grid.Children.Add(GetCheckBox(tool, "Trade share", nameof(Tool.TradeShare), 5, 130));
 
         grid.Children.Add(GetCheckBox(tool, "Basic security", nameof(Tool.ShowBasicSecurity), 105, 70));
-        grid.Children.Add(GetTextBlock("Wait limit", 105, 110));
-        grid.Children.Add(GetTextBox(tool, nameof(Tool.WaitingLimit), 165, 110));
         grid.Children.Add(GetCheckBox(tool, "Shift balance", nameof(Tool.UseShiftBalance), 105, 130));
 
         if (tool.TradeShare)
@@ -175,15 +168,15 @@ internal static class Controls
             grid.Children.Add(GetTextBox(tool, nameof(Tool.ShareOfFunds), 65, 150));
 
             grid.Children.Add(GetTextBlock("Min lots", 5, 170));
-            grid.Children.Add(GetTextBox(tool, nameof(Tool.MinNumberOfLots), 65, 170));
+            grid.Children.Add(GetTextBox(tool, nameof(Tool.MinQty), 65, 170));
 
             grid.Children.Add(GetTextBlock("Max lots", 105, 170));
-            grid.Children.Add(GetTextBox(tool, nameof(Tool.MaxNumberOfLots), 165, 170));
+            grid.Children.Add(GetTextBox(tool, nameof(Tool.MaxQty), 165, 170));
         }
         else
         {
             grid.Children.Add(GetTextBlock("Num lots", 5, 150));
-            grid.Children.Add(GetTextBox(tool, nameof(Tool.NumberOfLots), 65, 150));
+            grid.Children.Add(GetTextBox(tool, nameof(Tool.HardQty), 65, 150));
         }
         if (tool.UseShiftBalance)
         {
@@ -202,30 +195,36 @@ internal static class Controls
 
     private static void UpdateScriptControlPanel(Tool tool)
     {
-        var controlPanel = (Grid)(tool.Tab.Content as Grid).Children[1];
-        foreach (var grid in controlPanel.Children.OfType<Grid>().Skip(1)) grid.Children.Clear();
+        var mainGrid = tool.Tab?.Content as Grid ??
+            throw new ArgumentException("Main grid is not found", nameof(tool));
+        var controlPanel = mainGrid.Children[1] as Grid ??
+            throw new ArgumentException("Grid is not found", nameof(tool));
+
+        foreach (var grid in controlPanel.Children.OfType<Grid>().Skip(1))
+            grid.Children.Clear();
 
         var scripts = tool.Scripts;
         for (int i = 0; i < scripts.Length; i++)
         {
-            var props = scripts[i].Properties;
+            var props = scripts[i].Properties ?? throw new ArgumentException("Properties are null", nameof(tool));
             if (props.IsOSC)
             {
-                var plot = ((tool.Tab.Content as Grid).Children[0] as Grid).Children[0] as PlotView;
-                if (plot.Visibility == Visibility.Hidden)
+                var plot = (mainGrid.Children[0] as Grid)?.Children[0] as PlotView;
+                if (plot?.Visibility == Visibility.Hidden)
                 {
-                    Grid.SetRow(((tool.Tab.Content as Grid).Children[0] as Grid).Children[1] as PlotView, 1);
+                    Grid.SetRow((mainGrid.Children[0] as Grid)?.Children[1] as PlotView, 1);
                     plot.Visibility = Visibility.Visible;
                 }
             }
-            var collection = (controlPanel.Children[i + 1] as Grid).Children;
+            var collection = (controlPanel.Children[i + 1] as Grid)?.Children ??
+                throw new ArgumentException("Grid is not found", nameof(tool));
 
             collection.Add(GetTextBlock(scripts[i].Name, 5, 0));
             AddUpperControls(scripts[i], collection, props);
             if (props.MiddleProperties != null) AddMiddleControls(scripts[i], collection, props);
 
             var textBlock = GetTextBlock("Block Info", 5, 170);
-            scripts[i].BlockInfo = textBlock;
+            scripts[i].InfoBlock = textBlock;
             collection.Add(textBlock);
         }
     }
@@ -267,9 +266,9 @@ internal static class Controls
         ComboBox comboBox = new()
         {
             Width = 90,
-            Margin = new System.Windows.Thickness(5, 80, 0, 0),
-            VerticalAlignment = System.Windows.VerticalAlignment.Top,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            Margin = new Thickness(5, 80, 0, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Left,
             ItemsSource = new PositionType[] { PositionType.Long, PositionType.Short, PositionType.Neutral }
         };
         Binding binding = new()
@@ -286,15 +285,15 @@ internal static class Controls
             ComboBox comboBox2 = new()
             {
                 Width = 90,
-                Margin = new System.Windows.Thickness(105, 80, 0, 0),
-                VerticalAlignment = System.Windows.VerticalAlignment.Top,
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+                Margin = new Thickness(105, 80, 0, 0),
+                VerticalAlignment = VerticalAlignment.Top,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 ItemsSource = properties.MAObjects
             };
             Binding binding2 = new()
             {
                 Source = script,
-                Path = new System.Windows.PropertyPath(properties.MAProperty),
+                Path = new PropertyPath(properties.MAProperty),
                 Mode = BindingMode.TwoWay
             };
             comboBox2.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedItemProperty, binding2);
@@ -305,7 +304,7 @@ internal static class Controls
     private static void AddMiddleControls(Script script,
         UIElementCollection uiCollection, ScriptProperties properties)
     {
-        var props = properties.MiddleProperties;
+        var props = properties.MiddleProperties ?? throw new ArgumentNullException(nameof(properties));
         uiCollection.Add(GetCheckBox(script, props[0], props[0], 5, 110));
         if (props.Length > 1) uiCollection.Add(GetCheckBox(script, props[1], props[1], 5, 130));
         if (props.Length > 2) uiCollection.Add(GetCheckBox(script, props[2], props[2], 5, 150));

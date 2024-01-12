@@ -1,40 +1,37 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Net.WebSockets;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ProSystem;
 
 internal class WebSocketManager : IDisposable, INotifyPropertyChanged
 {
-    private readonly Uri URL;
+    private readonly string URL;
     private readonly AddInformation AddInfo;
     private readonly Action<string> DataHandler;
 
     private ClientWebSocket webSocket;
     private CancellationTokenSource tokenSource;
 
-    public event PropertyChangedEventHandler PropertyChanged;
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public bool Connected { get => webSocket != null && webSocket.State == WebSocketState.Open; }
 
     public WebSocketManager(string url, Action<string> dataHandler, AddInformation addInfo)
     {
         if (url == null || url == string.Empty) throw new ArgumentNullException(nameof(url));
-        URL = new(url);
+        URL = url;
         AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
         DataHandler = dataHandler ?? throw new ArgumentNullException(nameof(dataHandler));
     }
 
-    public async Task<bool> ConnectAsync()
+    public async Task<bool> ConnectAsync(string relativeURL)
     {
         if (!Connected)
         {
             tokenSource = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
             webSocket = new();
-            await webSocket.ConnectAsync(URL, tokenSource.Token);
+            await webSocket.ConnectAsync(new(URL + relativeURL), tokenSource.Token);
             if (webSocket.State != WebSocketState.Open) await Task.Delay(250);
 
             _ = Task.Run(ReceiveAsync, tokenSource.Token);
@@ -83,7 +80,7 @@ internal class WebSocketManager : IDisposable, INotifyPropertyChanged
                     result = await webSocket.ReceiveAsync(buffer, tokenSource.Token);
                     if (result.MessageType == WebSocketMessageType.Close) return;
 
-                    data = Encoding.UTF8.GetString(buffer.ToArray(), buffer.Offset, buffer.Count);
+                    data = Encoding.UTF8.GetString([.. buffer], buffer.Offset, buffer.Count);
                     DataHandler(data);
                 }
                 await DisconnectAsync();

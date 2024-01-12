@@ -1,9 +1,5 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -18,27 +14,27 @@ internal class ToolManager : IToolManager
     private readonly Connector Connector;
     private readonly CultureInfo IC = CultureInfo.InvariantCulture;
 
-    public ToolManager(Window window, TradingSystem tradingSystem,
-        IScriptManager scriptManager, AddInformation addInfo)
+    private DateTime ServerTime { get => Connector.ServerTime; }
+
+    public ToolManager(Window window, TradingSystem tradingSystem, IScriptManager scriptManager, AddInformation addInfo)
     {
-        Window = window ?? throw new ArgumentNullException(nameof(window));
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-        ScriptManager = scriptManager ?? throw new ArgumentNullException(nameof(scriptManager));
-        TradingSystem = tradingSystem ?? throw new ArgumentNullException(nameof(tradingSystem));
-        Connector = TradingSystem.Connector ?? throw new ArgumentException("Connector is null");
+        Window = window;
+        AddInfo = addInfo;
+        ScriptManager = scriptManager;
+        TradingSystem = tradingSystem;
+        Connector = TradingSystem.Connector;
     }
 
     public void Initialize(Tool tool)
     {
         if (tool.BaseTF < 1) tool.BaseTF = 30;
-        tool.Controller ??= Plot.GetController();
         tool.BrushState = tool.Active ? Theme.Green : Theme.Red;
         tool.Tab = Controls.GetTab(tool);
         UpdateControlPanel(tool, true);
         UpdateView(tool, true);
     }
 
-    public void UpdateControlPanel(Tool tool, bool updateScriptPanel) => 
+    public void UpdateControlPanel(Tool tool, bool updateScriptPanel) =>
         Controls.UpdateControlPanel(tool, updateScriptPanel, ChangeActivityToolAsync, UpdateViewTool);
 
     public async Task ChangeActivityAsync(Tool tool)
@@ -59,7 +55,7 @@ internal class ToolManager : IToolManager
             {
                 try
                 {
-                    await RequestBarsAsync(tool);
+                    await Connector.RequestBarsAsync(tool);
                     await Connector.OrderSecurityInfoAsync(security);
                     if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
                     {
@@ -73,12 +69,12 @@ internal class ToolManager : IToolManager
 
                     await Connector.SubscribeToTradesAsync(security);
                     if (basicSecurity != null) await Connector.SubscribeToTradesAsync(basicSecurity);
-                    await RequestBarsAsync(tool);
+                    await Connector.RequestBarsAsync(tool);
                 }
                 catch (Exception ex)
                 {
                     AddInfo("ChangeActivity: " + ex.Message);
-                    AddInfo(ex.StackTrace, false);
+                    AddInfo("StackTrace: " + ex.StackTrace, false);
                     return;
                 }
             }
@@ -88,8 +84,11 @@ internal class ToolManager : IToolManager
         tool.BrushState = tool.Active ? (tool.StopTrading ? Theme.Orange : Theme.Green) : Theme.Red;
         var btnContent = tool.Active ? "Deactivate tool" : "Activate tool";
 
-        Window.Dispatcher.Invoke(() => (tool.Tab.Content as Grid).Children.OfType<Grid>()
-            .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = btnContent);
+        if (tool.Tab != null)
+        {
+            Window.Dispatcher.Invoke(() => ((Grid)tool.Tab.Content).Children.OfType<Grid>()
+                .Last().Children.OfType<Grid>().First().Children.OfType<Button>().First().Content = btnContent);
+        }
         tool.NotifyChange();
     }
 
@@ -101,7 +100,7 @@ internal class ToolManager : IToolManager
             await Task.Delay(500);
         }
 
-        while (DateTime.Now.AddSeconds(-3) < tool.TimeLastRecalc)
+        while (ServerTime.AddSeconds(-3) < tool.LastRecalc)
         {
             AddInfo(tool.Name + ": Calculate: waiting for data from server", false);
             await Task.Delay(1000);
@@ -109,7 +108,7 @@ internal class ToolManager : IToolManager
 
         try
         {
-            if (await CheckToolAsync(tool)) await CalculateToolAsync(tool);
+            if (await Connector.CheckToolAsync(tool)) await CalculateToolAsync(tool);
             AddInfo("Scripts executed: " + tool.Name, false);
         }
         catch (Exception e)
@@ -124,38 +123,10 @@ internal class ToolManager : IToolManager
         }
         finally
         {
-            tool.TimeLastRecalc = DateTime.Now;
-            tool.TimeNextRecalc = DateTime.Now.AddSeconds(TradingSystem.Settings.RecalcInterval / 2);
+            tool.LastRecalc = ServerTime;
+            tool.NextRecalc = ServerTime.AddSeconds(TradingSystem.RecalcInterval / 2);
             Interlocked.Exchange(ref tool.IsOccupied, 0);
         }
-    }
-
-    public async Task RequestBarsAsync(Tool tool)
-    {
-        if (Connector.TimeFrames == null || Connector.TimeFrames.Count == 0)
-        {
-            AddInfo("RequestBars: Connector.TimeFrames is empty", notify: true);
-            return;
-        }
-
-        var tf = Connector.TimeFrames.Last(x => x.Seconds / 60 <= tool.BaseTF);
-        int count = 25;
-
-        var security = tool.Security;
-        var basicSec = tool.BasicSecurity;
-        if (basicSec != null)
-        {
-            if (basicSec.SourceBars == null || basicSec.SourceBars.Close.Length < 500 ||
-                basicSec.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-                tool.BaseTF != basicSec.SourceBars.TF && tool.BaseTF != basicSec.Bars.TF) count = 5000;
-            await Connector.OrderHistoricalDataAsync(basicSec, tf, count);
-        }
-
-        count = 25;
-        if (security.SourceBars == null || security.SourceBars.Close.Length < 500 ||
-            security.SourceBars.DateTime[^1].AddHours(6) < DateTime.Now ||
-            tool.BaseTF != security.SourceBars.TF && tool.BaseTF != security.Bars.TF) count = 5000;
-        await Connector.OrderHistoricalDataAsync(security, tf, count);
     }
 
     public async Task ReloadBarsAsync(Tool tool)
@@ -179,25 +150,9 @@ internal class ToolManager : IToolManager
 
         if (Connector.Connection == ConnectionState.Connected)
         {
-            await RequestBarsAsync(tool);
+            await Connector.RequestBarsAsync(tool);
             await Task.Delay(500);
             if (security.Bars != null) UpdateView(tool, true);
-        }
-    }
-
-    public void UpdateBars(Tool tool, bool updateBasicSecurity)
-    {
-        if (updateBasicSecurity)
-        {
-            var basic = tool.BasicSecurity;
-            if (basic.SourceBars.TF == tool.BaseTF) basic.Bars = basic.SourceBars;
-            else basic.Bars = basic.SourceBars.Compress(tool.BaseTF);
-        }
-        else
-        {
-            var sec = tool.Security;
-            if (sec.SourceBars.TF == tool.BaseTF) sec.Bars = sec.SourceBars;
-            else sec.Bars = sec.SourceBars.Compress(tool.BaseTF);
         }
     }
 
@@ -217,44 +172,9 @@ internal class ToolManager : IToolManager
     }
 
 
-    private async Task<bool> CheckToolAsync(Tool tool)
-    {
-        var security = tool.Security;
-        var basicSecurity = tool.BasicSecurity;
-        if (security.LastTrade == null || security.LastTrade.DateTime < DateTime.Now.AddDays(-5) ||
-            basicSecurity != null &&
-            (basicSecurity.LastTrade == null || basicSecurity.LastTrade.DateTime < DateTime.Now.AddDays(-5)))
-        {
-            AddInfo(tool.Name + ": last trade is not actual. Subscribing.", notify: true);
-            await Connector.SubscribeToTradesAsync(security);
-            return false;
-        }
-        else if (security.Bars == null || basicSecurity != null && basicSecurity.Bars == null)
-        {
-            AddInfo(tool.Name + ": there is no bars. Request.", notify: true);
-            await RequestBarsAsync(tool);
-            return false;
-        }
-        else if (basicSecurity == null && security.Bars.Close.Length < 200 ||
-            basicSecurity != null && (security.Bars.Close.Length < 200 || basicSecurity.Bars.Close.Length < 200))
-        {
-            var counts = security.Bars.Close.Length.ToString();
-            if (basicSecurity != null) counts += "/" + basicSecurity.Bars.Close.Length;
-            AddInfo(tool.Name + ": not enough bars: " + counts + " Request.", notify: true);
-            await RequestBarsAsync(tool);
-            return false;
-        }
-        else if (tool.Scripts.Length > 2)
-        {
-            AddInfo(tool.Name + ": unexpected number of scripts: " + tool.Scripts.Length, notify: true);
-            return false;
-        }
-        return true;
-    }
-
     private async Task CalculateToolAsync(Tool tool)
     {
-        await WaitCertaintyAsync(tool);
+        await Connector.WaitForCertaintyAsync(tool);
         var toolState = CalculateToolState(tool);
 
         UpdateControlPanel(tool, toolState);
@@ -277,25 +197,6 @@ internal class ToolManager : IToolManager
         await ScriptManager.ProcessOrdersAsync(tool, toolState);
     }
 
-    private async Task WaitCertaintyAsync(Tool tool)
-    {
-        var undefined = TradingSystem.Orders.ToArray()
-            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "forwarding" or "inactive"));
-        if (undefined.Any())
-        {
-            AddInfo(tool.Name + ": uncertain order status: " + undefined.First().Status);
-            for (int i = 0; i < 10; i++)
-            {
-                await Task.Delay(300);
-                if (!undefined.Where(x => x.Status is "forwarding" or "inactive").Any()) return;
-            }
-            AddInfo(tool.Name + ": failed to get certain order status");
-        }
-
-        var lastTrade = TradingSystem.Trades.ToArray().LastOrDefault(x => x.Seccode == tool.Security.Seccode);
-        if (lastTrade != null && lastTrade.DateTime.AddSeconds(2) > DateTime.Now) await Task.Delay(1500);
-    }
-
     private void IdentifyOrdersAndTrades(Tool tool)
     {
         ScriptManager.IdentifyOrdersAndTrades(tool);
@@ -305,7 +206,8 @@ internal class ToolManager : IToolManager
             .Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode);
         foreach (var unknownOrder in unknownOrders)
         {
-            int i = Array.FindIndex(systemOrders.ToArray(), x => x.TrID == unknownOrder.TrID);
+            int i = Array.FindIndex(systemOrders.ToArray(),
+                x => x.Id != 0 && x.Id == unknownOrder.Id || x.TrID != 0 && x.TrID == unknownOrder.TrID);
             if (i > -1)
             {
                 unknownOrder.Sender = systemOrders[i].Sender;
@@ -316,15 +218,15 @@ internal class ToolManager : IToolManager
         }
 
         var unknownTrades = TradingSystem.Trades.ToArray()
-            .Where(x => x.SenderOrder == null && x.Seccode == tool.Security.Seccode);
+            .Where(x => x.OrderSender == null && x.Seccode == tool.Security.Seccode);
         foreach (var unknownTrade in unknownTrades)
         {
-            int i = Array.FindIndex(systemOrders.ToArray(), x => x.OrderNo == unknownTrade.OrderNo);
+            int i = Array.FindIndex(systemOrders.ToArray(), x => x.Id == unknownTrade.OrderId);
             if (i > -1)
             {
-                unknownTrade.SenderOrder = systemOrders[i].Sender;
-                unknownTrade.SignalOrder = systemOrders[i].Signal;
-                unknownTrade.NoteOrder = systemOrders[i].Note;
+                unknownTrade.OrderSender = systemOrders[i].Sender;
+                unknownTrade.OrderSignal = systemOrders[i].Signal;
+                unknownTrade.OrderNote = systemOrders[i].Note;
                 Window.Dispatcher.Invoke(() => TradingSystem.SystemTrades.Add(unknownTrade));
             }
         }
@@ -333,11 +235,11 @@ internal class ToolManager : IToolManager
 
     private ToolState CalculateToolState(Tool tool)
     {
-        var average = Math.Round(tool.Security.Bars.Close.TakeLast(30).Average(), tool.Security.Decimals);
+        ArgumentNullException.ThrowIfNull(tool.Security.Bars);
+        var average = Math.Round(tool.Security.Bars.Close.TakeLast(30).Average(), tool.Security.TickPrecision);
         var atr = Indicators.ATR(tool.Security.Bars.High, tool.Security.Bars.Low, tool.Security.Bars.Close, 50);
 
-        var readyToTrade = !tool.StopTrading &
-            TradingSystem.PortfolioManager.CheckEquity() & Connector.CheckRequirements(tool.Security);
+        var readyToTrade = !tool.StopTrading & TradingSystem.PortfolioManager.CheckEquity();
         var toolState = new ToolState(readyToTrade, IsLogging(tool), Connector.SecurityIsBidding(tool.Security))
         {
             IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 15,
@@ -358,19 +260,19 @@ internal class ToolManager : IToolManager
     {
         var sec = tool.Security;
         var basicSec = tool.BasicSecurity;
-        if (DateTime.Now.Second >= 30 && (DateTime.Now.Minute is 0 or 29 or 30 or 59))
+        if (ServerTime.Second >= 30 && (ServerTime.Minute is 0 or 29 or 30 or 59))
         {
             try
             {
                 if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
-                if (!Directory.Exists("Logs/LogsTools")) Directory.CreateDirectory("Logs/LogsTools");
+                if (!Directory.Exists("Logs/Tools")) Directory.CreateDirectory("Logs/Tools");
 
-                var path = "Logs/LogsTools/" + tool.Name + ".txt";
+                var path = "Logs/Tools/" + tool.Name + ".txt";
                 if (!File.Exists(path)) File.Create(path).Close();
 
-                var data = DateTime.Now.ToString(IC) + ": /////////////////// RECOUNT SCRIPTS" +
+                var data = ServerTime.ToString(IC) + ": /////////////////// RECOUNT SCRIPTS" +
                     "\nLastTrade " + sec.LastTrade.Price.ToString(IC) +
-                    "\nDateLastTrade " + sec.LastTrade.DateTime.ToString(IC) + "\n";
+                    "\nDateLastTrade " + sec.LastTrade.Time.ToString(IC) + "\n";
 
                 if (sec.Bars != null)
                     data += "OHLCV[^1] " + sec.Bars.DateTime[^1] + "/" + sec.Bars.Open[^1] + "/" +
@@ -392,8 +294,12 @@ internal class ToolManager : IToolManager
 
     private void SetPositionVolumes(Tool tool, ToolState toolState)
     {
+        static double getVolume(Security symbol, double optShare, double reqs) =>
+            Math.Floor(optShare / reqs / symbol.LotSize) * symbol.LotSize * symbol.LotSize;
+
         var saldo = TradingSystem.Portfolio.Saldo;
         var maxShare = saldo / 100 * TradingSystem.Settings.MaxShareInitReqsPosition;
+        var symbol = tool.Security;
         if (tool.TradeShare)
         {
             var settings = TradingSystem.Settings;
@@ -404,58 +310,58 @@ internal class ToolManager : IToolManager
                 optShare = maxShare;
             }
 
-            int longVol = (int)Math.Floor(optShare / toolState.LongReqs);
-            if (longVol < tool.MinNumberOfLots)
+            var longVol = Math.Round(getVolume(symbol, optShare, toolState.LongReqs), symbol.LotPrecision);
+            if (longVol < tool.MinQty)
             {
                 AddInfo(tool.Name + ": LongVolume < MinNumberOfLots", settings.DisplaySpecialInfo, true);
-                longVol = tool.MinNumberOfLots;
+                longVol = tool.MinQty;
             }
-            if (longVol > tool.MaxNumberOfLots)
+            if (longVol > tool.MaxQty)
             {
                 AddInfo(tool.Name + ": LongVolume > MaxNumberOfLots", settings.DisplaySpecialInfo, true);
-                longVol = tool.MaxNumberOfLots;
+                longVol = tool.MaxQty;
             }
             if (longVol * toolState.LongReqs > maxShare)
             {
                 AddInfo(tool.Name + ": LongVolume exceeds risk level", settings.DisplaySpecialInfo, true);
-                longVol = (int)Math.Floor(optShare / toolState.LongReqs);
+                longVol = Math.Round(getVolume(symbol, optShare, toolState.LongReqs), symbol.LotPrecision);
             }
 
-            int shortVol = (int)Math.Floor(optShare / toolState.ShortReqs);
-            if (shortVol < tool.MinNumberOfLots)
+            var shortVol = Math.Round(getVolume(symbol, optShare, toolState.ShortReqs), symbol.LotPrecision);
+            if (shortVol < tool.MinQty)
             {
                 AddInfo(tool.Name + ": shortVol < MinNumberOfLots", settings.DisplaySpecialInfo, true);
-                shortVol = tool.MinNumberOfLots;
+                shortVol = tool.MinQty;
             }
-            if (shortVol > tool.MaxNumberOfLots)
+            if (shortVol > tool.MaxQty)
             {
                 AddInfo(tool.Name + ": shortVol > MaxNumberOfLots", settings.DisplaySpecialInfo, true);
-                shortVol = tool.MaxNumberOfLots;
+                shortVol = tool.MaxQty;
             }
             if (shortVol * toolState.ShortReqs > maxShare)
             {
                 AddInfo(tool.Name + ": ShortVolume exceeds risk level", settings.DisplaySpecialInfo, true);
-                shortVol = (int)Math.Floor(optShare / toolState.ShortReqs);
+                shortVol = Math.Round(getVolume(symbol, optShare, toolState.ShortReqs), symbol.LotPrecision);
             }
 
             toolState.LongVolume = longVol;
             toolState.ShortVolume = shortVol;
 
-            toolState.LongRealVolume = Math.Round(saldo * 0.01 * tool.ShareOfFunds / toolState.LongReqs, 2);
-            toolState.ShortRealVolume = Math.Round(saldo * 0.01 * tool.ShareOfFunds / toolState.ShortReqs, 2);
+            toolState.LongRealVolume = Math.Round(optShare / toolState.LongReqs * symbol.LotSize, 2);
+            toolState.ShortRealVolume = Math.Round(optShare / toolState.ShortReqs * symbol.LotSize, 2);
         }
         else
         {
-            if (tool.NumberOfLots * Math.Max(toolState.LongReqs, toolState.ShortReqs) > maxShare)
+            if (tool.HardQty * Math.Max(toolState.LongReqs, toolState.ShortReqs) > maxShare)
             {
                 AddInfo(tool.Name + ": NumberOfLots превышает допустимый объём риска.", notify: true);
-                toolState.LongVolume = (int)Math.Floor(maxShare / toolState.LongReqs);
-                toolState.ShortVolume = (int)Math.Floor(maxShare / toolState.ShortReqs);
+                toolState.LongVolume = Math.Floor(maxShare / toolState.LongReqs / symbol.LotSize) * symbol.LotSize;
+                toolState.ShortVolume = Math.Floor(maxShare / toolState.ShortReqs / symbol.LotSize) * symbol.LotSize;
             }
             else
             {
-                toolState.LongVolume = tool.NumberOfLots;
-                toolState.ShortVolume = tool.NumberOfLots;
+                toolState.LongVolume = tool.HardQty;
+                toolState.ShortVolume = tool.HardQty;
             }
             toolState.LongRealVolume = toolState.LongVolume;
             toolState.ShortRealVolume = toolState.ShortVolume;
@@ -467,13 +373,13 @@ internal class ToolManager : IToolManager
         toolState.Balance = 0;
         var position = TradingSystem.Portfolio.Positions
             .ToArray().SingleOrDefault(x => x.Seccode == tool.Security.Seccode);
-        if (position != null) toolState.Balance = (int)position.Saldo;
+        if (position != null) toolState.Balance = position.Saldo;
 
         toolState.RealBalance = toolState.Balance;
         if (tool.UseShiftBalance) toolState.Balance -= tool.BaseBalance;
 
         if (Math.Abs(toolState.Balance) >
-            Math.Max(Math.Max(toolState.LongVolume, toolState.ShortVolume), 1) *
+            Math.Max(Math.Max(toolState.LongVolume, toolState.ShortVolume), tool.Security.LotSize) *
             TradingSystem.Settings.TolerancePosition)
         {
             if (DateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
@@ -483,7 +389,7 @@ internal class ToolManager : IToolManager
                 {
                     AddInfo(tool.Name +
                         ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
-                    tool.TriggerPosition = DateTime.Now.AddHours(12);
+                    tool.TriggerPosition = ServerTime.AddHours(12);
                 }
             }
             else
@@ -492,10 +398,10 @@ internal class ToolManager : IToolManager
                     ": Объём текущей позиции за пределами допустимого отклонения. Ожидание.", notify: true);
                 if (tool.TriggerPosition == DateTime.MinValue)
                 {
-                    tool.TriggerPosition = DateTime.Now.AddHours(4);
+                    tool.TriggerPosition = ServerTime.AddHours(4);
                     toolState.ReadyToTrade = false;
                 }
-                else if (DateTime.Now < tool.TriggerPosition) toolState.ReadyToTrade = false;
+                else if (ServerTime < tool.TriggerPosition) toolState.ReadyToTrade = false;
                 else AddInfo(tool.Name +
                     ": Объём текущей позиции всё ещё за пределами допустимого отклонения, но торговля разрешена.");
             }
@@ -509,7 +415,7 @@ internal class ToolManager : IToolManager
 
         toolState.LongOrderVolume = balance;
         toolState.ShortOrderVolume = balance;
-        if (tool.Scripts.Length == 1 || toolState.Balance == 0)
+        if (tool.Scripts.Length == 1 || Math.Abs(toolState.Balance) < 0.000001)
         {
             toolState.LongOrderVolume += toolState.LongVolume;
             toolState.ShortOrderVolume += toolState.ShortVolume;
@@ -522,7 +428,7 @@ internal class ToolManager : IToolManager
         if (!toolState.IsBidding || !toolState.IsNormalPrice) return;
 
         var activeOrders = TradingSystem.Orders.ToArray().Where(x => x.Sender == "System" &&
-            x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
+            x.Seccode == tool.Security.Seccode && Connector.OrderIsActive(x));
         if (!activeOrders.Any() && !tool.UseNormalization) return;
         if (activeOrders.Count() > 1)
         {
@@ -538,46 +444,49 @@ internal class ToolManager : IToolManager
             return;
         }
 
+        ArgumentNullException.ThrowIfNull(tool.Security.Bars);
         var security = tool.Security;
         var balance = toolState.Balance;
 
         double gap = Math.Abs(balance) / 14D;
         if (gap > 0.5) gap = 0.5;
         bool normalizeUp =
-            balance > 0 && balance + Math.Ceiling(balance * 0.04) + gap < toolState.LongRealVolume ||
-            balance < 0 && -balance + Math.Ceiling(-balance * 0.04) + gap < toolState.ShortRealVolume;
+            balance > 0.000001 && balance + Math.Ceiling(balance * 0.04) + gap < toolState.LongRealVolume ||
+            balance < -0.000001 && -balance + Math.Ceiling(-balance * 0.04) + gap < toolState.ShortRealVolume;
 
-        int volume = balance > toolState.LongVolume ?
+        var volume = balance > toolState.LongVolume ?
             balance - toolState.LongVolume : -balance - toolState.ShortVolume;
 
         if (activeOrder != null)
         {
-            if ((activeOrder.BuySell == "B") == balance < 0 &&
+            if ((activeOrder.Side == "B") == balance < -0.000001 &&
                 (balance > toolState.LongVolume || -balance > toolState.ShortVolume))
             {
-                if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.00001 &&
-                    DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != volume)
+                if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.000001 &&
+                    ServerTime.Minute != 0 && ServerTime.Minute != 30 ||
+                    Math.Abs(activeOrder.Balance - volume) > 0.000001)
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security,
-                        OrderType.Limit, security.Bars.Close[^2], volume, "Normalization", null, "NM");
+                        Connector.OrderTypeNM, security.Bars.Close[^2], volume, "Normalization", null, "NM");
                 }
             }
-            else if ((activeOrder.BuySell == "B") == balance > 0 && normalizeUp)
+            else if ((activeOrder.Side == "B") == balance > 0.000001 && normalizeUp)
             {
-                volume = balance > 0 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                volume = balance > 0.000001 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
 
-                if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.00001 &&
-                    DateTime.Now.Minute != 0 && DateTime.Now.Minute != 30 || activeOrder.Balance != volume)
+                if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.000001 &&
+                    ServerTime.Minute != 0 && ServerTime.Minute != 30 ||
+                    Math.Abs(activeOrder.Balance - volume) > 0.000001 && volume > security.MinQty)
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security,
-                        OrderType.Limit, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
+                        Connector.OrderTypeNM, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
                 }
             }
             else await Connector.CancelOrderAsync(activeOrder);
         }
         else if (balance > toolState.LongVolume || -balance > toolState.ShortVolume)
         {
-            await Connector.SendOrderAsync(security, OrderType.Limit,
+            await Connector.SendOrderAsync(security, Connector.OrderTypeNM,
                 balance < 0, security.Bars.Close[^2], volume, "Normalization", null, "NM");
             WriteStateLog(tool, toolState, "NM");
         }
@@ -585,13 +494,18 @@ internal class ToolManager : IToolManager
         {
             foreach (var script in tool.Scripts)
             {
-                var lastExecuted = script.Orders.LastOrDefault(x => x.Status == "matched");
-                if (lastExecuted != null && (lastExecuted.DateTime.AddDays(4) > DateTime.Now ||
-                    balance > 0 == security.Bars.Close[^2] < lastExecuted.Price))
+                var lastExecuted = script.Orders.LastOrDefault(Connector.OrderIsExecuted);
+                if (lastExecuted != null && (lastExecuted.ChangeTime.AddDays(4) > ServerTime ||
+                    balance > 0.000001 == security.Bars.Close[^2] < lastExecuted.Price))
                 {
-                    volume = balance > 0 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                    volume = balance > 0.000001 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                    if (volume < security.MinQty)
+                    {
+                        AddInfo("Unable to normalize up: volume < security.MinQty");
+                        return;
+                    }
 
-                    await Connector.SendOrderAsync(security, OrderType.Limit,
+                    await Connector.SendOrderAsync(security, Connector.OrderTypeNM,
                         balance > 0, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
 
                     WriteStateLog(tool, toolState, "NM");
@@ -605,6 +519,7 @@ internal class ToolManager : IToolManager
     {
         if (!toolState.IsBidding || !toolState.IsNormalPrice) return true;
         if (CheckScriptOrderCloseToExecution(tool)) return true;
+        ArgumentNullException.ThrowIfNull(tool.Security.Bars);
 
         var longPos = PositionType.Long;
         var shortPos = PositionType.Short;
@@ -617,14 +532,14 @@ internal class ToolManager : IToolManager
         if (scripts.Length == 1)
         {
             var position = scripts[0].CurrentPosition;
-            if (position == neutralPos && balance != 0 ||
-                position == longPos && balance <= 0 || position == shortPos && balance >= 0)
+            if (position == neutralPos && Math.Abs(balance) > 0.000001 ||
+                position == longPos && balance < 0.000001 || position == shortPos && balance > -0.000001)
             {
                 AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                 if (!await CancelActiveOrdersAsync(tool)) return false;
 
-                int volume;
-                bool isBuy = position == neutralPos ? balance < 0 : position == longPos;
+                double volume;
+                bool isBuy = position == neutralPos ? balance < -0.000001 : position == longPos;
                 if (position == longPos) volume = Math.Abs(balance) + toolState.LongVolume;
                 else if (position == shortPos) volume = Math.Abs(balance) + toolState.ShortVolume;
                 else volume = Math.Abs(balance);
@@ -640,14 +555,14 @@ internal class ToolManager : IToolManager
             var position2 = scripts[1].CurrentPosition;
             if (position1 == position2)
             {
-                if (position1 == neutralPos && balance != 0 ||
-                    position1 == longPos && balance <= 0 || position1 == shortPos && balance >= 0)
+                if (position1 == neutralPos && Math.Abs(balance) > 0.000001 ||
+                    position1 == longPos && balance < 0.000001 || position1 == shortPos && balance > -0.000001)
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
-                    int volume;
-                    bool isBuy = position1 == neutralPos ? balance < 0 : position1 == longPos;
+                    double volume;
+                    bool isBuy = position1 == neutralPos ? balance < -0.000001 : position1 == longPos;
                     if (position1 == longPos) volume = Math.Abs(balance) + toolState.LongVolume;
                     else if (position1 == shortPos) volume = Math.Abs(balance) + toolState.ShortVolume;
                     else volume = Math.Abs(balance);
@@ -659,7 +574,7 @@ internal class ToolManager : IToolManager
             }
             else if (position1 == longPos && position2 == shortPos || position1 == shortPos && position2 == longPos)
             {
-                if (balance != 0)
+                if (Math.Abs(balance) > 0.000001)
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
@@ -672,12 +587,12 @@ internal class ToolManager : IToolManager
             else // Одна из позиций Neutral
             {
                 var position = position1 == neutralPos ? position2 : position1;
-                if (position == longPos && balance <= 0 || position == shortPos && balance >= 0)
+                if (position == longPos && balance < 0.000001 || position == shortPos && balance > -0.000001)
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
-                    int vol = position == longPos ?
+                    double vol = position == longPos ?
                         Math.Abs(balance) + toolState.LongVolume : Math.Abs(balance) + toolState.ShortVolume;
 
                     await Connector.SendOrderAsync(security, OrderType.Market,
@@ -692,17 +607,18 @@ internal class ToolManager : IToolManager
 
     private bool CheckScriptOrderCloseToExecution(Tool tool)
     {
-        return TradingSystem.Orders.ToArray().Any(order =>
-            order.Seccode == tool.Security.Seccode && order.Status == "active" && order.Sender != "System" &&
-            (Math.Abs(order.Price - tool.Security.Bars.Close[^2]) < 0.00001 ||
-            order.Quantity - order.Balance > 0.00001 || order.Note == "PartEx"));
+        ArgumentNullException.ThrowIfNull(tool.Security.Bars);
+        return TradingSystem.Orders.ToArray().Any(order => order.Seccode == tool.Security.Seccode &&
+            (order.Status is "active" or "NEW" or "PARTIALLY_FILLED") && order.Sender != "System" &&
+            (Math.Abs(order.Price - tool.Security.Bars.Close[^2]) < 0.000001 ||
+            order.Quantity - order.Balance > 0.000001 || order.Note == "PartEx"));
     }
 
 
     private async Task<bool> CancelActiveOrdersAsync(Tool tool)
     {
         var active = TradingSystem.Orders.ToArray()
-            .Where(x => x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
+            .Where(x => x.Seccode == tool.Security.Seccode && Connector.OrderIsActive(x));
         if (!active.Any()) return true;
 
         AddInfo(tool.Name + ": cancellation of all active orders: " + active.Count());
@@ -710,7 +626,7 @@ internal class ToolManager : IToolManager
 
         for (int i = 0; i < 20; i++)
         {
-            if (!active.Where(x => x.Status is "active" or "watching").Any()) return true;
+            if (!active.Where(Connector.OrderIsActive).Any()) return true;
             await Task.Delay(250);
         }
 
@@ -721,7 +637,7 @@ internal class ToolManager : IToolManager
     private async Task<bool> CancelUnknownOrdersAsync(Tool tool)
     {
         var unknown = TradingSystem.Orders.ToArray().Where(x => x.Sender == null &&
-            x.Seccode == tool.Security.Seccode && (x.Status is "active" or "watching"));
+            x.Seccode == tool.Security.Seccode && Connector.OrderIsActive(x));
         if (!unknown.Any()) return true;
 
         AddInfo(tool.Name + ": cancellation of unknown orders: " + unknown.Count());
@@ -729,7 +645,7 @@ internal class ToolManager : IToolManager
 
         for (int i = 0; i < 20; i++)
         {
-            if (!unknown.Where(x => x.Status is "active" or "watching").Any()) return true;
+            if (!unknown.Where(Connector.OrderIsActive).Any()) return true;
             await Task.Delay(250);
         }
 
@@ -746,43 +662,44 @@ internal class ToolManager : IToolManager
             tool.BrushState = toolState.ReadyToTrade ? Theme.Green : Theme.Orange;
 
             tool.MainBlockInfo.Text =
-            "\nReq " + Math.Round(toolState.LongReqs) + "/" + Math.Round(toolState.ShortReqs) +
-            "\nVols " + toolState.LongVolume + "/" + toolState.ShortVolume +
-            "\nOrderVols " + toolState.LongOrderVolume + "/" + toolState.ShortOrderVolume +
-            "\nLastTr " + tool.Security.LastTrade.DateTime.TimeOfDay.ToString();
+            "\n" + Math.Round(toolState.LongReqs, 2) + "/" + Math.Round(toolState.ShortReqs, 2) +
+            "\nVols " + Math.Round(toolState.LongVolume, 4) + "/" + Math.Round(toolState.ShortVolume, 4) +
+            "\nOrderVols " + Math.Round(toolState.LongOrderVolume, 4) + "/" + Math.Round(toolState.ShortOrderVolume, 4) +
+            "\nLastTr " + tool.Security.LastTrade.Time.TimeOfDay.ToString();
 
             tool.BlockInfo.Text = "\nBal/Real " + toolState.Balance + "/" + toolState.RealBalance +
             "\nRealV " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
-            "\nSMA " + toolState.AveragePrice + "\n15ATR " + Math.Round(toolState.ATR * 15, tool.Security.Decimals);
+            "\nSMA " + toolState.AveragePrice + "\n15ATR " + Math.Round(toolState.ATR * 15, tool.Security.TickPrecision);
         });
     }
 
-    private static void UpdateBarsColor(Tool tool, ToolState toolState)
+    private void UpdateBarsColor(Tool tool, ToolState toolState)
     {
-        (tool.MainModel.Series[0] as OxyPlot.Series.CandleStickSeries).DecreasingColor = toolState.IsBidding &&
-            (!tool.ShowBasicSecurity ||
-            tool.ShowBasicSecurity && tool.BasicSecurity.LastTrade.DateTime.AddHours(2) > DateTime.Now) ?
+        ArgumentNullException.ThrowIfNull(tool.MainModel);
+        ((OxyPlot.Series.CandleStickSeries)tool.MainModel.Series[0]).DecreasingColor =
+            toolState.IsBidding && (!tool.ShowBasicSecurity ||
+            tool.ShowBasicSecurity && tool.BasicSecurity?.LastTrade.Time.AddHours(2) > ServerTime) ?
             Theme.RedBar : Theme.FadedBar;
         tool.MainModel.InvalidatePlot(false);
     }
 
     private void WriteStateLog(Tool tool, ToolState toolState, string type = "Risks")
     {
-        var data = DateTime.Now + ": /////////////// " + type +
+        var data = ServerTime + ": /////////////// " + type +
             "\nStopTrading " + tool.StopTrading + "\nIsBidding " + toolState.IsBidding +
             "\nReadyToTrade " + toolState.ReadyToTrade + "\nPortfolio.Saldo " + TradingSystem.Portfolio.Saldo +
             "\nBalance " + toolState.Balance + "\nRealBalance " + toolState.RealBalance +
             "\nUseShiftBalance " + tool.UseShiftBalance + "\nBaseBalance " + tool.BaseBalance +
-            "\nReserate " + tool.Security.ReserateLong + "/" + tool.Security.ReserateShort +
+            "\nRiskrate " + tool.Security.RiskrateLong + "/" + tool.Security.RiskrateShort +
             "\nInitReq " + tool.Security.InitReqLong + "/" + tool.Security.InitReqShort +
             "\nShareOfFunds " + tool.ShareOfFunds + "\nRubReqs " + toolState.LongReqs + "/" + toolState.ShortReqs +
             "\nVols " + toolState.LongVolume + "/" + toolState.ShortVolume +
             "\nRealVols " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
             "\nOrderVol " + toolState.LongOrderVolume + "/" + toolState.ShortOrderVolume +
-            "\nMin/Max lots " + tool.MinNumberOfLots + "/" + tool.MaxNumberOfLots + "\n";
+            "\nMin/Max lots " + tool.MinQty + "/" + tool.MaxQty + "\n";
         try
         {
-            File.AppendAllText("Logs/LogsTools/" + tool.Name + ".txt", data);
+            File.AppendAllText("Logs/Tools/" + tool.Name + ".txt", data);
         }
         catch (Exception e)
         {
@@ -792,15 +709,15 @@ internal class ToolManager : IToolManager
 
     private void UpdateViewTool(object sender, SelectionChangedEventArgs e)
     {
-        var tool = (sender as ComboBox).DataContext as Tool;
+        var tool = (Tool)((ComboBox)sender).DataContext;
         Task.Run(() => UpdateView(tool, true));
     }
 
     private async void ChangeActivityToolAsync(object sender, RoutedEventArgs e)
     {
-        var button = sender as Button;
+        var button = (Button)sender;
         button.IsEnabled = false;
-        await ChangeActivityAsync(button.DataContext as Tool);
+        await ChangeActivityAsync((Tool)button.DataContext);
         button.IsEnabled = true;
     }
 }

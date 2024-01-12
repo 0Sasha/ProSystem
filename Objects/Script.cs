@@ -1,4 +1,4 @@
-﻿using System;
+﻿using Newtonsoft.Json;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Controls;
@@ -8,25 +8,29 @@ namespace ProSystem;
 [Serializable]
 public abstract class Script : INotifyPropertyChanged
 {
-    protected Order lastExecuted;
+    protected Order? lastExecuted;
     protected PositionType curPosition;
-    protected ScriptProperties properties;
+    protected ScriptProperties? properties;
 
-    [field: NonSerialized] protected TextBlock infoBlock;
-    [field: NonSerialized] public event PropertyChangedEventHandler PropertyChanged;
+    [JsonIgnore]
+    [field: NonSerialized]
+    protected TextBlock infoBlock = new();
+
+    [field: NonSerialized]
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public virtual string Name { get; set; }
 
-    public virtual Order ActiveOrder { get; set; }
+    public virtual Order? ActiveOrder { get; set; }
 
-    public virtual Order LastExecuted
+    public virtual Order? LastExecuted
     {
         get => lastExecuted;
         set
         {
             lastExecuted = value;
             if (lastExecuted != null)
-                CurrentPosition = lastExecuted.BuySell == "B" ? PositionType.Long : PositionType.Short;
+                CurrentPosition = lastExecuted.Side == "B" ? PositionType.Long : PositionType.Short;
         }
     }
 
@@ -36,19 +40,22 @@ public abstract class Script : INotifyPropertyChanged
         set { curPosition = value; NotifyChange(); }
     }
 
-    public virtual ScriptResult Result { get; set; }
+    [JsonIgnore]
+    [field: NonSerialized]
+    public virtual ScriptResult? Result { get; set; }
 
-    public virtual TextBlock BlockInfo
+    [JsonIgnore]
+    public virtual TextBlock InfoBlock
     {
         get => infoBlock;
         set { infoBlock = value; NotifyChange(); }
     }
 
-    public virtual ObservableCollection<Order> Orders { get; set; } = new();
+    public virtual ObservableCollection<Order> Orders { get; set; } = [];
 
-    public virtual ObservableCollection<Trade> Trades { get; set; } = new();
+    public virtual ObservableCollection<Trade> Trades { get; set; } = [];
 
-    public ScriptProperties Properties { get => properties; }
+    public ScriptProperties? Properties { get => properties; }
 
     public Script(string name) => Name = name;
 
@@ -56,6 +63,6 @@ public abstract class Script : INotifyPropertyChanged
 
     public override string ToString() => GetType().Name;
 
-    protected virtual void NotifyChange(string propertyName = "") =>
+    protected virtual void NotifyChange(string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

@@ -1,4 +1,4 @@
-﻿using System;
+﻿using Newtonsoft.Json;
 
 namespace ProSystem;
 
@@ -8,20 +8,19 @@ public class ScriptResult
     public ScriptType Type { get; set; }
     public bool[] IsGrow { get; set; }
     public double[][] Indicators { get; set; }
-    public DateTime iLastDT { get; set; }
+    public DateTime IndLastDT { get; set; }
 
     public int Centre { get; set; } = -1;
     public int Level { get; set; } = -1;
     public bool OnlyLimit { get; set; }
 
-    public ScriptResult() { }
-
-    public ScriptResult(ScriptType type, bool[] isGrow, double[][] indicators, DateTime inLastDT)
+    [JsonConstructor]
+    public ScriptResult(ScriptType type, bool[] isGrow, double[][] indicators, DateTime indLastDT)
     {
         Type = type;
         IsGrow = isGrow;
         Indicators = indicators;
-        iLastDT = inLastDT;
+        IndLastDT = indLastDT;
     }
 
     public ScriptResult(ScriptType type, bool[] isGrow, double[][] indicators, DateTime inLastDT,

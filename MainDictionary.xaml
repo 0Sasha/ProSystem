@@ -126,19 +126,19 @@
                                         <Button x:Name="btnMinimize" Background="Transparent" BorderBrush="Transparent"
                                                 Template="{DynamicResource winBtn}" Width="40" VerticalContentAlignment="Bottom"
                                                 WindowChrome.IsHitTestVisibleInChrome="True" FocusVisualStyle="{StaticResource FocusVisual}"
-                                                Click="Minimize_Event">
+                                                Click="MinimizeWindow">
                                             <Rectangle Width="10" VerticalAlignment="Center" Stroke="White" StrokeThickness="2" />
                                         </Button>
                                         <Button x:Name="btnRestore" Background="Transparent" BorderBrush="Transparent"
                                                 Template="{DynamicResource winBtn}" Width="40" WindowChrome.IsHitTestVisibleInChrome="True"
-                                                Click="AutoMinimize_Event">
+                                                Click="ChangeWindow">
                                             <Grid Width="12" Height="12">
                                                 <Rectangle Stroke="White" StrokeThickness="2"/>
                                             </Grid>
                                         </Button>
                                         <Button x:Name="btnClose" Background="Transparent" BorderBrush="Transparent"
                                                 Template="{DynamicResource closeBtn}" Width="40" WindowChrome.IsHitTestVisibleInChrome="True"
-                                                Click="CloseWindow_Event">
+                                                Click="CloseWindow">
                                             <Grid Margin="0 1 0 0">
                                                 <Line X1="0" Y1="0" X2="11" Y2="11" Stroke="White" StrokeThickness="2" />
                                                 <Line X1="0" Y2="0" Y1="11" X2="11" Stroke="White" StrokeThickness="2" />
@@ -211,7 +211,7 @@
                                     <StackPanel Orientation="Horizontal" Grid.Column="0" HorizontalAlignment="Right">
                                         <Button x:Name="btnClose" Background="Transparent" BorderBrush="Transparent"
                                                 Template="{DynamicResource closeBtn}" Width="40" WindowChrome.IsHitTestVisibleInChrome="True"
-                                                Click="CloseWindow_Event">
+                                                Click="CloseWindow">
                                             <Grid Margin="0 1 0 0">
                                                 <Line X1="0" Y1="0" X2="11" Y2="11" Stroke="White" StrokeThickness="2" />
                                                 <Line X1="0" Y2="0" Y1="11" X2="11" Stroke="White" StrokeThickness="2" />
@@ -420,8 +420,7 @@
                             <Setter Property="Background" TargetName="templateRoot" Value="{StaticResource volPressed}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Background" TargetName="templateRoot" Value="#FFF0F0F0"/>
-                            <Setter Property="BorderBrush" TargetName="templateRoot" Value="#FFD9D9D9"/>
+                            <Setter Property="Background" TargetName="templateRoot" Value="{StaticResource volPressed}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -514,7 +513,7 @@
         <Setter Property="AllowDrop" Value="true"/>
         <Setter Property="ScrollViewer.PanningMode" Value="VerticalFirst"/>
         <Setter Property="Stylus.IsFlicksEnabled" Value="False"/>
-        <EventSetter Event="KeyDown" Handler="TxtKeyDown"></EventSetter>
+        <EventSetter Event="KeyDown" Handler="HandleKeyDown"></EventSetter>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TextBox}">
@@ -1499,7 +1498,7 @@
                     <Grid x:Name="Bg" SnapsToDevicePixels="true">
                         <Grid.RowDefinitions>
                             <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}" />
-                            <RowDefinition Height="0.00001*" />
+                            <RowDefinition Height="0.000001*" />
                             <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}" />
                         </Grid.RowDefinitions>
                         <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
@@ -1577,7 +1576,7 @@
                             <Grid x:Name="Bg" SnapsToDevicePixels="true">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}" />
-                                    <ColumnDefinition Width="0.00001*" />
+                                    <ColumnDefinition Width="0.000001*" />
                                     <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}" />
                                 </Grid.ColumnDefinitions>
                                 <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
