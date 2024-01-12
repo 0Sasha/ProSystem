@@ -482,7 +482,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
         {
             script.Result.IsGrow = script.Result.IsGrow[x..];
             for (int i = 0; i < script.Result.Indicators.Length; i++)
-                if (script.Result.Indicators[i] != null)
+                if (script.Result.Indicators[i].Length > 0)
                     script.Result.Indicators[i] = script.Result.Indicators[i][x..];
         }
         else if (x < 0)

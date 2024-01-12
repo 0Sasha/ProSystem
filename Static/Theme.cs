@@ -73,11 +73,11 @@ internal static class Theme
         axis.ExtraGridlineColor = mainModel ? Gridline : OxyColors.LightGray;
     }
 
-    public static void Color(this CandleStickSeries candles)
+    public static void Color(this CandleStickSeries candles, OxyColor? decreasingColor)
     {
         candles.Color = Front;
         candles.TextColor = Text;
         candles.IncreasingColor = GreenBar;
-        candles.DecreasingColor = RedBar;
+        candles.DecreasingColor = decreasingColor ?? RedBar;
     }
 }

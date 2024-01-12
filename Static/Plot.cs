@@ -153,7 +153,7 @@ internal static class Plot
 
         xAxis.Color();
         yAxis.Color();
-        candles.Color();
+        candles.Color((model?.Series[0] as CandleStickSeries)?.DecreasingColor);
 
         double yMin = double.MaxValue;
         double yMax = double.MinValue;
