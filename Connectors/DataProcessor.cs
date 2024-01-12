@@ -75,11 +75,11 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
     {
         var tool = TradingSystem.Tools
             .Single(x => x.Security.Seccode == lastTrade.Seccode || x.BasicSecurity?.Seccode == lastTrade.Seccode);
-        
+
         var security = tool.BasicSecurity;
         if (security == null || tool.Security.Seccode == lastTrade.Seccode) security = tool.Security;
         ArgumentNullException.ThrowIfNull(security.Bars);
-        
+
         var prevTradeTime = security.LastTrade.Time;
         security.LastTrade = lastTrade;
 
