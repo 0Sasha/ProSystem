@@ -84,10 +84,10 @@ public class TradingSystem
 
     public async Task PrepareForTrading()
     {
-        await Connector.OrderPortfolioInfoAsync(Portfolio);
         if (!ReadyToTrade)
         {
-            if (await Connector.PrepareForTradingAsync() && await PrepareToolsAsync())
+            if (await Connector.OrderPortfolioInfoAsync(Portfolio) &&
+                await Connector.PrepareForTradingAsync() && await PrepareToolsAsync())
             {
                 if (ServerTime < DateTime.Today.AddHours(7)) ClearObsoleteData();
                 if (Connector.Connection != ConnectionState.Connected) return;
@@ -99,6 +99,7 @@ public class TradingSystem
         }
         else
         {
+            await Connector.OrderPortfolioInfoAsync(Portfolio);
             foreach (var tool in Tools) await Connector.RequestBarsAsync(tool);
             AddInfo("PrepareForTrading: bars updated.", false);
         }
@@ -169,7 +170,11 @@ public class TradingSystem
             var min = ServerTime.Minute;
             var minutes = min < 25 ? 25 - min : min < 55 ? 55 - min : 85 - min;
             triggerRequestInfo = ServerTime.AddMinutes(minutes);
-            await Connector.OrderPortfolioInfoAsync(Portfolio);
+            if (!await Connector.OrderPortfolioInfoAsync(Portfolio))
+            {
+                await Task.Delay(5000);
+                if (!await Connector.OrderPortfolioInfoAsync(Portfolio)) ReadyToTrade = false;
+            }
             foreach (var tool in Tools) await Connector.OrderSecurityInfoAsync(tool.Security);
         }
 

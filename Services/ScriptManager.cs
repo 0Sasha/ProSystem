@@ -519,7 +519,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
             "\nCentre " + script.Result.Centre + "\nLevel " + script.Result.Level;
 
         for (int i = 0; i < script.Result.Indicators.Length; i++)
-            if (script.Result.Indicators[i] != null)
+            if (script.Result.Indicators[i].Length > 2)
                 data += "\nIndicator" + (i + 1) + "[^2] " + script.Result.Indicators[i][^2];
         try
         {

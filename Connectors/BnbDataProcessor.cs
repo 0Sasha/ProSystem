@@ -304,22 +304,9 @@ internal class BnbDataProcessor : DataProcessor
     private void ProcessPositions(JsonElement root)
     {
         if (Connector.DeepLog) AddInfo("ProcessPositions: " + root.GetRawText(), false);
+        Task.Run(() => Connector.OrderPortfolioInfoAsync(TradingSystem.Portfolio));
 
-        var data = root.GetProperty("a");
-        foreach (var b in data.GetProperty("B").EnumerateArray())
-        {
-            if (b.GetString("a") == "USDT")
-            {
-                AddInfo("ProcessPositions: update of Wallet Balance");
-                var wb = b.GetDouble("wb");
-                var cw = b.GetDouble("cw");
-                TradingSystem.Portfolio.Saldo = wb;
-                if (Math.Abs(wb - cw) > 0.000001)
-                    AddInfo("ProcessPositions: Cross Wallet Balance != Wallet Balance", true, true);
-            }
-            else AddInfo("ProcessPositions: unknown asset: " + b.GetString("a"), true, true);
-        }
-        foreach (var p in data.GetProperty("P").EnumerateArray())
+        foreach (var p in root.GetProperty("a").GetProperty("P").EnumerateArray())
         {
             var seccode = p.GetString("s");
             var pos = TradingSystem.Portfolio.Positions.SingleOrDefault(x => x.Seccode == seccode);
