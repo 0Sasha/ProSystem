@@ -37,8 +37,8 @@ public partial class MainWindow : Window
 
         Settings = Serializer.TryDeserialize<Settings>();
         Portfolio = Serializer.TryDeserialize<Portfolio>();
-        Tools = Serializer.TryDeserialize<ObservableCollection<Tool>>(nameof(Tools));
-        Trades = Serializer.TryDeserialize<ObservableCollection<Trade>>(nameof(Trades));
+        Tools = new ObservableCollection<Tool>(Serializer.TryDeserialize<List<Tool>>(nameof(Tools)));
+        Trades = new ObservableCollection<Trade>(Serializer.TryDeserialize<List<Trade>>(nameof(Trades)));
 
         Settings.Prepare(Tools, AddInfo);
         Notifier = new EmailNotifier(Settings, AddInfo);
@@ -250,7 +250,7 @@ public partial class MainWindow : Window
             Source = portfolio,
             Path = new PropertyPath(nameof(Portfolio.AverageEquity)),
             Mode = BindingMode.OneWay,
-            StringFormat = "### ### ### УЕ"
+            StringFormat = "### ### ###"
         });
         CurShareInitReqsTxt.SetBinding(TextBlock.TextProperty, new Binding()
         {
@@ -331,10 +331,10 @@ public partial class MainWindow : Window
         AddInfo("SaveData: Сериализация", false);
         try
         {
-            Serializer.Serialize(TradingSystem.Tools, nameof(TradingSystem.Tools));
+            Serializer.Serialize(TradingSystem.Tools.ToList(), nameof(TradingSystem.Tools));
             Serializer.Serialize(TradingSystem.Portfolio, nameof(TradingSystem.Portfolio));
             Serializer.Serialize(TradingSystem.Settings, nameof(TradingSystem.Settings));
-            Serializer.Serialize(TradingSystem.Trades, nameof(TradingSystem.Trades));
+            Serializer.Serialize(TradingSystem.Trades.ToList(), nameof(TradingSystem.Trades));
             if (SaveInfoPanel) Dispatcher.Invoke(() => File.WriteAllText(DataDirectory + "/Info.txt", TxtBox.Text));
             return true;
         }

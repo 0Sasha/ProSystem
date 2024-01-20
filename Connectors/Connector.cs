@@ -117,7 +117,7 @@ public abstract class Connector : INotifyPropertyChanged
 
         if (count == 0)
         {
-            var maxCount = basic ? 3500 : 3000;
+            var maxCount = basic ? 4000 : 3000;
             count = security.Bars == null || security.Bars.Close.Length < 300 ||
                 security.Bars.DateTime[^1].AddHours(12) < ServerTime || minuteTF != security.Bars.TF ? maxCount : 25;
         }

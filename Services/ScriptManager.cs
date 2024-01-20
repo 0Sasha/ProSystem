@@ -227,6 +227,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
     {
         ArgumentNullException.ThrowIfNull(script.Result);
         ArgumentNullException.ThrowIfNull(tool.Security.Bars);
+        ArgumentOutOfRangeException.ThrowIfLessThan(volume, 0.000001);
 
         var basicSecurity = tool.BasicSecurity;
         var security = tool.Security;
@@ -275,10 +276,13 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
             return;
         }
 
-        if (lastExecuted != null && lastExecuted.ChangeTime >= script.Result.IndLastDT || volume < 0.000001 ||
-            basicSecurity == null && security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date ||
-            basicSecurity != null && basicSecurity.Bars?.DateTime[^1].Date != basicSecurity.Bars?.DateTime[^2].Date)
-            return;
+        if (lastExecuted?.ChangeTime >= script.Result.IndLastDT) return;
+        if (security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date) return;
+        if (basicSecurity != null)
+        {
+            if (basicSecurity.Bars?.DateTime[^1].Date > security.Bars.DateTime[^1].Date) return;
+            if (basicSecurity.Bars?.DateTime[^1].Date != basicSecurity.Bars?.DateTime[^2].Date) return;
+        }
 
         if (script.CurrentPosition == PositionType.Short && isGrow[^1] ||
             script.CurrentPosition == PositionType.Long && !isGrow[^1])

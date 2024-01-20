@@ -114,7 +114,7 @@ public class Settings : INotifyPropertyChanged
         get => toleranceBaseAssets;
         set
         {
-            if (value is < 1 or > 150)
+            if (value is < 1 or > 50)
             {
                 toleranceBaseAssets = 5;
                 AddInfo("ToleranceBaseAssets is 5");

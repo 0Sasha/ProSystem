@@ -45,7 +45,7 @@
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=AverageEquity, StringFormat=N2, ConverterCulture=ru}"/>
         </DataTemplate>
         <DataTemplate x:Key="LastTrade">
-            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.LastTrade.Price, StringFormat=N2}"/>
+            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.LastTrade.Price}"/>
         </DataTemplate>
         <DataTemplate x:Key="InitReqLong">
             <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Path=Security.InitReqLong, StringFormat=N2}"/>

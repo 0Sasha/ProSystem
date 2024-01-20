@@ -41,7 +41,6 @@ internal class BnbConnector : Connector
 
     public bool DeepLog { get => TradingSystem.Settings.DeepLog; }
     public string? ListenKey { get; private set; }
-    public override OrderType OrderTypeNM { get; set; } = OrderType.Market;
 
     public BnbConnector(TradingSystem tradingSystem, AddInformation addInfo) : base(tradingSystem, addInfo)
     {
