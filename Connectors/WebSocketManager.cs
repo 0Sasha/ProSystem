@@ -8,21 +8,21 @@ internal class WebSocketManager : IDisposable, INotifyPropertyChanged
 {
     private readonly string URL;
     private readonly AddInformation AddInfo;
-    private readonly Action<string> DataHandler;
+    private readonly Action<string> HandleData;
 
-    private ClientWebSocket webSocket;
-    private CancellationTokenSource tokenSource;
+    private ClientWebSocket? webSocket;
+    private CancellationTokenSource? tokenSource;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public bool Connected { get => webSocket != null && webSocket.State == WebSocketState.Open; }
+    public bool Connected { get => webSocket?.State == WebSocketState.Open; }
 
-    public WebSocketManager(string url, Action<string> dataHandler, AddInformation addInfo)
+    public WebSocketManager(string url, Action<string> handleData, AddInformation addInfo)
     {
-        if (url == null || url == string.Empty) throw new ArgumentNullException(nameof(url));
+        ArgumentException.ThrowIfNullOrEmpty(url, nameof(url));
         URL = url;
-        AddInfo = addInfo ?? throw new ArgumentNullException(nameof(addInfo));
-        DataHandler = dataHandler ?? throw new ArgumentNullException(nameof(dataHandler));
+        AddInfo = addInfo;
+        HandleData = handleData;
     }
 
     public async Task<bool> ConnectAsync(string relativeURL)
@@ -31,11 +31,12 @@ internal class WebSocketManager : IDisposable, INotifyPropertyChanged
         {
             tokenSource = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
             webSocket = new();
+            webSocket.Options.KeepAliveInterval = TimeSpan.FromHours(24);
             await webSocket.ConnectAsync(new(URL + relativeURL), tokenSource.Token);
-            if (webSocket.State != WebSocketState.Open) await Task.Delay(250);
+            if (!Connected) await Task.Delay(250);
 
             _ = Task.Run(ReceiveAsync, tokenSource.Token);
-            PropertyChanged.Invoke(this, new(nameof(Connected)));
+            PropertyChanged?.Invoke(this, new(nameof(Connected)));
         }
         return Connected;
     }
@@ -47,63 +48,53 @@ internal class WebSocketManager : IDisposable, INotifyPropertyChanged
         tokenSource = null;
         if (webSocket == null) return;
 
-        if (webSocket.State == WebSocketState.Open)
+        if (Connected)
         {
             await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
             await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
-            if (webSocket.State == WebSocketState.Open) await Task.Delay(250);
+            if (Connected) await Task.Delay(250);
         }
         webSocket.Dispose();
         webSocket = null;
+        PropertyChanged?.Invoke(this, new(nameof(Connected)));
     }
 
-    public async Task SendAsync(string message, CancellationToken? token = null)
+    public async Task SendAsync(string message)
     {
-        if (message == null || message == string.Empty) throw new ArgumentNullException(nameof(message));
+        ArgumentException.ThrowIfNullOrEmpty(message, nameof(message));
+        ArgumentNullException.ThrowIfNull(webSocket, nameof(webSocket));
+
         var data = Encoding.ASCII.GetBytes(message);
-        await webSocket.SendAsync(new(data), WebSocketMessageType.Text,
-            true, token == null ? CancellationToken.None : token.Value);
+        await webSocket.SendAsync(new(data), WebSocketMessageType.Text, true, CancellationToken.None);
     }
 
     private async Task ReceiveAsync()
     {
-        var data = string.Empty;
-        WebSocketReceiveResult result;
-        while (true)
+        try
         {
-            try
+            while (webSocket != null && tokenSource != null && !tokenSource.IsCancellationRequested &&
+                (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseSent))
             {
-                while (webSocket != null && tokenSource != null && !tokenSource.Token.IsCancellationRequested &&
-                    (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseSent))
-                {
-                    var buffer = new ArraySegment<byte>(new byte[8192]);
-                    result = await webSocket.ReceiveAsync(buffer, tokenSource.Token);
-                    if (result.MessageType == WebSocketMessageType.Close) return;
+                var buffer = new ArraySegment<byte>(new byte[8192]);
+                var result = await webSocket.ReceiveAsync(buffer, tokenSource.Token);
+                if (result.MessageType == WebSocketMessageType.Close) break;
 
-                    data = Encoding.UTF8.GetString([.. buffer], buffer.Offset, buffer.Count);
-                    DataHandler(data);
-                }
-                await DisconnectAsync();
-                PropertyChanged.Invoke(this, new(nameof(Connected)));
-                return;
-            }
-            catch (TaskCanceledException)
-            {
-                await DisconnectAsync();
-                PropertyChanged.Invoke(this, new(nameof(Connected)));
-                return;
-            }
-            catch (Exception ex)
-            {
-                AddInfo("WebSocketManager: " + ex.Message, notify: true);
-                AddInfo("StackTrace: " + ex.StackTrace);
-                if (ex.InnerException != null)
-                {
-                    AddInfo("Inner: " + ex.InnerException.Message, false);
-                    AddInfo("Inner stackTrace: " + ex.InnerException.StackTrace, false);
-                }
+                var data = Encoding.UTF8.GetString([.. buffer], buffer.Offset, buffer.Count);
+                HandleData(data);
             }
         }
+        catch (TaskCanceledException) { }
+        catch (Exception ex)
+        {
+            AddInfo("WebSocketManager: " + ex.Message, true, !ex.Message.StartsWith("The remote party closed"));
+            AddInfo("StackTrace: " + ex.StackTrace, false);
+            if (ex.InnerException != null)
+            {
+                AddInfo("Inner: " + ex.InnerException.Message, false);
+                AddInfo("Inner stackTrace: " + ex.InnerException.StackTrace, false);
+            }
+        }
+        finally { await DisconnectAsync(); }
     }
 
     public void Dispose() => DisconnectAsync().Wait();
