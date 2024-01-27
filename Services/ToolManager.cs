@@ -109,7 +109,7 @@ internal class ToolManager : IToolManager
         try
         {
             if (await Connector.CheckToolAsync(tool)) await CalculateToolAsync(tool);
-            AddInfo("Scripts executed: " + tool.Name, false);
+            AddInfo("Calculated: " + tool.Name, false);
         }
         catch (Exception e)
         {
@@ -501,7 +501,8 @@ internal class ToolManager : IToolManager
                     volume = balance > 0.000001 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
                     if (volume < security.MinQty)
                     {
-                        AddInfo("Unable to normalize up: volume < security.MinQty");
+                        AddInfo(tool.Name + ": unable to normalize up: volume < security.MinQty",
+                            TradingSystem.Settings.DisplaySpecialInfo);
                         return;
                     }
 

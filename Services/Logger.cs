@@ -40,7 +40,7 @@ public class Logger
 
     public void WriteLog(string data)
     {
-        DataQueue.Enqueue(DateTime.Now.ToString("dd.MM.yy HH:mm:ss.ffff", IC) + " " + data);
+        DataQueue.Enqueue(DateTime.Now.ToString("dd.MM HH:mm:ss.ffff", IC) + " " + data);
         if (Interlocked.Exchange(ref occupied, 1) != 0) return;
 
         while (DataQueue.TryDequeue(out var dt)) writer.WriteLine(dt);

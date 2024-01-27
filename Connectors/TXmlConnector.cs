@@ -22,13 +22,15 @@ internal class TXmlConnector : Connector
     };
     private readonly StringComparison SC = StringComparison.Ordinal;
     private readonly Thread MainThread;
+    private readonly int FirstTradingHour = 7;
 
     private int waitingTimeMs = 18000;
     private bool isWorking;
 
     public virtual double USDRUB { get; set; }
     public virtual double EURRUB { get; set; }
-    public override bool ReconnectTime => base.ReconnectTime || ServerTime.Hour == 6 && ServerTime.Minute is 40 or 41;
+    public override bool ReconnectTime =>
+        base.ReconnectTime || ServerTime.Hour == FirstTradingHour && ServerTime.Minute is 0 or 1;
     public override DateTime ServerTime { get => DateTime.UtcNow.AddHours(3); }
     public List<ClientAccount> Clients { get; } = [];
 
@@ -128,7 +130,7 @@ internal class TXmlConnector : Connector
         await base.ResetAsync();
         await FileManager.ArchiveFiles("Logs/Transaq", ServerTime.AddDays(-1).ToString("yyyyMMdd"),
             ServerTime.AddDays(-1).ToString("yyyyMMdd") + " archive", true);
-        var time = ServerTime.Date.AddMinutes(400) - ServerTime;
+        var time = ServerTime.Date.AddHours(FirstTradingHour) - ServerTime;
         if (time.TotalMinutes > 0)
         {
             AddInfo("Reset: waiting " + time, false);
