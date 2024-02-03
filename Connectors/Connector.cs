@@ -39,8 +39,9 @@ public abstract class Connector : INotifyPropertyChanged
             if (connection != value)
             {
                 connection = value;
-                if (connection == ConnectionState.Connecting)
-                    ReconnectTrigger = ServerTime.AddSeconds(180);
+                if (connection == ConnectionState.Connecting) ReconnectTrigger = ServerTime.AddSeconds(180);
+                else if (connection is ConnectionState.Disconnected or ConnectionState.Disconnecting)
+                    TradingSystem.ReadyToTrade = false;
                 NotifyChange(nameof(Connection));
             }
         }
@@ -184,7 +185,16 @@ public abstract class Connector : INotifyPropertyChanged
     protected abstract bool CheckRequirements(Security security);
 
 
-    public virtual bool SecurityIsBidding(Security security) => security.LastTrade.Time.AddMinutes(1) > ServerTime;
+    public virtual bool SecurityIsBidding(Security security)
+    {
+        var isBidding = security.LastTrade.Time.AddMinutes(1) > ServerTime;
+        if (!isBidding)
+        {
+            AddInfo(security + " is not bidding. Subscribing", notify: true);
+            _ = SubscribeToTradesAsync(security);
+        }
+        return isBidding;
+    }
 
     public abstract bool OrderIsActive(Order order);
 

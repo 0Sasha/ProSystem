@@ -109,7 +109,6 @@ internal class TXmlConnector : Connector
     public override async Task<bool> DisconnectAsync()
     {
         var result = true;
-        TradingSystem.ReadyToTrade = false;
         Connection = ConnectionState.Disconnecting;
 
         var res = await SendCommandAsync("<command id=\"disconnect\"/>");
@@ -289,7 +288,7 @@ internal class TXmlConnector : Connector
 
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
-        AddInfo("SubUnsub: " + result);
+        ShowBadResult("SubUnsub", result, command);
         return false;
     }
 
@@ -300,7 +299,7 @@ internal class TXmlConnector : Connector
             tf.ID + "</period><count>" + count + "</count><reset>true</reset></command>";
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
-        AddInfo("OrderHistoricalData: " + result + " command: " + command);
+        ShowBadResult("OrderHistoricalData", result, command);
         return false;
     }
 
@@ -311,7 +310,7 @@ internal class TXmlConnector : Connector
             "\" currency=\"false\" asset=\"false\" money=\"false\" depo=\"true\" registers=\"false\"/>";
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
-        AddInfo("OrderPortfolioInfo: " + result);
+        ShowBadResult("OrderPortfolioInfo", result, command);
         return false;
     }
 
@@ -331,7 +330,7 @@ internal class TXmlConnector : Connector
             "</market><seccode>" + symbol.Seccode + "</seccode></security></command>";
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
-        AddInfo("GetSecurityInfo: " + result);
+        ShowBadResult("GetSecurityInfo", result, command);
         return false;
     }
 
@@ -348,9 +347,12 @@ internal class TXmlConnector : Connector
             "<seccode>" + symbol.Seccode + "</seccode></security><client>" + client.ID + "</client></command>";
         var result = await SendCommandAsync(command);
         if (result == "<result success=\"true\"/>") return true;
-        AddInfo("GetClnSecPermissions: " + result);
+        ShowBadResult("GetClnSecPermissions", result, command);
         return false;
     }
+
+    private void ShowBadResult(string method, string result, string command) =>
+        AddInfo(method + ": " + result + " || " + command);
 
     public override async Task WaitForCertaintyAsync(Tool tool)
     {

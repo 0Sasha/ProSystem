@@ -89,7 +89,6 @@ internal class BnbConnector : Connector
 
     public override async Task<bool> DisconnectAsync()
     {
-        TradingSystem.ReadyToTrade = false;
         if (SocketManager.Connected)
         {
             Connection = ConnectionState.Disconnecting;

@@ -355,7 +355,6 @@ internal class TXmlDataProcessor : DataProcessor
         }
         else if (connected == "false")
         {
-            TradingSystem.ReadyToTrade = false;
             Connector.ServerAvailable = true;
 
             if (xr.GetAttribute("recover") != "true")
@@ -371,7 +370,6 @@ internal class TXmlDataProcessor : DataProcessor
         }
         else if (connected == "error")
         {
-            TradingSystem.ReadyToTrade = false;
             Connector.ServerAvailable = false;
             Connector.BackupServer = !Connector.BackupServer;
 
