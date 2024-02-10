@@ -80,7 +80,7 @@
                         <CheckBox Name="DisplayNewTradesCheck" Content="Display new trades" HorizontalAlignment="Left" Margin="0,233,0,0" VerticalAlignment="Top"/>
                         <CheckBox Name="DisplaySpecialInfoCheck" Content="Display special information" HorizontalAlignment="Left" Margin="0,263,0,0" VerticalAlignment="Top"/>
                     </Grid>
-                    <Grid HorizontalAlignment="Left" Margin="270,10,0,0" Width="490" Height="570" VerticalAlignment="Top">
+                    <Grid HorizontalAlignment="Left" Margin="270,10,0,0" Width="340" Height="570" VerticalAlignment="Top">
                         <TextBlock HorizontalAlignment="Left" Margin="0,3,0,0" Text="Risk management" VerticalAlignment="Top" FontWeight="Bold"/>
 
                         <TextBlock HorizontalAlignment="Left" Margin="0,33,0,0" Text="Average equity for 5 days" VerticalAlignment="Top"/>
@@ -126,25 +126,6 @@
 
                         <TextBlock HorizontalAlignment="Left" Margin="0,543,0,0" Text="Maximum InitReqs of the portfolio" VerticalAlignment="Top"/>
                         <TextBox Name="MaxShareInitReqsPortfolioTxt" HorizontalAlignment="Left" Margin="280,540,0,0" VerticalAlignment="Top" TextAlignment="Center" Height="24" Width="50"/>
-
-                        <TextBlock HorizontalAlignment="Left" Margin="340,3,0,0" Text="Tools by priority" VerticalAlignment="Top" FontWeight="Bold"/>
-                        <ListView Name="ToolsByPriorityView" Margin="340,33,0,0" Height="530" VerticalAlignment="Top">
-                            <ListView.View>
-                                <GridView>
-                                    <GridViewColumn Width="120">Tool</GridViewColumn>
-                                </GridView>
-                            </ListView.View>
-                            <ListView.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="Raise by 1" Click="ChangePriorityTool"></MenuItem>
-                                    <MenuItem Header="Raise by 2" Click="ChangePriorityTool"></MenuItem>
-                                    <MenuItem Header="Raise by 5" Click="ChangePriorityTool"></MenuItem>
-                                    <MenuItem Header="Downgrade by 1" Click="ChangePriorityTool"></MenuItem>
-                                    <MenuItem Header="Downgrade by 2" Click="ChangePriorityTool"></MenuItem>
-                                    <MenuItem Header="Downgrade by 5" Click="ChangePriorityTool"></MenuItem>
-                                </ContextMenu>
-                            </ListView.ContextMenu>
-                        </ListView>
                     </Grid>
                 </Grid>
             </TabItem>

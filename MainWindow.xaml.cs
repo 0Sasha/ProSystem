@@ -60,7 +60,6 @@ public partial class MainWindow : Window
             ToolManager.Initialize(tool);
             TabsTools.Items.Add(tool.Tab);
             TradingSystem.Settings.ToolsByPriority.Add(tool.Name);
-            ToolsByPriorityView.Items.Refresh();
             tool.PropertyChanged += UpdateTool;
         }
         else
@@ -126,7 +125,6 @@ public partial class MainWindow : Window
         OrdersView.ItemsSource = tradingSystem.Orders;
         TradesView.ItemsSource = tradingSystem.Trades;
         PortfolioView.ItemsSource = tradingSystem.Portfolio.AllPositions;
-        ToolsByPriorityView.ItemsSource = tradingSystem.Settings.ToolsByPriority;
         BackupServerCheck.SetBinding(ToggleButton.IsCheckedProperty, new Binding()
         {
             Source = tradingSystem.Connector,
@@ -440,40 +438,9 @@ public partial class MainWindow : Window
 
             // Удаление инструмента
             Settings.ToolsByPriority.Remove(Tools[i].Name);
-            ToolsByPriorityView.Items.Refresh();
             if (Tools.Remove(Tools[i])) AddInfo("Удалён инструмент: " + ToolName);
             else AddInfo("Не получилось удалить инструмент: " + ToolName);
         }
-    }
-
-    private void ChangePriorityTool(object? sender, RoutedEventArgs e)
-    {
-        ArgumentNullException.ThrowIfNull(sender, nameof(sender));
-        var header = (string)((MenuItem)sender).Header;
-        int i = ToolsByPriorityView.SelectedIndex;
-        int n = int.Parse(header[^1].ToString());
-
-        if (header.StartsWith("Raise") && i >= n)
-        {
-            while (n > 0)
-            {
-                (Settings.ToolsByPriority[i], Settings.ToolsByPriority[i - 1]) =
-                    (Settings.ToolsByPriority[i - 1], Settings.ToolsByPriority[i]);
-                n--;
-                i--;
-            }
-        }
-        else if (header.StartsWith("Downgrade") && i > -1 && i < Settings.ToolsByPriority.Count - n)
-        {
-            while (n > 0)
-            {
-                (Settings.ToolsByPriority[i], Settings.ToolsByPriority[i + 1]) =
-                    (Settings.ToolsByPriority[i + 1], Settings.ToolsByPriority[i]);
-                n--;
-                i++;
-            }
-        }
-        ToolsByPriorityView.Items.Refresh();
     }
 
     private async void CancelOrderContext(object? sender, RoutedEventArgs e)

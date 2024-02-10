@@ -17,8 +17,6 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
 
     public void IdentifyOrdersAndTrades(Tool tool)
     {
-        ArgumentNullException.ThrowIfNull(tool);
-
         foreach (var unknownOrder in
             TradingSystem.Orders.ToArray().Where(x => x.Sender == null && x.Seccode == tool.Security.Seccode))
         {
