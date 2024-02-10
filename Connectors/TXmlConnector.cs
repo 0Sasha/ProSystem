@@ -190,7 +190,7 @@ internal class TXmlConnector : Connector
             }, DispatcherPriority.Send);
 
             AddInfo("SendOrder: order is sent: " + order.Sender + "/" + order.Seccode + "/" + order.Side + "/" +
-                order.Price + "/" + order.Quantity + "/" + order.TrID, TradingSystem.Settings.DisplaySentOrders);
+                price + "/" + quantity + "/" + order.TrID, TradingSystem.Settings.DisplaySentOrders);
 
             _ = Task.Run(() =>
             {

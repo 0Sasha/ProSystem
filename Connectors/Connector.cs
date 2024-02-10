@@ -39,7 +39,8 @@ public abstract class Connector : INotifyPropertyChanged
             if (connection != value)
             {
                 connection = value;
-                if (connection == ConnectionState.Connecting) ReconnectTrigger = ServerTime.AddSeconds(180);
+                if (connection == ConnectionState.Connected) ServerAvailable = true;
+                else if (connection == ConnectionState.Connecting) ReconnectTrigger = ServerTime.AddSeconds(180);
                 else if (connection is ConnectionState.Disconnected or ConnectionState.Disconnecting)
                     TradingSystem.ReadyToTrade = false;
                 NotifyChange(nameof(Connection));
@@ -216,8 +217,7 @@ public abstract class Connector : INotifyPropertyChanged
                     if (!sentCommand.Wait(longMsTimeout))
                     {
                         ServerAvailable = false;
-                        if (Connection == ConnectionState.Connected)
-                            Connection = ConnectionState.Connecting;
+                        if (Connection == ConnectionState.Connected) Connection = ConnectionState.Connecting;
                         AddInfo("Server is not responding. Command: " + command, false);
 
                         if (!sentCommand.Wait(longMsTimeout * 15))
@@ -232,7 +232,7 @@ public abstract class Connector : INotifyPropertyChanged
                 }
             });
         }
-        catch (Exception e) { AddInfo("Exception during sending command: " + e.Message); }
+        catch (Exception e) { AddInfo("Exception during sending command: " + e.Message, notify: true); }
         finally { sentCommand.Dispose(); }
     }
 

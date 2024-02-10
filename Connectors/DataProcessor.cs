@@ -80,7 +80,7 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
         if (security == null || tool.Security.Seccode == lastTrade.Seccode) security = tool.Security;
         ArgumentNullException.ThrowIfNull(security.Bars);
 
-        var prevTradeTime = security.LastTrade.Time;
+        if (lastTrade.Time < security.LastTrade.Time) lastTrade.Time = security.LastTrade.Time;
         security.LastTrade = lastTrade;
 
         var bars = security.Bars;
@@ -91,12 +91,17 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
             else if (lastTrade.Price < bars.Low[^1]) bars.Low[^1] = lastTrade.Price;
             bars.Volume[^1] += lastTrade.Quantity;
         }
-        else if (ServerTime > prevTradeTime)
+        else if (lastTrade.Time < ServerTime.AddSeconds(5))
         {
             var startTime = ServerTime.Date == bars.DateTime[^1].Date ?
                 bars.DateTime[^1].AddMinutes(bars.TF) : ServerTime.Date.AddHours(ServerTime.Hour);
             var price = lastTrade.Price;
             AddNewBar(tool, security, true, true, startTime, price, price, price, price, lastTrade.Quantity);
+        }
+        else if (lastTrade.Time >= ServerTime.AddSeconds(20))
+        {
+            AddInfo(security.Seccode +
+                ": trade time is much more than server time: " + lastTrade.Time + "/" + ServerTime, notify: true);
         }
     }
 
@@ -130,7 +135,8 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
     {
         ArgumentNullException.ThrowIfNull(security.Bars);
 
-        security.LastTrade.Time = ServerTime.AddSeconds(10);
+        var lastTradeTime = security.LastTrade.Time;
+        security.LastTrade.Time = ServerTime.AddSeconds(15);
         tool.NextRecalc = ServerTime.AddSeconds(30);
 
         security.Bars.DateTime = [.. security.Bars.DateTime, .. new[] { startTime }];
@@ -140,7 +146,12 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
         security.Bars.Close = [.. security.Bars.Close, .. new[] { close }];
         security.Bars.Volume = [.. security.Bars.Volume, .. new[] { volume }];
 
-        Task.Run(() => RecalculateAsync(tool, security, delay, requestBars));
+        Task.Run(async () =>
+        {
+            await RecalculateAsync(tool, security, delay, requestBars);
+            AddInfo("New bar: " + security.Seccode + ": trade time: " +
+                lastTradeTime.ToString("HH:mm:ss") + " server time: " + ServerTime.ToString("HH:mm:ss"), false);
+        });
     }
 
     private async Task RecalculateAsync(Tool tool, Security security, bool delay, bool requestBars)

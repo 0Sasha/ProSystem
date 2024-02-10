@@ -64,16 +64,27 @@ internal class BnbConnector : Connector
         apiSecret = Encoding.UTF8.GetBytes(Marshal.PtrToStringUni(s) ?? throw new Exception("s is null"));
         Marshal.ZeroFreeGlobalAllocUnicode(s);
 
-        if (!await CheckServerTimeAsync() || !await CheckAPIPermissionsAsync()) return false;
+        Connection = ConnectionState.Connecting;
+        if (!await CheckServerTimeAsync() || !await CheckAPIPermissionsAsync())
+        {
+            ServerAvailable = false;
+            Connection = ConnectionState.Disconnected;
+            return false;
+        }
 
         Securities.Clear();
-        if (await GetExchangeInfoAsync()) Connection = ConnectionState.Connecting;
-        else return false;
+        if (!await GetExchangeInfoAsync())
+        {
+            ServerAvailable = false;
+            Connection = ConnectionState.Disconnected;
+            return false;
+        }
 
         if (!SocketManager.Connected)
         {
             if (!await UpdateListenKey() || !await SocketManager.ConnectAsync("/ws/" + ListenKey))
             {
+                ServerAvailable = false;
                 Connection = ConnectionState.Disconnected;
                 return false;
             }

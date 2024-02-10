@@ -341,7 +341,6 @@ internal class TXmlDataProcessor : DataProcessor
         var connected = xr.GetAttribute("connected");
         if (connected == "true")
         {
-            Connector.ServerAvailable = true;
             if (xr.GetAttribute("recover") != "true")
             {
                 Connector.Connection = ConnectionState.Connected;
@@ -355,8 +354,6 @@ internal class TXmlDataProcessor : DataProcessor
         }
         else if (connected == "false")
         {
-            Connector.ServerAvailable = true;
-
             if (xr.GetAttribute("recover") != "true")
             {
                 Connector.Connection = ConnectionState.Disconnected;
