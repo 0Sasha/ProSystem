@@ -30,6 +30,10 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual bool ReconnectTime { get => ServerTime.Hour == 0 && ServerTime.Minute is 15 or 16; }
     public virtual long UnixTime { get => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); }
     public virtual DateTime ServerTime { get => DateTime.UtcNow; }
+    public virtual int FirstTradingHour { get; init; } = 0;
+    public virtual bool FirstBar { get =>
+            FirstTradingHour != 0 && ServerTime < ServerTime.Date.AddHours(FirstTradingHour).AddMinutes(30); }
+    public virtual OrderType OrderTypeNM { get; set; } = OrderType.Limit;
 
     public ConnectionState Connection
     {
@@ -52,8 +56,6 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual List<Security> Securities { get; protected set; } = [];
     public virtual List<Market> Markets { get; protected set; } = [];
     public virtual List<TimeFrame> TimeFrames { get; protected set; } = [];
-
-    public virtual OrderType OrderTypeNM { get; set; } = OrderType.Limit;
 
     protected Connector(TradingSystem tradingSystem, AddInformation addInfo)
     {
@@ -188,7 +190,7 @@ public abstract class Connector : INotifyPropertyChanged
 
     public virtual bool SecurityIsBidding(Security security)
     {
-        var isBidding = security.LastTrade.Time.AddMinutes(1) > ServerTime;
+        var isBidding = security.LastTrade.Time.AddMinutes(3) > ServerTime;
         if (!isBidding)
         {
             AddInfo(security + " is not bidding. Subscribing", notify: true);

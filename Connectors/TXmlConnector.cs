@@ -22,13 +22,14 @@ internal class TXmlConnector : Connector
     };
     private readonly StringComparison SC = StringComparison.Ordinal;
     private readonly Thread MainThread;
-    private readonly int FirstTradingHour = 7;
 
     private int waitingTimeMs = 18000;
     private bool isWorking;
 
     public virtual double USDRUB { get; set; }
     public virtual double EURRUB { get; set; }
+
+    public override int FirstTradingHour { get; init; } = 7;
     public override bool ReconnectTime =>
         base.ReconnectTime || ServerTime.Hour == FirstTradingHour && ServerTime.Minute is 0 or 1;
     public override DateTime ServerTime { get => DateTime.UtcNow.AddHours(3); }

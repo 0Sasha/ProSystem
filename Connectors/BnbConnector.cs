@@ -35,7 +35,7 @@ internal class BnbConnector : Connector
     private const string BaseUrl = "https://api.binance.com";
     private const string BaseFuturesUrl = "https://fapi.binance.com";
     private const string BaseFuturesStreamUrl = "wss://fstream.binance.com";
-    private const string RecvWindow = "8000";
+    private const string RecvWindow = "10000";
 
     public readonly WebSocketManager SocketManager;
 
@@ -404,7 +404,7 @@ internal class BnbConnector : Connector
     public override bool OrderIsExecuted(Order order) => order.Status is "FILLED";
 
     public override bool OrderIsTriggered(Order order) =>
-        order.Type is "LIMIT" or "MARKET" && order.Status is "NEW" or "PARTIALLY_FILLED";
+        order.Type is "LIMIT" && order.Status is "NEW" or "PARTIALLY_FILLED";
 
 
     private async Task<bool> CheckAPIPermissionsAsync()

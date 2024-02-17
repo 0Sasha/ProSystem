@@ -80,7 +80,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
                         Window.Dispatcher.Invoke(() => script.Orders[i] = orders[y]);
                     }
                     else if (Connector.OrderIsActive(script.Orders[i]) &&
-                        DateTime.Today.DayOfWeek != DayOfWeek.Saturday && DateTime.Today.DayOfWeek != DayOfWeek.Sunday)
+                        ServerTime.Date.DayOfWeek != DayOfWeek.Saturday && ServerTime.Date.DayOfWeek != DayOfWeek.Sunday)
                     {
                         script.Orders[i].Status = "lost";
                         script.Orders[i].ChangeTime = ServerTime.AddDays(-2);
@@ -96,8 +96,8 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
     {
         foreach (var script in tool.Scripts)
         {
-            var oldOrders = script.Orders.ToArray().Where(x => x.ChangeTime.Date < DateTime.Today.AddDays(-180));
-            var oldTrades = script.Trades.ToArray().Where(x => x.Time.Date < DateTime.Today.AddDays(-180));
+            var oldOrders = script.Orders.ToArray().Where(x => x.ChangeTime.Date < ServerTime.Date.AddDays(-180));
+            var oldTrades = script.Trades.ToArray().Where(x => x.Time.Date < ServerTime.Date.AddDays(-180));
             Window.Dispatcher.Invoke(() =>
             {
                 foreach (var order in oldOrders) script.Orders.Remove(order);
@@ -379,7 +379,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
                         else AddInfo(script.Name + ": price is out of normal range", notify: true);
                     }
                 }
-                else if (volume < 0.000001 || ServerTime < DateTime.Today.AddHours(7.5) && activeOrder.Note == null ||
+                else if (volume < 0.000001 || Connector.FirstBar && activeOrder.Note == null ||
                     (activeOrder.Side == "B") == isGrow[^1]) await Connector.CancelOrderAsync(activeOrder);
                 else if (Math.Abs(activeOrder.Price - price) > 0.000001 || activeOrder.Balance - volume - tool.Security.LotSize > 0.000001)
                     await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Conditional, price, volume, activeOrder.Signal ?? "", script);
@@ -388,9 +388,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
             {
                 if (activeOrder.Note == "NB")
                 {
-                    if (ServerTime > DateTime.Today.AddHours(7.5) && security.LastTrade.Time > DateTime.Today.AddHours(7.5) &&
-                        ServerTime < DateTime.Today.AddHours(9.5) ||
-                        ServerTime > DateTime.Today.AddHours(10.5) && security.LastTrade.Time > DateTime.Today.AddHours(10.5))
+                    if (!Connector.FirstBar)
                     {
                         if (normalPrice)
                         {
@@ -415,11 +413,9 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
 
         var lastExecuted = script.LastExecuted;
         if (!nowBidding || volume < 0.000001) return;
-        if (lastExecuted != null &&
-            lastExecuted.ChangeTime.Date == DateTime.Today && lastExecuted.ChangeTime >= script.Result.IndLastDT)
+        if (lastExecuted?.ChangeTime >= script.Result.IndLastDT)
         {
-            if (lastExecuted.Note == null ||
-                lastExecuted.Note == "NB" && lastExecuted.ChangeTime < DateTime.Today.AddHours(7.5)) return;
+            if (lastExecuted.Note == null || lastExecuted.Note == "NB") return;
 
             for (int bar = script.Result.Indicators[0].Length - 1; bar > 1; bar--)
             {
@@ -433,8 +429,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
         }
 
         var curPosition = script.CurrentPosition;
-        if (Connector.GetType() == typeof(TXmlConnector) &&
-            security.LastTrade.Time < DateTime.Today.AddHours(7.5) && ServerTime < DateTime.Today.AddHours(7.5))
+        if (Connector.FirstBar)
         {
             if (curPosition == PositionType.Short && isGrow[^1] || curPosition == PositionType.Long && !isGrow[^1])
             {
@@ -454,7 +449,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
         else
         {
             AddInfo(script.Name + ": Текущая позиция скрипта не соответствует IsGrow.", notify: true);
-            if (security.LastTrade.Time < DateTime.Today.AddHours(10.5) && ServerTime < DateTime.Today.AddHours(10.5))
+            if (Connector.FirstBar)
             {
                 double Price = isGrow[^1] ? prevStopLine - atr : prevStopLine + atr;
                 await Connector.SendOrderAsync(security, OrderType.Limit,
