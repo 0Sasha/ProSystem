@@ -18,10 +18,10 @@ public class Trade
     public string? OrderSignal { get; set; }
     public string? OrderNote { get; set; }
 
-    public Trade(string seccode, DateTime dateTime, double price, double quantity)
+    public Trade(string seccode, DateTime time, double price, double quantity)
     {
         Seccode = seccode;
-        Time = dateTime;
+        Time = time;
         Price = price;
         Quantity = quantity;
     }

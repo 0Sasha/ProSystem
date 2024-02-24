@@ -276,8 +276,7 @@ internal class BnbDataProcessor : DataProcessor
         var volume = kline.GetDouble("v");
         //var barIsClosed = kline.GetBool("x");
 
-        var lastTrade = new Trade(code, Connector.ServerTime, close, 0);
-        UpdateLastBar(lastTrade, startTime, open, high, low, close, volume);
+        UpdateLastBar(code, startTime, open, high, low, close, volume);
     }
 
     private void ProcessOrder(JsonElement root)

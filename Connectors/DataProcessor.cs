@@ -105,16 +105,15 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
         }
     }
 
-    protected void UpdateLastBar(Trade lastTrade, DateTime startTime,
+    protected void UpdateLastBar(string seccode, DateTime startTime,
         double open, double high, double low, double close, double volume)
     {
-        var tool = TradingSystem.Tools
-            .Single(x => x.Security.Seccode == lastTrade.Seccode || x.BasicSecurity?.Seccode == lastTrade.Seccode);
+        var tool = TradingSystem.Tools.Single(x => x.Security.Seccode == seccode || x.BasicSecurity?.Seccode == seccode);
 
         var security = tool.BasicSecurity;
-        if (security == null || tool.Security.Seccode == lastTrade.Seccode) security = tool.Security;
+        if (security == null || tool.Security.Seccode == seccode) security = tool.Security;
+        security.LastTrade = new Trade(seccode, ServerTime, close, 0);
         ArgumentNullException.ThrowIfNull(security.Bars);
-        security.LastTrade = lastTrade;
 
         var bars = security.Bars;
         if (startTime == bars.DateTime[^1])
@@ -126,7 +125,10 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
             bars.Volume[^1] = volume;
         }
         else if (startTime > bars.DateTime[^1])
+        {
+            if (security.LastTrade.Time < startTime) security.LastTrade.Time = startTime;
             AddNewBar(tool, security, false, false, startTime, open, high, low, close, volume);
+        }
         else throw new ArgumentException("StartTime < Bars.DateTime[^1]");
     }
 
