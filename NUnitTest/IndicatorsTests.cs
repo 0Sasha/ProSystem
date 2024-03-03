@@ -3,7 +3,7 @@ using ProSystem;
 
 namespace NUnitTest;
 
-public class Tests
+public class IndicatorsTests
 {
     [TestCase(new double[] { 24, 25, 26, 27 }, 2, ExpectedResult = new double[] { 0, 24.5, 25.5, 26.5 })]
     [TestCase(new double[] { 13546, 13909, 14455, 14077, 13765, 13728, 13483 }, 4,
