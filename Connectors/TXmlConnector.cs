@@ -374,6 +374,8 @@ internal class TXmlConnector : Connector
         if (lastTrade != null && lastTrade.Time.AddSeconds(2) > ServerTime) await Task.Delay(1500);
     }
 
+    public override bool PriceIsNormal(double price, double average, double deviation) =>
+        Math.Abs(average - price) < deviation * 15;
 
     public override bool SecurityIsBidding(Security security)
     {
@@ -395,8 +397,8 @@ internal class TXmlConnector : Connector
             return false;
         }
 
-        if (security.TickSize < 0.000001 || security.TickCost < 0.000001 || security.TickPrecision < -0.000001 ||
-            security.LotSize < 0.000001 || security.LotPrecision < -0.000001)
+        if (security.TickSize.LessEq(0) || security.TickCost.LessEq(0) || security.TickPrecision < 0 ||
+            security.LotSize.LessEq(0) || security.LotPrecision < 0)
         {
             AddInfo("CheckRequirements: " + security.Seccode + ": properties are incorrect", notify: true);
             return false;

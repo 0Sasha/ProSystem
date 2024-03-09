@@ -33,6 +33,7 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual int FirstTradingHour { get; init; } = 0;
     public virtual bool FirstBar { get =>
             FirstTradingHour != 0 && ServerTime < ServerTime.Date.AddHours(FirstTradingHour).AddMinutes(30); }
+
     public virtual OrderType OrderTypeNM { get; set; } = OrderType.Limit;
 
     public ConnectionState Connection
@@ -187,6 +188,7 @@ public abstract class Connector : INotifyPropertyChanged
 
     protected abstract bool CheckRequirements(Security security);
 
+    public virtual bool PriceIsNormal(double price, double average, double deviation) => true;
 
     public virtual bool SecurityIsBidding(Security security)
     {

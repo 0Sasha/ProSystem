@@ -171,7 +171,7 @@ public abstract class DataProcessor(TradingSystem tradingSystem, AddInformation 
         {
             var active = TradingSystem.Orders.ToArray()
                 .Where(x => x.Seccode == security.Seccode && TradingSystem.Connector.OrderIsActive(x)).ToArray();
-            if (active.Any(x => Math.Abs(x.Price - security.LastTrade.Price) < 0.000001))
+            if (active.Any(x => x.Price.Eq(security.LastTrade.Price)))
             {
                 AddInfo(tool.Name + ": active order price equals bar opening. Waiting.", false);
                 await Task.Delay(2000);

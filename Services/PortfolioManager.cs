@@ -102,14 +102,14 @@ internal class PortfolioManager : IPortfolioManager
 
                 if (tool.UseShiftBalance)
                 {
-                    if (tool.Security.LastTrade.Price > 0.000001)
+                    if (tool.Security.LastTrade.Price.More(0))
                     {
                         sumReqsBaseAssets += tool.BaseBalance *
                             (tool.Security.LastTrade.Price / tool.Security.TickSize * tool.Security.TickCost);
                     }
                     else AddInfo("CheckPortfolioAsync: there is no last trade: " + tool.Security.Seccode, true, true);
 
-                    var inReqsBaseAssets = tool.BaseBalance > 0.000001 ?
+                    var inReqsBaseAssets = tool.BaseBalance.More(0) ?
                         tool.BaseBalance * tool.Security.InitReqLong :
                         -tool.BaseBalance * tool.Security.InitReqShort;
 
@@ -133,6 +133,11 @@ internal class PortfolioManager : IPortfolioManager
             Portfolio.ShareBaseAssets < Settings.OptShareBaseAssets - Settings.ToleranceBaseAssets)
         {
             AddInfo("Share of base assets is out of scope: " + Portfolio.ShareBaseAssets + "%", notify: true);
+        }
+        if (Portfolio.ShareInitReqs > Portfolio.PotentialShareInitReqs)
+        {
+            AddInfo("ShareInitReqs > PotentialShareInitReqs: " +
+               Portfolio.ShareInitReqs + "/" + Portfolio.PotentialShareInitReqs);
         }
     }
 

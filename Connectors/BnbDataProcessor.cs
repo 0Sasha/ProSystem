@@ -87,7 +87,7 @@ internal class BnbDataProcessor : DataProcessor
                 else if (type == "MARKET_LOT_SIZE")
                 {
                     var l = filter.GetDouble("stepSize");
-                    if (Math.Abs(security.LotSize - l) > 0.000001)
+                    if (security.LotSize.NotEq(l))
                         AddInfo(code + ": MARKET_LOT_SIZE != LOT_SIZE", notify: true);
                 }
             }
@@ -113,7 +113,7 @@ internal class BnbDataProcessor : DataProcessor
         {
             var code = a.GetString("asset");
             var saldo = a.GetDouble("marginBalance");
-            if (saldo > 0.000001 || portfolio.MoneyPositions.Any(p => p.Seccode == code))
+            if (saldo.NotEq(0) || portfolio.MoneyPositions.Any(p => p.Seccode == code))
             {
                 if (Connector.DeepLog) AddInfo("Asset: " + a.GetRawText(), false);
 
@@ -134,7 +134,7 @@ internal class BnbDataProcessor : DataProcessor
         {
             var code = p.GetString("symbol");
             var saldo = p.GetDouble("positionAmt");
-            if (Math.Abs(saldo) > 0.000001 || portfolio.Positions.Any(p => p.Seccode == code))
+            if (saldo.NotEq(0) || portfolio.Positions.Any(p => p.Seccode == code))
             {
                 if (Connector.DeepLog) AddInfo("Position: " + p.GetRawText(), false);
 
@@ -346,13 +346,24 @@ internal class BnbDataProcessor : DataProcessor
             Type = root.GetString(isEvent ? "o" : "type"),
             Time = root.GetDateTime(isEvent ? "T" : "time")
         };
-
-        newOrder.Price = root.GetDouble(isEvent ? (newOrder.Type is "LIMIT" or "MARKET" ? "p" : "sp") : "price");
         newOrder.Balance = newOrder.Quantity - root.GetDouble(isEvent ? "z" : "executedQty");
 
-        if (newOrder.Type == "MARKET") newOrder.InitType = OrderType.Market;
-        else newOrder.InitType = newOrder.Type == "LIMIT" ? OrderType.Limit : OrderType.Conditional;
-
+        if (newOrder.Type is "STOP_MARKET" or "STOP_LIMIT")
+        {
+            newOrder.Price = root.GetDouble(isEvent ? "sp" : "stopPrice");
+            newOrder.InitType = OrderType.Conditional;
+        }
+        else if (newOrder.Type == "MARKET")
+        {
+            newOrder.Price = root.GetDouble(isEvent ? "ap" : "avgPrice");
+            newOrder.InitType = OrderType.Market;
+        }
+        else if (newOrder.Type == "LIMIT")
+        {
+            newOrder.Price = root.GetDouble(isEvent ? "p" : "price");
+            newOrder.InitType = OrderType.Limit;
+        }
+        else throw new Exception("Unexpected order type");
         return newOrder;
     }
 

@@ -117,10 +117,10 @@ internal class BnbConnector : Connector
         bool isBuy, double price, double quantity, string signal, Script? sender = null, string? note = null)
     {
         var senderName = sender != null ? sender.Name : "System";
-        if (price < 0.000001)
-            throw new ArgumentOutOfRangeException(nameof(price), "Price <= 0. Sender: " + senderName);
-        if (quantity < 0.000001)
-            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity <= 0: " + senderName + "/" + quantity);
+        if (price.LessEq(0))
+            throw new ArgumentOutOfRangeException(nameof(price), price + "/" + senderName);
+        if (quantity.LessEq(0))
+            throw new ArgumentOutOfRangeException(nameof(quantity), quantity + "/" + senderName);
         price = Math.Round(price, security.TickPrecision);
         quantity = Math.Round(quantity, security.LotPrecision);
 
@@ -168,7 +168,7 @@ internal class BnbConnector : Connector
         {
             Quantity = origQty,
             Balance = origQty - root.GetDouble("executedQty"),
-            Price = root.GetDouble("price"),
+            Price = price,
             Side = root.GetString("side")[..1],
             InitType = type,
             Type = root.GetString("type"),
@@ -380,11 +380,10 @@ internal class BnbConnector : Connector
     }
 
 
-
     protected override bool CheckRequirements(Security security)
     {
-        if (security.TickSize < 0.000001 || security.TickCost < 0.000001 || security.TickPrecision < -0.000001 ||
-            security.LotSize < 0.000001 || security.LotPrecision < -0.000001 || security.Notional < 0.000001)
+        if (security.TickSize.LessEq(0) || security.TickCost.LessEq(0)|| security.LotSize.LessEq(0) ||
+            security.Notional.LessEq(0) || security.LotPrecision < 0 || security.TickPrecision < 0)
         {
             AddInfo("CheckRequirements: " + security.Seccode + ": properties are incorrect", notify: true);
             return false;
@@ -622,7 +621,7 @@ internal class BnbConnector : Connector
         var sentCommand = Task.Run(async () => response = await HttpClient.SendAsync(request));
 
         AddInfo("Request is sent: " + httpMethod.Method + " " + requestUri, false);
-        await WaitSentCommandAsync(sentCommand, requestUri, 2000, 18000);
+        await WaitSentCommandAsync(sentCommand, requestUri, 3000, 18000);
         return response;
     }
 

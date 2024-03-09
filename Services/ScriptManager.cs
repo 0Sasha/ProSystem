@@ -225,7 +225,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
     {
         ArgumentNullException.ThrowIfNull(script.Result);
         ArgumentNullException.ThrowIfNull(tool.Security.Bars);
-        ArgumentOutOfRangeException.ThrowIfLessThan(volume, 0.000001);
+        ArgumentOutOfRangeException.ThrowIfLessThan(volume, tool.Security.MinQty);
 
         var basicSecurity = tool.BasicSecurity;
         var security = tool.Security;
@@ -240,19 +240,19 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
             var activeOrder = script.ActiveOrder;
             if (script.Result.OnlyLimit)
             {
-                if (activeOrder.Quantity - activeOrder.Balance > 0.000001 || activeOrder.Note == "PartEx")
+                if (activeOrder.Quantity.More(activeOrder.Balance) || activeOrder.Note == "PartEx")
                 {
-                    if (Math.Abs(activeOrder.Price - prevClose) > 0.000001)
+                    if (activeOrder.Price.NotEq(prevClose))
                         await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit,
                             prevClose, activeOrder.Balance, activeOrder.Signal ?? "", script, "PartEx");
                 }
                 else if ((activeOrder.Side == "B") != isGrow[^1] ||
-                    (script.CurrentPosition == PositionType.Short) != isGrow[^1] || volume < 0.000001)
+                    (script.CurrentPosition == PositionType.Short) != isGrow[^1] || volume.LessEq(0))
                 {
                     await Connector.CancelOrderAsync(activeOrder);
                 }
-                else if (Math.Abs(activeOrder.Price - prevClose) > 0.000001 ||
-                    Math.Abs(activeOrder.Balance - volume) - tool.Security.LotSize > 0.000001)
+                else if (activeOrder.Price.NotEq(prevClose) ||
+                    Math.Abs(activeOrder.Balance - volume).More(tool.Security.LotSize))
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit,
                         prevClose, volume, activeOrder.Signal ?? "", script, activeOrder.Note);
@@ -267,7 +267,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
                 }
                 else AddInfo(script.Name + ": price is out of normal range", notify: true);
             }
-            else if ((activeOrder.Side == "B") != isGrow[^1] || volume < 0.000001)
+            else if ((activeOrder.Side == "B") != isGrow[^1] || volume.LessEq(0))
             {
                 await Connector.CancelOrderAsync(activeOrder);
             }
@@ -308,20 +308,20 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
 
         if (activeOrder != null)
         {
-            if (activeOrder.Quantity - activeOrder.Balance > 0.000001)
+            if (activeOrder.Quantity.More(activeOrder.Balance))
             {
-                if (Math.Abs(activeOrder.Price - orderPrice) > 0.000001)
+                if (activeOrder.Price.NotEq(orderPrice))
                 {
                     var vol = activeOrder.Quantity - activeOrder.Balance;
                     await Connector.ReplaceOrderAsync(activeOrder, security,
                         OrderType.Market, orderPrice, vol, "CancelPartEx", script, "NM");
                 }
             }
-            else if (volume < 0.000001) await Connector.CancelOrderAsync(activeOrder);
-            else if (Math.Abs(activeOrder.Price - orderPrice) > 0.000001 ||
-                Math.Abs(activeOrder.Balance - volume) - tool.Security.LotSize > 0.000001)
+            else if (volume.LessEq(0)) await Connector.CancelOrderAsync(activeOrder);
+            else if (activeOrder.Price.NotEq(orderPrice) ||
+                Math.Abs(activeOrder.Balance - volume).More(tool.Security.LotSize))
             {
-                if (orderPrice - security.MinPrice > -0.000001 && orderPrice - security.MaxPrice < 0.000001)
+                if (orderPrice.MoreEq(security.MinPrice) && orderPrice.LessEq(security.MaxPrice))
                     await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Limit,
                         orderPrice, volume, activeOrder.Signal ?? "", script, activeOrder.Note);
                 else await Connector.CancelOrderAsync(activeOrder);
@@ -329,14 +329,14 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
             return;
         }
 
-        if (lastExecuted != null && lastExecuted.ChangeTime >= script.Result.IndLastDT || volume < 0.000001 ||
+        if (lastExecuted != null && lastExecuted.ChangeTime >= script.Result.IndLastDT || volume.LessEq(0) ||
             basicSecurity == null && security.Bars.DateTime[^1].Date != security.Bars.DateTime[^2].Date ||
             basicSecurity != null && basicSecurity.Bars?.DateTime[^1].Date != basicSecurity.Bars?.DateTime[^2].Date)
             return;
 
         if ((script.CurrentPosition == PositionType.Short && isGrow[^1] ||
             script.CurrentPosition == PositionType.Long && !isGrow[^1]) &&
-            orderPrice - security.MinPrice > -0.000001 && orderPrice - security.MaxPrice < 0.000001)
+            orderPrice.MoreEq(security.MinPrice) && orderPrice.LessEq(security.MaxPrice))
         {
             await Connector.SendOrderAsync(security, OrderType.Limit,
                 isGrow[^1], orderPrice, volume, isGrow[^1] ? "BuyAtLimit" : "SellAtLimit", script);
@@ -379,9 +379,9 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
                         else AddInfo(script.Name + ": price is out of normal range", notify: true);
                     }
                 }
-                else if (volume < 0.000001 || Connector.FirstBar && activeOrder.Note == null ||
+                else if (volume.LessEq(0) || Connector.FirstBar && activeOrder.Note == null ||
                     (activeOrder.Side == "B") == isGrow[^1]) await Connector.CancelOrderAsync(activeOrder);
-                else if (Math.Abs(activeOrder.Price - price) > 0.000001 || activeOrder.Balance - volume - tool.Security.LotSize > 0.000001)
+                else if (activeOrder.Price.NotEq(price) || (activeOrder.Balance - volume).More(tool.Security.LotSize))
                     await Connector.ReplaceOrderAsync(activeOrder, security, OrderType.Conditional, price, volume, activeOrder.Signal ?? "", script);
             }
             else if (nowBidding)
@@ -412,7 +412,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
         }
 
         var lastExecuted = script.LastExecuted;
-        if (!nowBidding || volume < 0.000001) return;
+        if (!nowBidding || volume.LessEq(0)) return;
         if (lastExecuted?.ChangeTime >= script.Result.IndLastDT)
         {
             if (lastExecuted.Note == null || lastExecuted.Note == "NB") return;
@@ -421,8 +421,7 @@ internal class ScriptManager(Window window, TradingSystem tradingSystem, AddInfo
             {
                 if (lastExecuted.Side == "B" && !isGrow[bar - 1] || lastExecuted.Side == "S" && isGrow[bar - 1])
                 {
-                    if (Math.Abs(script.Result.Indicators[0][bar - 1] - script.Result.Indicators[0][^2]) < 0.000001)
-                        return;
+                    if (script.Result.Indicators[0][bar - 1].Eq(script.Result.Indicators[0][^2])) return;
                     else break;
                 }
             }

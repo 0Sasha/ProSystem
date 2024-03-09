@@ -242,7 +242,7 @@ internal class ToolManager : IToolManager
         var readyToTrade = !tool.StopTrading & TradingSystem.PortfolioManager.CheckEquity();
         var toolState = new ToolState(readyToTrade, IsLogging(tool), Connector.SecurityIsBidding(tool.Security))
         {
-            IsNormalPrice = Math.Abs(average - tool.Security.Bars.Close[^1]) < atr[^2] * 15,
+            IsNormalPrice = Connector.PriceIsNormal(tool.Security.Bars.Close[^1], average, atr[^2]),
             AveragePrice = average,
             ATR = atr[^2],
             LongReqs = tool.Security.InitReqLong,
@@ -294,9 +294,6 @@ internal class ToolManager : IToolManager
 
     private void SetPositionVolumes(Tool tool, ToolState toolState)
     {
-        static double getVolume(Security symbol, double optShare, double reqs) =>
-            Math.Floor(optShare / reqs / symbol.LotSize) * symbol.LotSize * symbol.LotSize;
-
         var saldo = TradingSystem.Portfolio.Saldo;
         var maxShare = saldo / 100 * TradingSystem.Settings.MaxShareInitReqsPosition;
         var symbol = tool.Security;
@@ -310,7 +307,7 @@ internal class ToolManager : IToolManager
                 optShare = maxShare;
             }
 
-            var longVol = Math.Round(getVolume(symbol, optShare, toolState.LongReqs), symbol.LotPrecision);
+            var longVol = Math.Floor(optShare / toolState.LongReqs) * symbol.LotSize;
             if (longVol < tool.MinQty)
             {
                 AddInfo(tool.Name + ": LongVolume < MinNumberOfLots", settings.DisplaySpecialInfo, true);
@@ -324,10 +321,10 @@ internal class ToolManager : IToolManager
             if (longVol * toolState.LongReqs > maxShare)
             {
                 AddInfo(tool.Name + ": LongVolume exceeds risk level", settings.DisplaySpecialInfo, true);
-                longVol = Math.Round(getVolume(symbol, optShare, toolState.LongReqs), symbol.LotPrecision);
+                longVol = Math.Floor(optShare / toolState.LongReqs) * symbol.LotSize;
             }
 
-            var shortVol = Math.Round(getVolume(symbol, optShare, toolState.ShortReqs), symbol.LotPrecision);
+            var shortVol = Math.Floor(optShare / toolState.ShortReqs) * symbol.LotSize;
             if (shortVol < tool.MinQty)
             {
                 AddInfo(tool.Name + ": shortVol < MinNumberOfLots", settings.DisplaySpecialInfo, true);
@@ -341,14 +338,14 @@ internal class ToolManager : IToolManager
             if (shortVol * toolState.ShortReqs > maxShare)
             {
                 AddInfo(tool.Name + ": ShortVolume exceeds risk level", settings.DisplaySpecialInfo, true);
-                shortVol = Math.Round(getVolume(symbol, optShare, toolState.ShortReqs), symbol.LotPrecision);
+                shortVol = Math.Floor(optShare / toolState.ShortReqs) * symbol.LotSize;
             }
 
             toolState.LongVolume = longVol;
             toolState.ShortVolume = shortVol;
 
-            toolState.LongRealVolume = Math.Round(optShare / toolState.LongReqs * symbol.LotSize, 2);
-            toolState.ShortRealVolume = Math.Round(optShare / toolState.ShortReqs * symbol.LotSize, 2);
+            toolState.LongRealVolume = Math.Round(optShare / toolState.LongReqs * symbol.LotSize, 4);
+            toolState.ShortRealVolume = Math.Round(optShare / toolState.ShortReqs * symbol.LotSize, 4);
         }
         else
         {
@@ -415,7 +412,7 @@ internal class ToolManager : IToolManager
 
         toolState.LongOrderVolume = balance;
         toolState.ShortOrderVolume = balance;
-        if (tool.Scripts.Length == 1 || Math.Abs(toolState.Balance) < 0.000001)
+        if (tool.Scripts.Length == 1 || toolState.Balance.Eq(0))
         {
             toolState.LongOrderVolume += toolState.LongVolume;
             toolState.ShortOrderVolume += toolState.ShortVolume;
@@ -451,32 +448,32 @@ internal class ToolManager : IToolManager
         double gap = Math.Abs(balance) / 14D;
         if (gap > 0.5) gap = 0.5;
         bool normalizeUp =
-            balance > 0.000001 && balance + Math.Ceiling(balance * 0.04) + gap < toolState.LongRealVolume ||
-            balance < -0.000001 && -balance + Math.Ceiling(-balance * 0.04) + gap < toolState.ShortRealVolume;
+            balance.More(0) && balance + Math.Ceiling(balance * 0.04) + gap < toolState.LongRealVolume ||
+            balance.Less(0) && -balance + Math.Ceiling(-balance * 0.04) + gap < toolState.ShortRealVolume;
 
         var volume = balance > toolState.LongVolume ?
             balance - toolState.LongVolume : -balance - toolState.ShortVolume;
 
         if (activeOrder != null)
         {
-            if ((activeOrder.Side == "B") == balance < -0.000001 &&
+            if ((activeOrder.Side == "B") == balance.Less(0) &&
                 (balance > toolState.LongVolume || -balance > toolState.ShortVolume))
             {
-                if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.000001 &&
+                if (activeOrder.Price.NotEq(security.Bars.Close[^2]) &&
                     ServerTime.Minute != 0 && ServerTime.Minute != 30 ||
-                    Math.Abs(activeOrder.Balance - volume) > 0.000001)
+                    activeOrder.Balance.NotEq(volume))
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security,
                         Connector.OrderTypeNM, security.Bars.Close[^2], volume, "Normalization", null, "NM");
                 }
             }
-            else if ((activeOrder.Side == "B") == balance > 0.000001 && normalizeUp)
+            else if ((activeOrder.Side == "B") == balance.More(0) && normalizeUp)
             {
-                volume = balance > 0.000001 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                volume = balance.More(0) ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
 
-                if (Math.Abs(activeOrder.Price - security.Bars.Close[^2]) > 0.000001 &&
+                if (activeOrder.Price.NotEq(security.Bars.Close[^2]) &&
                     ServerTime.Minute != 0 && ServerTime.Minute != 30 ||
-                    Math.Abs(activeOrder.Balance - volume) > 0.000001 && volume > security.MinQty)
+                    activeOrder.Balance.NotEq(volume) && volume > security.MinQty)
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security,
                         Connector.OrderTypeNM, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
@@ -496,9 +493,9 @@ internal class ToolManager : IToolManager
             {
                 var lastExecuted = script.Orders.LastOrDefault(Connector.OrderIsExecuted);
                 if (lastExecuted != null && (lastExecuted.ChangeTime.AddDays(4) > ServerTime ||
-                    balance > 0.000001 == security.Bars.Close[^2] < lastExecuted.Price))
+                    balance.More(0) == security.Bars.Close[^2] < lastExecuted.Price))
                 {
-                    volume = balance > 0.000001 ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
+                    volume = balance.More(0) ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
                     if (volume < security.MinQty)
                     {
                         AddInfo(tool.Name + ": unable to normalize up: volume < security.MinQty",
@@ -507,7 +504,7 @@ internal class ToolManager : IToolManager
                     }
 
                     await Connector.SendOrderAsync(security, Connector.OrderTypeNM,
-                        balance > 0, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
+                        balance.More(0), security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
 
                     WriteStateLog(tool, toolState, "NM");
                     return;
@@ -533,14 +530,14 @@ internal class ToolManager : IToolManager
         if (scripts.Length == 1)
         {
             var position = scripts[0].CurrentPosition;
-            if (position == neutralPos && Math.Abs(balance) > 0.000001 ||
-                position == longPos && balance < 0.000001 || position == shortPos && balance > -0.000001)
+            if (position == neutralPos && balance.NotEq(0) ||
+                position == longPos && balance.LessEq(0) || position == shortPos && balance.MoreEq(0))
             {
                 AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                 if (!await CancelActiveOrdersAsync(tool)) return false;
 
                 double volume;
-                bool isBuy = position == neutralPos ? balance < -0.000001 : position == longPos;
+                bool isBuy = position == neutralPos ? balance.Less(0) : position == longPos;
                 if (position == longPos) volume = Math.Abs(balance) + toolState.LongVolume;
                 else if (position == shortPos) volume = Math.Abs(balance) + toolState.ShortVolume;
                 else volume = Math.Abs(balance);
@@ -556,14 +553,14 @@ internal class ToolManager : IToolManager
             var position2 = scripts[1].CurrentPosition;
             if (position1 == position2)
             {
-                if (position1 == neutralPos && Math.Abs(balance) > 0.000001 ||
-                    position1 == longPos && balance < 0.000001 || position1 == shortPos && balance > -0.000001)
+                if (position1 == neutralPos && balance.NotEq(0) ||
+                    position1 == longPos && balance.LessEq(0) || position1 == shortPos && balance.MoreEq(0))
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     double volume;
-                    bool isBuy = position1 == neutralPos ? balance < -0.000001 : position1 == longPos;
+                    bool isBuy = position1 == neutralPos ? balance.Less(0) : position1 == longPos;
                     if (position1 == longPos) volume = Math.Abs(balance) + toolState.LongVolume;
                     else if (position1 == shortPos) volume = Math.Abs(balance) + toolState.ShortVolume;
                     else volume = Math.Abs(balance);
@@ -575,20 +572,20 @@ internal class ToolManager : IToolManager
             }
             else if (position1 == longPos && position2 == shortPos || position1 == shortPos && position2 == longPos)
             {
-                if (Math.Abs(balance) > 0.000001)
+                if (balance.NotEq(0))
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     await Connector.SendOrderAsync(security, OrderType.Market,
-                        balance < 0, security.Bars.Close[^2], Math.Abs(balance), "BringingIntoLine", null, "NM");
+                        balance.Less(0), security.Bars.Close[^2], Math.Abs(balance), "BringingIntoLine", null, "NM");
                     return false;
                 }
             }
             else // Одна из позиций Neutral
             {
                 var position = position1 == neutralPos ? position2 : position1;
-                if (position == longPos && balance < 0.000001 || position == shortPos && balance > -0.000001)
+                if (position == longPos && balance.LessEq(0) || position == shortPos && balance.MoreEq(0))
                 {
                     AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
@@ -611,8 +608,8 @@ internal class ToolManager : IToolManager
         ArgumentNullException.ThrowIfNull(tool.Security.Bars);
         return TradingSystem.Orders.ToArray().Any(order => order.Seccode == tool.Security.Seccode &&
             (order.Status is "active" or "NEW" or "PARTIALLY_FILLED") && order.Sender != "System" &&
-            (Math.Abs(order.Price - tool.Security.Bars.Close[^2]) < 0.000001 ||
-            order.Quantity - order.Balance > 0.000001 || order.Note == "PartEx"));
+            (order.Price.Eq(tool.Security.Bars.Close[^2]) ||
+            order.Quantity.More(order.Balance) || order.Note == "PartEx"));
     }
 
 
@@ -669,7 +666,7 @@ internal class ToolManager : IToolManager
             "\nLastTr " + tool.Security.LastTrade.Time.TimeOfDay.ToString();
 
             tool.BlockInfo.Text = "\nBal/Real " + toolState.Balance + "/" + toolState.RealBalance +
-            "\nRealV " + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
+            "\n" + toolState.LongRealVolume + "/" + toolState.ShortRealVolume +
             "\nSMA " + toolState.AveragePrice + "\n15ATR " + Math.Round(toolState.ATR * 15, tool.Security.TickPrecision);
         });
     }

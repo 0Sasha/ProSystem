@@ -565,11 +565,11 @@ internal class TXmlDataProcessor : DataProcessor
     {
         for (int i = 0; security.Bars == null && i < 20; i++) Thread.Sleep(250);
         if (security.Bars == null) throw new ArgumentException("There is no bars");
-        if (security.TickSize < 0.000001) throw new ArgumentException("TickSize is <= 0");
-        if (security.TickCost < 0.000001) throw new ArgumentException("TickCost is <= 0");
-        if (security.TickPrecision < -0.000001) throw new ArgumentException("TickPrecision is < 0");
-        if (security.RiskrateLong < 0.000001) throw new ArgumentException("RiskrateLong is <= 0");
-        if (security.RiskrateShort < 0.000001) throw new ArgumentException("RiskrateShort is <= 0");
+        if (security.TickSize.LessEq(0)) throw new ArgumentException("TickSize is <= 0");
+        if (security.TickCost.LessEq(0)) throw new ArgumentException("TickCost is <= 0");
+        if (security.TickPrecision < 0) throw new ArgumentException("TickPrecision is < 0");
+        if (security.RiskrateLong.LessEq(0)) throw new ArgumentException("RiskrateLong is <= 0");
+        if (security.RiskrateShort.LessEq(0)) throw new ArgumentException("RiskrateShort is <= 0");
 
         var lastPrice = security.LastTrade.Time > security.Bars.DateTime[^1] ?
             security.LastTrade.Price : security.Bars.Close[^1];
