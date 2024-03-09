@@ -6,8 +6,8 @@ internal class CrossMA : Script
     private int period = 10;
     private int mult = 2;
     private int tf = 60;
+    private bool isTrend = true;
     private bool onlyLimit = true;
-    private bool isCrossMALimit = false;
     private NameMA nameMA = NameMA.SMA;
 
     public int Period
@@ -34,10 +34,10 @@ internal class CrossMA : Script
         set { onlyLimit = value; NotifyChange(); }
     }
 
-    public bool IsCrossMALim
+    public bool IsTrend
     {
-        get => isCrossMALimit;
-        set { isCrossMALimit = value; NotifyChange(); }
+        get => isTrend;
+        set { isTrend = value; NotifyChange(); }
     }
 
     public NameMA NameMA
@@ -50,7 +50,7 @@ internal class CrossMA : Script
     {
         var isOSC = false;
         var upper = new[] { nameof(Period), nameof(Mult), nameof(IndicatorTF) };
-        var middle = new[] { nameof(IsCrossMALim), nameof(OnlyLimit) };
+        var middle = new[] { nameof(IsTrend), nameof(OnlyLimit) };
         var maObjects = new[] { NameMA.SMA, NameMA.EMA, NameMA.SMMA, NameMA.DEMA, NameMA.KAMA };
         properties = new(isOSC, upper, middle, nameof(NameMA), maObjects);
     }
@@ -58,45 +58,23 @@ internal class CrossMA : Script
     public override void Calculate(Security symbol)
     {
         ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
+        Func<double[], int, int, double[]> indicator = NameMA switch
+        {
+            NameMA.SMA => Indicators.SMA,
+            NameMA.EMA => Indicators.EMA,
+            NameMA.SMMA => Indicators.SMMA,
+            NameMA.DEMA => Indicators.DEMA,
+            NameMA.KAMA => Indicators.KAMA,
+            _ => throw new Exception("Unknown type of MA")
+        };
+
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        double[] shortMA, longMA;
-        if (NameMA == NameMA.SMA)
-        {
-            shortMA = Indicators.SMA(iBars.Close, Period, symbol.TickPrecision);
-            longMA = Indicators.SMA(iBars.Close, Period * Mult, symbol.TickPrecision);
-        }
-        else if (NameMA == NameMA.EMA)
-        {
-            shortMA = Indicators.EMA(iBars.Close, Period, symbol.TickPrecision);
-            longMA = Indicators.EMA(iBars.Close, Period * Mult, symbol.TickPrecision);
-        }
-        else if (NameMA == NameMA.SMMA)
-        {
-            shortMA = Indicators.SMMA(iBars.Close, Period, symbol.TickPrecision);
-            longMA = Indicators.SMMA(iBars.Close, Period * Mult, symbol.TickPrecision);
-        }
-        else if (NameMA == NameMA.DEMA)
-        {
-            shortMA = Indicators.DEMA(iBars.Close, Period, symbol.TickPrecision);
-            longMA = Indicators.DEMA(iBars.Close, Period * Mult, symbol.TickPrecision);
-        }
-        else if (NameMA == NameMA.KAMA)
-        {
-            shortMA = Indicators.KAMA(iBars.Close, Period, symbol.TickPrecision);
-            longMA = Indicators.KAMA(iBars.Close, Period * Mult, symbol.TickPrecision);
-        }
-        else throw new Exception("Непредвиденный тип MA");
+        var shortMA = indicator(iBars.Close, Period, symbol.TickPrecision);
+        var longMA = indicator(iBars.Close, Period * Mult, symbol.TickPrecision);
         shortMA = Indicators.Synchronize(shortMA, iBars, symbol.Bars);
         longMA = Indicators.Synchronize(longMA, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (shortMA[i - 1] - longMA[i - 1] > 0.000001) isGrow[i] = true;
-            else if (shortMA[i - 1] - longMA[i - 1] < -0.000001) isGrow[i] = false;
-            else isGrow[i] = isGrow[i - 1];
-        }
-        Result = new(IsCrossMALim ? ScriptType.LimitLine : ScriptType.Line,
-            isGrow, [shortMA, longMA], iBars.DateTime[^1], OnlyLimit);
+        var isGrow = GetGrowLineForCross(symbol.Bars.Close.Length, IsTrend, shortMA, longMA);
+        Result = new(ScriptType.Line, isGrow, [shortMA, longMA], iBars.DateTime[^1], OnlyLimit);
     }
 }

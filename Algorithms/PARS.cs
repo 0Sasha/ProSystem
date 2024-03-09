@@ -39,22 +39,7 @@ internal class PARS : Script
         var parStop = Indicators.PARLine(iBars.High, iBars.Low, CoefAccel, MaxCoef, symbol.TickPrecision);
         parStop = Indicators.Synchronize(parStop, iBars, symbol.Bars);
 
-        var pastParStop = 0D;
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (Math.Abs(pastParStop - parStop[i - 1]) > 0.000001 || pastParStop < 0.000001)
-            {
-                if (!isGrow[i - 1] && symbol.Bars.High[i] - parStop[i - 1] > 0.000001 ||
-                    isGrow[i - 1] && symbol.Bars.Low[i] - parStop[i - 1] < -0.000001)
-                {
-                    isGrow[i] = !isGrow[i - 1];
-                    pastParStop = parStop[i - 1];
-                }
-                else isGrow[i] = isGrow[i - 1];
-            }
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForStop(symbol.Bars, parStop);
         Result = new(ScriptType.StopLine, isGrow, [parStop], iBars.DateTime[^1]);
     }
 }

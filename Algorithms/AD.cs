@@ -58,34 +58,7 @@ internal class AD : Script
     {
         ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        double[] upper = [], lower = [], ma = [];
-        double[] ad = Indicators.AD(iBars.High, iBars.Low, iBars.Close, iBars.Volume);
-
-        if (UseChannel)
-        {
-            var lines = ChannelBands ? Indicators.BBands(ad, Period, 1.5) : Indicators.Extremes(ad, ad, Period);
-            upper = Indicators.Synchronize(lines.Item1, iBars, symbol.Bars);
-            lower = Indicators.Synchronize(lines.Item2, iBars, symbol.Bars);
-        }
-        else ma = Indicators.Synchronize(Indicators.EMA(ad, Period), iBars, symbol.Bars);
-        ad = Indicators.Synchronize(ad, iBars, symbol.Bars);
-
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 2; i < isGrow.Length; i++)
-        {
-            if (UseChannel)
-            {
-                if (ad[i - 1] - upper[i - 2] > 0.000001) isGrow[i] = IsTrend;
-                else if (ad[i - 1] - lower[i - 2] < -0.000001) isGrow[i] = !IsTrend;
-                else isGrow[i] = isGrow[i - 1];
-            }
-            else
-            {
-                if (ad[i - 1] - ma[i - 1] > 0.000001) isGrow[i] = IsTrend;
-                else if (ad[i - 1] - ma[i - 1] < -0.000001) isGrow[i] = !IsTrend;
-                else isGrow[i] = isGrow[i - 1];
-            }
-        }
-        Result = new(ScriptType.OSC, isGrow, [ad, upper, lower, ma], iBars.DateTime[^1], OnlyLimit);
+        var ad = Indicators.AD(iBars.High, iBars.Low, iBars.Close, iBars.Volume);
+        CalculateTotalOSC(symbol.Bars, iBars, ad, Period, UseChannel, ChannelBands, IsTrend, OnlyLimit);
     }
 }

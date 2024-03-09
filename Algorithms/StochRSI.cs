@@ -54,13 +54,7 @@ internal class StochRSI : Script
         var stochRSI = Indicators.StochRSI(iBars.Close, Period);
         stochRSI = Indicators.Synchronize(stochRSI, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (stochRSI[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
-            else if (stochRSI[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, stochRSI, 50 + Level, 50 - Level);
         Result = new(ScriptType.OSC, isGrow, [stochRSI], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

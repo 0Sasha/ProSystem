@@ -54,13 +54,7 @@ internal class ROC : Script
         var roc = Indicators.ROC(iBars.Close, Period);
         roc = Indicators.Synchronize(roc, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (roc[i - 1] - Level > 0.000001) isGrow[i] = IsTrend;
-            else if (roc[i - 1] - -Level < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, roc, Level, -Level);
         Result = new(ScriptType.OSC, isGrow, [roc], iBars.DateTime[^1], 0, Level, OnlyLimit);
     }
 }

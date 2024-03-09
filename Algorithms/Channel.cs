@@ -71,17 +71,7 @@ internal class Channel : Script
         var upper = Indicators.Synchronize(bands.Item1, iBars, symbol.Bars);
         var lower = Indicators.Synchronize(bands.Item2, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 2; i < isGrow.Length; i++)
-        {
-            if (isGrow[i - 1] != IsTrend &&
-                symbol.Bars.High[i - 1] - upper[i - 2] > 0.000001 &&
-                symbol.Bars.Close[i - 1] - lower[i - 2] > 0.000001) isGrow[i] = IsTrend;
-            else if (isGrow[i - 1] == IsTrend &&
-                symbol.Bars.Low[i - 1] - lower[i - 2] < -0.000001 &&
-                symbol.Bars.Close[i - 1] - upper[i - 2] < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForChannel(symbol.Bars, IsTrend, upper, lower);
         Result = new(ScriptType.Line, isGrow, [upper, lower], iBars.DateTime[^1], true);
     }
 }

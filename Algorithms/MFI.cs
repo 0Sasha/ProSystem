@@ -54,13 +54,7 @@ internal class MFI : Script
         var mfi = Indicators.MFI(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period);
         mfi = Indicators.Synchronize(mfi, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (mfi[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
-            else if (mfi[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, mfi, 50 + Level, 50 - Level);
         Result = new(ScriptType.OSC, isGrow, [mfi], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

@@ -54,13 +54,7 @@ internal class DeMarker : Script
         var dem = Indicators.DeMarker(iBars.High, iBars.Low, Period);
         dem = Indicators.Synchronize(dem, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (dem[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
-            else if (dem[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, dem, 50 + Level, 50 - Level);
         Result = new(ScriptType.OSC, isGrow, [dem], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

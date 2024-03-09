@@ -52,22 +52,19 @@ internal class MA : Script
     {
         ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        double[] ma;
-        if (NameMA == NameMA.SMA) ma = Indicators.SMA(iBars.Close, Period);
-        else if (NameMA == NameMA.EMA) ma = Indicators.EMA(iBars.Close, Period);
-        else if (NameMA == NameMA.DEMA) ma = Indicators.DEMA(iBars.Close, Period);
-        else if (NameMA == NameMA.KAMA) ma = Indicators.KAMA(iBars.Close, Period);
-        else if (NameMA == NameMA.Median) ma = Indicators.Median(iBars.Close, Period);
-        else throw new Exception("Непредвиденный тип MA");
+        Func<double[], int, int, double[]> indicator = NameMA switch
+        {
+            NameMA.SMA => Indicators.SMA,
+            NameMA.EMA => Indicators.EMA,
+            NameMA.DEMA => Indicators.DEMA,
+            NameMA.KAMA => Indicators.KAMA,
+            NameMA.Median => Indicators.Median,
+            _ => throw new Exception("Unknown type of MA")
+        };
+        var ma = indicator(iBars.Close, Period, -1);
         ma = Indicators.Synchronize(ma, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 2; i < isGrow.Length; i++)
-        {
-            if (ma[i - 1] - ma[i - 2] > 0.000001) isGrow[i] = IsTrend;
-            else if (ma[i - 1] - ma[i - 2] < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForDirection(symbol.Bars.Close.Length, IsTrend, ma);
         Result = new(ScriptType.Line, isGrow, [ma], iBars.DateTime[^1], OnlyLimit);
     }
 }

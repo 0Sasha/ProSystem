@@ -54,13 +54,7 @@ internal class RSI : Script
         var rsi = Indicators.RSI(iBars.Close, Period);
         rsi = Indicators.Synchronize(rsi, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (rsi[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
-            else if (rsi[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, rsi, 50 + Level, 50 - Level);
         Result = new(ScriptType.OSC, isGrow, [rsi], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

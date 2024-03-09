@@ -56,13 +56,7 @@ internal class MACD : Script
         macdLine = Indicators.Synchronize(macdLine, iBars, symbol.Bars);
         signalLine = Indicators.Synchronize(signalLine, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (macdLine[i - 1] - signalLine[i - 1] > 0.000001) isGrow[i] = IsTrend;
-            else if (macdLine[i - 1] - signalLine[i - 1] < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForSignal(symbol.Bars.Close.Length, IsTrend, macdLine, signalLine);
         Result = new(ScriptType.OSC, isGrow, [macdLine, signalLine], iBars.DateTime[^1], OnlyLimit);
     }
 }

@@ -55,22 +55,7 @@ internal class ATRS : Script
             iBars.Close, Period, Mult, PeriodEx, Correction, symbol.TickPrecision);
         atr = Indicators.Synchronize(atr, iBars, symbol.Bars);
 
-        var pastStopATR = 0D;
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (Math.Abs(pastStopATR - atr[i - 1]) > 0.000001 || pastStopATR < 0.000001)
-            {
-                if (!isGrow[i - 1] && symbol.Bars.High[i] - atr[i - 1] > 0.000001 ||
-                    isGrow[i - 1] && symbol.Bars.Low[i] - atr[i - 1] < -0.000001)
-                {
-                    isGrow[i] = !isGrow[i - 1];
-                    pastStopATR = atr[i - 1];
-                }
-                else isGrow[i] = isGrow[i - 1];
-            }
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForStop(symbol.Bars, atr);
         Result = new(ScriptType.StopLine, isGrow, [atr], iBars.DateTime[^1]);
     }
 }

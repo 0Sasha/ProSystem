@@ -1,4 +1,6 @@
-﻿namespace ProSystem.Algorithms;
+﻿using System.Security.Cryptography;
+
+namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class Stochastic : Script
@@ -54,13 +56,7 @@ internal class Stochastic : Script
         var stoch = Indicators.Stochastic(iBars.High, iBars.Low, iBars.Close, Period);
         stoch = Indicators.Synchronize(stoch, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (stoch[i - 1] - (50 + Level) > 0.000001) isGrow[i] = IsTrend;
-            else if (stoch[i - 1] - (50 - Level) < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, stoch, 50 + Level, 50 - Level);
         Result = new(ScriptType.OSC, isGrow, [stoch], iBars.DateTime[^1], 50, Level, OnlyLimit);
     }
 }

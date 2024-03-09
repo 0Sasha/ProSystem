@@ -1,4 +1,6 @@
-﻿namespace ProSystem.Algorithms;
+﻿using ProSystem.Services;
+
+namespace ProSystem.Algorithms;
 
 [Serializable]
 internal class OBV : Script
@@ -58,34 +60,7 @@ internal class OBV : Script
     {
         ArgumentNullException.ThrowIfNull(symbol.Bars, nameof(symbol.Bars));
         var iBars = symbol.Bars.Compress(IndicatorTF);
-        double[] upper = [], lower = [], ma = [];
-        double[] obv = Indicators.OBV(iBars.Close, iBars.Volume);
-
-        if (UseChannel)
-        {
-            var lines = ChannelBands ? Indicators.BBands(obv, Period, 1.5) : Indicators.Extremes(obv, obv, Period);
-            upper = Indicators.Synchronize(lines.Item1, iBars, symbol.Bars);
-            lower = Indicators.Synchronize(lines.Item2, iBars, symbol.Bars);
-        }
-        else ma = Indicators.Synchronize(Indicators.EMA(obv, Period), iBars, symbol.Bars);
-        obv = Indicators.Synchronize(obv, iBars, symbol.Bars);
-
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 2; i < isGrow.Length; i++)
-        {
-            if (UseChannel)
-            {
-                if (obv[i - 1] - upper[i - 2] > 0.000001) isGrow[i] = IsTrend;
-                else if (obv[i - 1] - lower[i - 2] < -0.000001) isGrow[i] = !IsTrend;
-                else isGrow[i] = isGrow[i - 1];
-            }
-            else
-            {
-                if (obv[i - 1] - ma[i - 1] > 0.000001) isGrow[i] = IsTrend;
-                else if (obv[i - 1] - ma[i - 1] < -0.000001) isGrow[i] = !IsTrend;
-                else isGrow[i] = isGrow[i - 1];
-            }
-        }
-        Result = new(ScriptType.OSC, isGrow, [obv, upper, lower, ma], iBars.DateTime[^1], OnlyLimit);
+        var obv = Indicators.OBV(iBars.Close, iBars.Volume);
+        CalculateTotalOSC(symbol.Bars, iBars, obv, Period, UseChannel, ChannelBands, IsTrend, OnlyLimit);
     }
 }

@@ -54,13 +54,7 @@ internal class CMO : Script
         var cmo = Indicators.CMO(iBars.Close, Period);
         cmo = Indicators.Synchronize(cmo, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (cmo[i - 1] - Level > 0.000001) isGrow[i] = IsTrend;
-            else if (cmo[i - 1] - -Level < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, cmo, Level, -Level);
         Result = new(ScriptType.OSC, isGrow, [cmo], iBars.DateTime[^1], 0, Level, OnlyLimit);
     }
 }

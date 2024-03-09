@@ -54,13 +54,7 @@ internal class CMF : Script
         var cmf = Indicators.CMF(iBars.High, iBars.Low, iBars.Close, iBars.Volume, Period, symbol.TickSize);
         cmf = Indicators.Synchronize(cmf, iBars, symbol.Bars);
 
-        var isGrow = new bool[symbol.Bars.Close.Length];
-        for (int i = 1; i < isGrow.Length; i++)
-        {
-            if (cmf[i - 1] - Level > 0.000001) isGrow[i] = IsTrend;
-            else if (cmf[i - 1] - -Level < -0.000001) isGrow[i] = !IsTrend;
-            else isGrow[i] = isGrow[i - 1];
-        }
+        var isGrow = GetGrowLineForLevels(symbol.Bars.Close.Length, IsTrend, cmf, Level, -Level);
         Result = new(ScriptType.OSC, isGrow, [cmf], iBars.DateTime[^1], 0, Level, OnlyLimit);
     }
 }
