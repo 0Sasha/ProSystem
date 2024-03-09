@@ -2,7 +2,6 @@
 
 public static class Indicators
 {
-    // Линии
     public static double[] ATRLine(double[] High, double[] Low, double[] Close, int Period, int Mult, int PeriodEXTR, double Correction, int Round)
     {
         bool Grow = false;
@@ -27,11 +26,11 @@ public static class Indicators
             Res = Math.Round(Highest + Highest / 100 * Correction + Mult * ATR[i], Round);
 
             Stop[i] = Stop[i - 1];
-            if (Grow && Low[i] - Stop[i - 1] < -0.000001) { Stop[i] = Res; Grow = false; continue; }
-            else if (!Grow && High[i] - Stop[i - 1] > 0.000001) { Stop[i] = Sup; Grow = true; continue; }
+            if (Grow && Low[i].Less(Stop[i - 1])) { Stop[i] = Res; Grow = false; continue; }
+            else if (!Grow && High[i].More(Stop[i - 1])) { Stop[i] = Sup; Grow = true; continue; }
 
-            if (!Grow && Res - Stop[i - 1] < -0.000001) Stop[i] = Res;
-            else if (Grow && Sup - Stop[i - 1] > 0.000001) Stop[i] = Sup;
+            if (!Grow && Res.Less(Stop[i - 1])) Stop[i] = Res;
+            else if (Grow && Sup.More(Stop[i - 1])) Stop[i] = Sup;
         }
         return Stop;
     }
@@ -44,13 +43,13 @@ public static class Indicators
         for (int i = 1; i < High.Length; i++)
         {
             StopPAR[i] = StopPAR[i - 1];
-            if (Grow && Low[i] - StopPAR[i] < -0.000001)
+            if (Grow && Low[i].Less(StopPAR[i]))
             {
                 StopPAR[i] = Ex; Grow = false;
                 Ex = Low[i]; NewKF = KF;
                 FirstTime = true; continue;
             }
-            else if (!Grow && High[i] - StopPAR[i] > 0.000001)
+            else if (!Grow && High[i].More(StopPAR[i]))
             {
                 StopPAR[i] = Ex; Grow = true;
                 Ex = High[i]; NewKF = KF;
@@ -62,7 +61,7 @@ public static class Indicators
 
             if (Grow)
             {
-                if (High[i] - Ex > 0.000001)
+                if (High[i].More(Ex))
                 {
                     Ex = High[i];
                     if (!FirstTime) { NewKF += KF; if (NewKF > MaxKF) NewKF = MaxKF; }
@@ -73,7 +72,7 @@ public static class Indicators
             }
             else
             {
-                if (Low[i] - Ex < -0.000001)
+                if (Low[i].Less(Ex))
                 {
                     Ex = Low[i];
                     if (!FirstTime) { NewKF += KF; if (NewKF > MaxKF) NewKF = MaxKF; }
@@ -228,7 +227,7 @@ public static class Indicators
         double SumX = 0, SumX2 = 0;
         double SumY = 0, SumXY = 0, a, b, c;
         double[] Regression = new double[Close.Length];
-        for (int i = 0; i < Close.Length; i++)
+        for (long i = 0; i < Close.Length; i++)
         {
             SumX += i;
             SumX2 += i * i;
@@ -291,7 +290,6 @@ public static class Indicators
         return Vidya;
     }
 
-    // Осцилляторы
     public static double[] SD(double[] Close, int Period)
     {
         double Sum = 0, SumSq = 0;
@@ -329,8 +327,8 @@ public static class Indicators
         double[] RSI = new double[Close.Length];
         for (int i = 1; i < Close.Length; i++)
         {
-            if (Close[i] - Close[i - 1] > 0.000001) { Up = Close[i] - Close[i - 1]; Down = 0; }
-            else if (Close[i] - Close[i - 1] < -0.000001) { Up = 0; Down = Close[i - 1] - Close[i]; }
+            if (Close[i].More(Close[i - 1])) { Up = Close[i] - Close[i - 1]; Down = 0; }
+            else if (Close[i].Less(Close[i - 1])) { Up = 0; Down = Close[i - 1] - Close[i]; }
             else { Up = 0; Down = 0; }
             WilderUp[i] = (WilderUp[i - 1] * (Period - 1) + Up) / Period;
             WilderDown[i] = (WilderDown[i - 1] * (Period - 1) + Down) / Period;
@@ -366,8 +364,8 @@ public static class Indicators
         for (int i = 1, x; i < Close.Length; i++)
         {
             TP[i] = (High[i] + Low[i] + Close[i]) / 3;
-            if (TP[i] - TP[i - 1] > 0.000001) PositiveMF[i] = TP[i] * Volume[i];
-            else if (TP[i] - TP[i - 1] < -0.000001) NegativeMF[i] = TP[i] * Volume[i];
+            if (TP[i].More(TP[i - 1])) PositiveMF[i] = TP[i] * Volume[i];
+            else if (TP[i].Less(TP[i - 1])) NegativeMF[i] = TP[i] * Volume[i];
 
             if (i >= Period)
             {
@@ -389,8 +387,8 @@ public static class Indicators
         double[] DeMarker = new double[High.Length];
         for (int i = 1; i < High.Length; i++)
         {
-            if (High[i] - High[i - 1] > 0.000001) DeMax[i] = High[i] - High[i - 1];
-            if (Low[i] - Low[i - 1] < -0.000001) DeMin[i] = Low[i - 1] - Low[i];
+            if (High[i].More(High[i - 1])) DeMax[i] = High[i] - High[i - 1];
+            if (Low[i].Less(Low[i - 1])) DeMin[i] = Low[i - 1] - Low[i];
 
             SumMax += DeMax[i];
             SumMin += DeMin[i];
@@ -426,14 +424,14 @@ public static class Indicators
         double[] CMO = new double[Close.Length];
         for (int i = 1; i < Close.Length; i++)
         {
-            if (Close[i] - Close[i - 1] > 0.000001) SumPos += Close[i] - Close[i - 1];
-            else if (Close[i] - Close[i - 1] < -0.000001) SumNeg += Close[i - 1] - Close[i];
+            if (Close[i].More(Close[i - 1])) SumPos += Close[i] - Close[i - 1];
+            else if (Close[i].Less(Close[i - 1])) SumNeg += Close[i - 1] - Close[i];
 
             if (i >= Period)
             {
                 CMO[i] = (SumPos - SumNeg) / (SumPos + SumNeg) * 100;
-                if (Close[i - Period + 1] - Close[i - Period] > 0.000001) SumPos -= Close[i - Period + 1] - Close[i - Period];
-                else if (Close[i - Period + 1] - Close[i - Period] < -0.000001) SumNeg -= Close[i - Period] - Close[i - Period + 1];
+                if (Close[i - Period + 1].More(Close[i - Period])) SumPos -= Close[i - Period + 1] - Close[i - Period];
+                else if (Close[i - Period + 1].Less(Close[i - Period])) SumNeg -= Close[i - Period] - Close[i - Period + 1];
             }
         }
         return CMO;
@@ -445,13 +443,13 @@ public static class Indicators
         for (int i = 0; i < Close.Length; i++)
         {
             SumVol += Volume[i];
-            Dif = High[i] - Low[i] > 0.000001 ? High[i] - Low[i] : Step;
+            Dif = High[i].More(Low[i]) ? High[i] - Low[i] : Step;
             Sum += (Close[i] - Low[i] - (High[i] - Close[i])) / Dif * Volume[i];
             if (i >= Period - 1)
             {
                 CMF[i] = Sum / SumVol * 100;
                 SumVol -= Volume[i - Period + 1];
-                Dif = High[i - Period + 1] - Low[i - Period + 1] > 0.000001 ? High[i - Period + 1] - Low[i - Period + 1] : Step;
+                Dif = High[i - Period + 1].More(Low[i - Period + 1]) ? High[i - Period + 1] - Low[i - Period + 1] : Step;
                 Sum -= (Close[i - Period + 1] - Low[i - Period + 1] - (High[i - Period + 1] - Close[i - Period + 1])) / Dif * Volume[i - Period + 1];
             }
         }
@@ -494,12 +492,12 @@ public static class Indicators
         double[] DirBars = new double[Close.Length];
         for (int i = 1; i < Close.Length; i++)
         {
-            if (Close[i] - Close[i - 1] > 0.000001)
+            if (Close[i].More(Close[i - 1]))
             {
                 if (DirBars[i - 1] > 0) DirBars[i] = DirBars[i - 1] + 1;
                 else DirBars[i] = 1;
             }
-            else if (Close[i] - Close[i - 1] < -0.000001)
+            else if (Close[i].Less(Close[i - 1]))
             {
                 if (DirBars[i - 1] < 0) DirBars[i] = DirBars[i - 1] - 1;
                 else DirBars[i] = -1;
@@ -532,8 +530,8 @@ public static class Indicators
         for (int i = 1; i < Close.Length; i++)
         {
             TR[i] = Math.Max(High[i] - Low[i], Math.Max(Math.Abs(High[i] - Close[i - 1]), Math.Abs(Low[i] - Close[i - 1])));
-            if (High[i] - High[i - 1] > 0.000001) DIPlus[i] = High[i] - High[i - 1];
-            if (Low[i - 1] - Low[i] > 0.000001) DIMinus[i] = Low[i - 1] - Low[i];
+            if (High[i].More(High[i - 1])) DIPlus[i] = High[i] - High[i - 1];
+            if (Low[i - 1].More(Low[i])) DIMinus[i] = Low[i - 1] - Low[i];
         }
 
         TR = SMMA(TR, Period);
@@ -567,8 +565,8 @@ public static class Indicators
         double[] OBV = new double[Close.Length];
         for (int i = 1; i < Close.Length; i++)
         {
-            if (Close[i] - Close[i - 1] > 0.000001) OBV[i] = OBV[i - 1] + Volume[i];
-            else if (Close[i] - Close[i - 1] < -0.000001) OBV[i] = OBV[i - 1] - Volume[i];
+            if (Close[i].More(Close[i - 1])) OBV[i] = OBV[i - 1] + Volume[i];
+            else if (Close[i].Less(Close[i - 1])) OBV[i] = OBV[i - 1] - Volume[i];
             else OBV[i] = OBV[i - 1];
         }
         return OBV;
@@ -578,7 +576,7 @@ public static class Indicators
         double[] AD = new double[Close.Length];
         for (int i = 1; i < Close.Length; i++)
         {
-            if (High[i] - Low[i] > 0.000001) AD[i] = (Close[i] - Low[i] - (High[i] - Close[i])) / (High[i] - Low[i]) * Volume[i] + AD[i - 1];
+            if (High[i].More(Low[i])) AD[i] = (Close[i] - Low[i] - (High[i] - Close[i])) / (High[i] - Low[i]) * Volume[i] + AD[i - 1];
             else AD[i] = AD[i - 1];
         }
         return AD;
@@ -635,7 +633,7 @@ public static class Indicators
         double[] EMV = new double[High.Length];
         for (int i = 1; i < High.Length; i++)
         {
-            if (Volume[i] > 0.1 && High[i] - Low[i] > 0.000001)
+            if (Volume[i] > 0.1 && High[i].More(Low[i]))
                 EMV[i] = ((High[i] + Low[i]) / 2 - (High[i - 1] + Low[i - 1]) / 2) / (Volume[i] / 1000000 / (High[i] - Low[i]));
             else EMV[i] = EMV[i - 1];
         }
@@ -653,13 +651,13 @@ public static class Indicators
         {
             DM[i] = High[i] - Low[i];
 
-            if (High[i] + Low[i] + Close[i] - (High[i - 1] + Low[i - 1] + Close[i - 1]) > 0.000001) Trend[i] = 1;
+            if ((High[i] + Low[i] + Close[i] - (High[i - 1] + Low[i - 1] + Close[i - 1])).More(0)) Trend[i] = 1;
             else Trend[i] = -1;
 
             if (Trend[i] == Trend[i - 1]) CM[i] = CM[i - 1] + DM[i];
             else CM[i] = DM[i - 1] + DM[i];
 
-            if (CM[i] < 0.000001) VF[i] = Volume[i] * -2 * Trend[i] * 100;
+            if (CM[i].LessEq(0)) VF[i] = Volume[i] * -2 * Trend[i] * 100;
             else VF[i] = Volume[i] * (2 * (DM[i] / CM[i] - 1)) * Trend[i] * 100;
         }
 
@@ -670,7 +668,6 @@ public static class Indicators
         return KVO;
     }
 
-    // Каналы
     public static (double[], double[], double[]) BBands(double[] Close, int Period, double Mult, int Round = -1)
     {
         double[] MA = SMA(Close, Period);
@@ -704,8 +701,8 @@ public static class Indicators
         {
             for (x = 1, Highest[i] = High[i], Lowest[i] = Low[i]; x < Period; x++)
             {
-                if (High[i - x] - Highest[i] > 0.000001) Highest[i] = High[i - x];
-                if (Low[i - x] - Lowest[i] < -0.000001) Lowest[i] = Low[i - x];
+                if (High[i - x].More(Highest[i])) Highest[i] = High[i - x];
+                if (Low[i - x].Less(Lowest[i])) Lowest[i] = Low[i - x];
             }
             Average[i] = (Highest[i] + Lowest[i]) / 2;
         }
@@ -757,7 +754,6 @@ public static class Indicators
         return (Upper, Lower);
     }
 
-    // Вспомогательные
     public static double[] GetLevelSeries(double Level, int Count)
     {
         double[] LevelSeries = new double[Count];
@@ -765,7 +761,6 @@ public static class Indicators
         return LevelSeries;
     }
 
-    // Методы для обработки индикаторов
     public static double[] Synchronize(double[] Indicator, Bars iBars, Bars Bars)
     {
         if (Bars.TF == iBars.TF) return Indicator;

@@ -72,10 +72,10 @@ internal static class Plot
                 filter == "First part" && i < myTools.Length / 2 || filter == "Second part" && i >= myTools.Length / 2)
             {
                 var pos = positions.SingleOrDefault(x => x.Seccode == myTools[i].Security.Seccode);
-                if (pos != null && Math.Abs(pos.Saldo) > 0.000001)
+                if (pos != null && pos.Saldo.NotEq(0))
                 {
                     var shift = excludeBaseBals ? myTools[i].BaseBalance : 0;
-                    var factReq = Math.Abs((pos.Saldo > 0.000001 ? (pos.Saldo - shift) * myTools[i].Security.InitReqLong :
+                    var factReq = Math.Abs((pos.Saldo.More(0) ? (pos.Saldo - shift) * myTools[i].Security.InitReqLong :
                         (-pos.Saldo - shift) * myTools[i].Security.InitReqShort) / saldo * 100) / myTools[i].Security.LotSize;
                     factVol.Items.Add(new BarItem
                     {
@@ -90,7 +90,7 @@ internal static class Plot
                 maxVol.Items.Add(new BarItem
                 {
                     Value = excludeBaseBals || !myTools[i].UseShiftBalance ?
-                    myTools[i].ShareOfFunds : (myTools[i].BaseBalance > 0.000001 ?
+                    myTools[i].ShareOfFunds : (myTools[i].BaseBalance.More(0) ?
                     myTools[i].ShareOfFunds + (myTools[i].BaseBalance * myTools[i].Security.InitReqLong / saldo * 100) :
                     myTools[i].ShareOfFunds + (-myTools[i].BaseBalance * myTools[i].Security.InitReqShort / saldo * 100))
                 });

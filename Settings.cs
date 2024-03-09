@@ -129,13 +129,16 @@ public class Settings : INotifyPropertyChanged
         get => maxShareInitReqsPosition;
         set
         {
-            if (value is < 1 or > 75)
+            if (value is < 1 or > 15)
             {
                 maxShareInitReqsPosition = 15;
                 AddInfo("MaxShareInitReqsPosition is 15%");
             }
-            else maxShareInitReqsPosition = value;
-            if (maxShareInitReqsPosition > 15) AddInfo("MaxShareInitReqsPosition is more than 15%.");
+            else
+            {
+                maxShareInitReqsPosition = value;
+                if (maxShareInitReqsPosition > 10) AddInfo("MaxShareInitReqsPosition is more than 10%.");
+            }
             Notify();
         }
     }
@@ -145,13 +148,16 @@ public class Settings : INotifyPropertyChanged
         get => maxShareInitReqsTool;
         set
         {
-            if (value is < 1 or > 150)
+            if (value is < 1 or > 25)
             {
                 maxShareInitReqsTool = 25;
                 AddInfo("MaxShareInitReqsTool is 25%");
             }
-            else maxShareInitReqsTool = value;
-            if (maxShareInitReqsTool > 35) AddInfo("MaxShareInitReqsTool is more than 35%.");
+            else
+            {
+                maxShareInitReqsTool = value;
+                if (maxShareInitReqsTool > 15) AddInfo("MaxShareInitReqsTool is more than 15%.");
+            }
             Notify();
         }
     }
@@ -177,7 +183,7 @@ public class Settings : INotifyPropertyChanged
         get => maxShareInitReqsPortfolio;
         set
         {
-            if (value is < 10 or > 200)
+            if (value is < 10 or > 150)
             {
                 maxShareInitReqsPortfolio = 85;
                 AddInfo("MaxShareInitReqsPortfolio is 85%");

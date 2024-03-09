@@ -92,6 +92,16 @@ public class ExtensionsTests
     [TestCase(BigNeg, BigNeg - 0.00_00_00_00_00_1)]
     public void Equal(double origin, double changed)
     {
-        if (!origin.Eq(changed)) throw new Exception(origin + "/" + changed);
+        if (origin.NotEq(changed) || !origin.Eq(changed)) throw new Exception(origin + "/" + changed);
+    }
+
+    [Test]
+    [TestCase(SmallPos, SmallPos * 1.01)]
+    [TestCase(SmallNeg, SmallNeg / 1.01)]
+    [TestCase(BigPos, BigPos + 0.00_00_00_00_1)]
+    [TestCase(BigNeg, BigNeg - 0.00_00_00_00_1)]
+    public void NotEqual(double origin, double changed)
+    {
+        if (!origin.NotEq(changed) || origin.Eq(changed)) throw new Exception(origin + "/" + changed);
     }
 }

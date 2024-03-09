@@ -13,4 +13,6 @@ public static class DoubleExtensions
     public static bool LessEq(this double value1, double value2) => value1 - value2 < MinDif;
 
     public static bool Eq(this double value1, double value2) => Math.Abs(value1 - value2) < MinDif;
+
+    public static bool NotEq(this double value1, double value2) => !value1.Eq(value2);
 }
