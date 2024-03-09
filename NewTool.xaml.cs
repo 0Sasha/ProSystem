@@ -36,7 +36,8 @@ public partial class NewTool : Window
         "Channel",
         "CrossMA",
         "ATRS",
-        "PARS"
+        "PARS",
+        "DI"
     ];
 
     private Security? TradedSecurity
@@ -169,6 +170,7 @@ public partial class NewTool : Window
                 "RVI" => new Algorithms.RVI(ScriptName.Text),
                 "MA" => new Algorithms.MA(ScriptName.Text),
                 "SumLine" => new Algorithms.SumLine(ScriptName.Text),
+                "DI" => new Algorithms.DI(ScriptName.Text),
                 _ => null
             };
 
