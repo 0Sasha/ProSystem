@@ -148,7 +148,7 @@ internal static class Plot
         CandleStickSeries candles = new()
         {
             ItemsSource = items,
-            TrackerFormatString = "High: {3:0.0000}\nLow: {4:0.0000}\nOpen: {5:0.0000}\nClose: {6:0.0000}"
+            TrackerFormatString = "High: {3:0.000000}\nLow: {4:0.000000}\nOpen: {5:0.000000}\nClose: {6:0.000000}"
         };
 
         xAxis.Color();

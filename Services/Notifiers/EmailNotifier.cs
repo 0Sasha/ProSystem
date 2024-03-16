@@ -17,7 +17,7 @@ internal class EmailNotifier(Settings settings, AddInformation addInfo) : INotif
 
     public void Notify(string data)
     {
-        if (!DataQueue.Contains(data)) DataQueue.Enqueue(DateTime.Now + ": " + data);
+        if (DataQueue.IsEmpty || !DataQueue.Last().EndsWith(data)) DataQueue.Enqueue(DateTime.Now + ": " + data);
         if (DateTime.Now > trigger && !DataQueue.IsEmpty)
         {
             trigger = DateTime.Now.AddHours(4);

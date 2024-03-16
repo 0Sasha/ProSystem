@@ -29,7 +29,7 @@ internal class PortfolioManager : IPortfolioManager
 
     public void UpdateEquity()
     {
-        Portfolio.Equity[DateTime.Today.AddDays(-1)] = (int)Portfolio.Saldo;
+        Portfolio.Equity[DateTime.Today.AddDays(-1)] = Portfolio.Saldo;
         Portfolio.NotifyChange(nameof(Portfolio.AverageEquity));
     }
 

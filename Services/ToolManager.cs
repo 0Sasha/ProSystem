@@ -100,14 +100,14 @@ internal class ToolManager : IToolManager
             await Task.Delay(500);
         }
 
-        while (ServerTime.AddSeconds(-3) < tool.LastRecalc)
-        {
-            AddInfo(tool.Name + ": Calculate: waiting for data from server", false);
-            await Task.Delay(1000);
-        }
-
         try
         {
+            while (ServerTime.AddSeconds(-3) < tool.LastRecalc)
+            {
+                AddInfo(tool.Name + ": Calculate: waiting for data from server", false);
+                await Task.Delay(1000);
+            }
+
             if (await Connector.CheckToolAsync(tool)) await CalculateToolAsync(tool);
             AddInfo("Calculated: " + tool.Name, false);
         }
@@ -459,24 +459,22 @@ internal class ToolManager : IToolManager
             if ((activeOrder.Side == "B") == balance.Less(0) &&
                 (balance > toolState.LongVolume || -balance > toolState.ShortVolume))
             {
-                if (activeOrder.Price.NotEq(security.Bars.Close[^2]) &&
-                    ServerTime.Minute != 0 && ServerTime.Minute != 30 ||
+                if (activeOrder.Price.NotEq(security.Bars.Close[^2]) || // && ServerTime.Minute != 0 && ServerTime.Minute != 30 
                     activeOrder.Balance.NotEq(volume))
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security,
-                        Connector.OrderTypeNM, security.Bars.Close[^2], volume, "Normalization", null, "NM");
+                        Connector.OrderTypeNM, security.Bars.Close[^2], volume, "NM", null, "NM");
                 }
             }
             else if ((activeOrder.Side == "B") == balance.More(0) && normalizeUp)
             {
                 volume = balance.More(0) ? toolState.LongVolume - balance : toolState.ShortVolume + balance;
 
-                if (activeOrder.Price.NotEq(security.Bars.Close[^2]) &&
-                    ServerTime.Minute != 0 && ServerTime.Minute != 30 ||
+                if (activeOrder.Price.NotEq(security.Bars.Close[^2]) || // && ServerTime.Minute != 0 && ServerTime.Minute != 30
                     activeOrder.Balance.NotEq(volume) && volume > security.MinQty)
                 {
                     await Connector.ReplaceOrderAsync(activeOrder, security,
-                        Connector.OrderTypeNM, security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
+                        Connector.OrderTypeNM, security.Bars.Close[^2], volume, "NMUp", null, "NM");
                 }
             }
             else await Connector.CancelOrderAsync(activeOrder);
@@ -484,7 +482,7 @@ internal class ToolManager : IToolManager
         else if (balance > toolState.LongVolume || -balance > toolState.ShortVolume)
         {
             await Connector.SendOrderAsync(security, Connector.OrderTypeNM,
-                balance < 0, security.Bars.Close[^2], volume, "Normalization", null, "NM");
+                balance < 0, security.Bars.Close[^2], volume, "NM", null, "NM");
             WriteStateLog(tool, toolState, "NM");
         }
         else if (normalizeUp)
@@ -504,7 +502,7 @@ internal class ToolManager : IToolManager
                     }
 
                     await Connector.SendOrderAsync(security, Connector.OrderTypeNM,
-                        balance.More(0), security.Bars.Close[^2], volume, "NormalizationUp", null, "NM");
+                        balance.More(0), security.Bars.Close[^2], volume, "NMUp", null, "NM");
 
                     WriteStateLog(tool, toolState, "NM");
                     return;
@@ -556,7 +554,7 @@ internal class ToolManager : IToolManager
                 if (position1 == neutralPos && balance.NotEq(0) ||
                     position1 == longPos && balance.LessEq(0) || position1 == shortPos && balance.MoreEq(0))
                 {
-                    AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                    AddInfo(tool.Name + ": position mismatch (С1). Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     double volume;
@@ -574,7 +572,7 @@ internal class ToolManager : IToolManager
             {
                 if (balance.NotEq(0))
                 {
-                    AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                    AddInfo(tool.Name + ": position mismatch (С2). Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     await Connector.SendOrderAsync(security, OrderType.Market,
@@ -587,7 +585,7 @@ internal class ToolManager : IToolManager
                 var position = position1 == neutralPos ? position2 : position1;
                 if (position == longPos && balance.LessEq(0) || position == shortPos && balance.MoreEq(0))
                 {
-                    AddInfo(tool.Name + ": position mismatch. Normalization by market.", notify: true);
+                    AddInfo(tool.Name + ": position mismatch (С3). Normalization by market.", notify: true);
                     if (!await CancelActiveOrdersAsync(tool)) return false;
 
                     double vol = position == longPos ?

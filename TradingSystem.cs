@@ -8,6 +8,7 @@ public delegate void AddInformation(string data, bool important = true, bool not
 
 public class TradingSystem
 {
+    private int isOccupied;
     private Thread? stateChecker;
     private DateTime triggerRequestInfo;
     private DateTime triggerCheckState;
@@ -84,24 +85,32 @@ public class TradingSystem
 
     public async Task PrepareForTrading()
     {
-        if (!ReadyToTrade)
+        if (Interlocked.Exchange(ref isOccupied, 1) != 0) return;
+        try
         {
-            if (await Connector.OrderPortfolioInfoAsync(Portfolio) &&
-                await Connector.PrepareForTradingAsync() && await PrepareToolsAsync())
+            if (!ReadyToTrade)
             {
-                if (ServerTime < DateTime.Today.AddHours(7)) ClearObsoleteData();
-                if (Connector.Connection != ConnectionState.Connected) return;
-                ReadyToTrade = true;
-                AddInfo("System is ready to trade.", false);
+                if (await Connector.OrderPortfolioInfoAsync(Portfolio) &&
+                    await Connector.PrepareForTradingAsync() && await PrepareToolsAsync())
+                {
+                    if (ServerTime < DateTime.Today.AddHours(7)) ClearObsoleteData();
+                    if (Connector.Connection != ConnectionState.Connected) return;
+                    ReadyToTrade = true;
+                    AddInfo("System is ready to trade.", false);
+                }
+                else if (Connector.Connection == ConnectionState.Connected)
+                    await Connector.DisconnectAsync();
             }
-            else if (Connector.Connection == ConnectionState.Connected)
-                await Connector.DisconnectAsync();
+            else
+            {
+                await Connector.OrderPortfolioInfoAsync(Portfolio);
+                foreach (var tool in Tools) await Connector.RequestBarsAsync(tool);
+                AddInfo("PrepareForTrading: bars updated.", false);
+            }
         }
-        else
+        finally
         {
-            await Connector.OrderPortfolioInfoAsync(Portfolio);
-            foreach (var tool in Tools) await Connector.RequestBarsAsync(tool);
-            AddInfo("PrepareForTrading: bars updated.", false);
+            Interlocked.Exchange(ref isOccupied, 0);
         }
     }
 
@@ -167,9 +176,8 @@ public class TradingSystem
 
         if (ServerTime > triggerRequestInfo)
         {
-            var min = ServerTime.Minute;
-            var minutes = min < 25 ? 25 - min : min < 55 ? 55 - min : 85 - min;
-            triggerRequestInfo = ServerTime.AddMinutes(minutes);
+            var next = new List<int>([10, 25, 40, 55, 70]).First(m => m > ServerTime.Minute);
+            triggerRequestInfo = ServerTime.AddMinutes(next - ServerTime.Minute);
             if (!await Connector.OrderPortfolioInfoAsync(Portfolio))
             {
                 await Task.Delay(5000);

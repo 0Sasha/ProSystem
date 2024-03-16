@@ -34,7 +34,7 @@ public abstract class Connector : INotifyPropertyChanged
     public virtual bool FirstBar { get =>
             FirstTradingHour != 0 && ServerTime < ServerTime.Date.AddHours(FirstTradingHour).AddMinutes(30); }
 
-    public virtual OrderType OrderTypeNM { get; set; } = OrderType.Limit;
+    public virtual OrderType OrderTypeNM { get; } = OrderType.Limit;
 
     public ConnectionState Connection
     {
@@ -195,7 +195,7 @@ public abstract class Connector : INotifyPropertyChanged
         var isBidding = security.LastTrade.Time.AddMinutes(3) > ServerTime;
         if (!isBidding)
         {
-            AddInfo(security + " is not bidding. Subscribing", notify: true);
+            AddInfo(security.Seccode + " is not bidding. Subscribing", notify: true);
             _ = SubscribeToTradesAsync(security);
         }
         return isBidding;

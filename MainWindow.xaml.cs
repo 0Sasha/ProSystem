@@ -316,8 +316,12 @@ public partial class MainWindow : Window
         {
             Dispatcher.Invoke(() =>
             {
-                TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss") + ": " + data);
-                TxtBox.ScrollToEnd();
+                if (TxtBox.Text.EndsWith(data)) TxtBox.AppendText(" (many times)");
+                else if (!TxtBox.Text.EndsWith(data + " (many times)"))
+                {
+                    TxtBox.AppendText("\n" + DateTime.Now.ToString("dd.MM HH:mm:ss") + ": " + data);
+                    TxtBox.ScrollToEnd();
+                }
             });
         }
         if (notify) Notifier.Notify(data);
@@ -366,12 +370,6 @@ public partial class MainWindow : Window
     }
     private void Test(object? sender, RoutedEventArgs e)
     {
-        try
-        {
-
-
-        }
-        catch { }
 
     }
     #endregion
