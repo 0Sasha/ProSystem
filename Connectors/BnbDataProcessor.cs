@@ -173,25 +173,8 @@ internal class BnbDataProcessor : DataProcessor
             var price = json.GetDouble("price");
             var quantity = json.GetDouble("qty");
             var commission = json.GetDouble("commission");
-
-            var trade = TradingSystem.Trades.SingleOrDefault(o => o.Id == id);
-            if (trade == null)
-            {
-                trade = new(id, orderId, symbol, side, time, price, quantity, commission);
-                TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Trades.Add(trade));
-                AddInfo("New trade: " + trade.Seccode + "/" + trade.Side + "/" +
-                    trade.Price + "/" + trade.Quantity, TradingSystem.Settings.DisplayNewTrades);
-            }
-            else
-            {
-                trade.OrderId = orderId;
-                trade.Seccode = symbol;
-                trade.Side = side;
-                trade.Time = time;
-                trade.Price = price;
-                trade.Quantity = quantity;
-                trade.Commission = commission;
-            }
+            var newTrade = new Trade(id, orderId, symbol, side, time, price, quantity, commission);
+            UpdateTrade(newTrade);
         }
     }
 
@@ -231,8 +214,9 @@ internal class BnbDataProcessor : DataProcessor
             var eventType = e.GetString();
             if (eventType == "kline") ProcessBar(root);
             else if (eventType == "ORDER_TRADE_UPDATE") ProcessOrder(root);
-            else if (eventType == "ACCOUNT_UPDATE") ProcessPositions(root);
+            else if (eventType == "ACCOUNT_UPDATE") ProcessAccount(root);
             else if (eventType == "ACCOUNT_CONFIG_UPDATE") ProcessAccountConfig(root);
+            else if (eventType == "CONDITIONAL_ORDER_TRIGGER_REJECT") ProcessConditionalOrderReject(root);
             //else if (eventType == "MARGIN_CALL") { }
             else AddInfo("Unknown eventType: " + eventType + "\n" + root.GetRawText());
         }
@@ -288,24 +272,23 @@ internal class BnbDataProcessor : DataProcessor
         var tradeId = root.GetLong("t");
         if (tradeId != 0)
         {
-            Task.Run(async () =>
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    Thread.Sleep(1000);
-                    if (await Connector.GetTradesAsync(newOrder.Seccode, true)) return;
-                }
-                AddInfo("ProcessOrder: failed to order trades of " + newOrder.Seccode, true, true);
-            });
+            var time = root.GetDateTime("T");
+            var price = root.GetDouble("L");
+            var quantity = root.GetDouble("l");
+            var commission = root.GetDouble("n");
+            var newTrade =
+                new Trade(tradeId, newOrder.Id, newOrder.Seccode, newOrder.Side, time, price, quantity, commission);
+            UpdateTrade(newTrade);
+            // Save diff between ap (Average Price) or L (Last Filled Price) and sp (Stop Price)
         }
     }
 
-    private void ProcessPositions(JsonElement root)
+    private void ProcessAccount(JsonElement root)
     {
-        if (Connector.DeepLog) AddInfo("ProcessPositions: " + root.GetRawText(), false);
-        Task.Run(() => Connector.OrderPortfolioInfoAsync(TradingSystem.Portfolio));
+        if (Connector.DeepLog) AddInfo("ProcessAccount: " + root.GetRawText(), false);
 
-        foreach (var p in root.GetProperty("a").GetProperty("P").EnumerateArray())
+        var newData = root.GetProperty("a");
+        foreach (var p in newData.GetProperty("P").EnumerateArray())
         {
             var seccode = p.GetString("s");
             var pos = TradingSystem.Portfolio.Positions.SingleOrDefault(x => x.Seccode == seccode);
@@ -317,6 +300,17 @@ internal class BnbDataProcessor : DataProcessor
             pos.Saldo = p.GetDouble("pa");
             pos.UnrealPL = p.GetDouble("up");
             pos.PL = p.GetDouble("cr");
+        }
+
+        foreach (var balance in newData.GetProperty("B").EnumerateArray())
+        {
+            if (balance.GetString("a") == "USDT")
+            {
+                var walletBalance = balance.GetDouble("wb");
+                var curMarginBalance = TradingSystem.Portfolio.Saldo;
+                if (Math.Abs(walletBalance - curMarginBalance).More(curMarginBalance * 0.03))
+                    Task.Run(() => Connector.OrderPortfolioInfoAsync(TradingSystem.Portfolio));
+            }
         }
     }
 
@@ -331,6 +325,12 @@ internal class BnbDataProcessor : DataProcessor
         else AddInfo("ProcessAccountConfig: unknown data", true, true);
     }
 
+    private void ProcessConditionalOrderReject(JsonElement root)
+    {
+        if (Connector.DeepLog) AddInfo("ProcessConditionalOrderReject: " + root.GetRawText(), false);
+        var or = root.GetProperty("or");
+        AddInfo($"Order was rejected: {or.GetString("s")}/{or.GetLong("i")}/{or.GetString("r")}", notify: true);
+    }
 
     private Order ConstructOrder(JsonElement root, bool isEvent)
     {
@@ -378,13 +378,34 @@ internal class BnbDataProcessor : DataProcessor
             oldOrder.Balance = newOrder.Balance;
             oldOrder.Price = newOrder.Price;
             oldOrder.Side = newOrder.Side;
-            oldOrder.Time = newOrder.Time;
             oldOrder.Type = newOrder.Type;
             if (oldOrder.Status != newOrder.Status)
             {
                 oldOrder.Status = newOrder.Status;
                 oldOrder.ChangeTime = newOrder.ChangeTime;
             }
+            //if (oldOrder.Time > newOrder.Time) oldOrder.Time = newOrder.Time;
+        }
+    }
+
+    private void UpdateTrade(Trade newTrade)
+    {
+        var oldTrade = TradingSystem.Trades.SingleOrDefault(o => o.Id == newTrade.Id);
+        if (oldTrade == null)
+        {
+            TradingSystem.Window.Dispatcher.Invoke(() => TradingSystem.Trades.Add(newTrade));
+            AddInfo("New trade: " + newTrade.Seccode + "/" + newTrade.Side + "/" +
+                newTrade.Price + "/" + newTrade.Quantity, TradingSystem.Settings.DisplayNewTrades);
+        }
+        else
+        {
+            oldTrade.OrderId = newTrade.OrderId;
+            oldTrade.Seccode = newTrade.Seccode;
+            oldTrade.Side = newTrade.Side;
+            oldTrade.Time = newTrade.Time;
+            oldTrade.Price = newTrade.Price;
+            oldTrade.Quantity = newTrade.Quantity;
+            oldTrade.Commission = newTrade.Commission;
         }
     }
 }

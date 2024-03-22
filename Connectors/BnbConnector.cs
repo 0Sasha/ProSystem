@@ -39,6 +39,8 @@ internal class BnbConnector : Connector
 
     public readonly WebSocketManager SocketManager;
 
+    public override OrderType OrderTypeNM { get => OrderType.Market; }
+
     public bool DeepLog { get => TradingSystem.Settings.DeepLog; }
     public string? ListenKey { get; private set; }
 
@@ -51,7 +53,18 @@ internal class BnbConnector : Connector
         SocketManager.PropertyChanged += SocketManagerConnectionChanged;
         ListenKeyHolder = new(async (o) =>
         {
-            if (Connection == ConnectionState.Connected) await UpdateListenKey();
+            if (Connection == ConnectionState.Connected)
+            {
+                try
+                {
+                    while (!await UpdateListenKey())
+                    {
+                        AddInfo("Failed to update listen key");
+                        await Task.Delay(60000);
+                    }
+                }
+                catch (Exception ex) { AddInfo("UpdateListenKey: " + ex.Message + "\n" + ex.StackTrace, true, true); }
+            }
         }, null, 0, 1800000);
     }
 
@@ -147,7 +160,15 @@ internal class BnbConnector : Connector
         }
         else throw new ArgumentException("Unexpected OrderType");
 
-        if (signal == "Normalization") query["reduceOnly"] = "true";
+        if (signal is "Normalization" or "NM") query["reduceOnly"] = "true";
+        else if ((price * quantity).Less(security.Notional))
+        {
+            query["reduceOnly"] = "true";
+            var position = TradingSystem.Portfolio.Positions
+                .ToArray().SingleOrDefault(x => x.Seccode == security.Seccode);
+            if (position == null || position.Saldo.Eq(0) || position.Saldo.More(0) == isBuy)
+                throw new ArgumentException($"Volume < notional: {price}/{quantity}/{security.Notional}/{senderName}");
+        }
 
         using var res = await SendRequestAsync(BaseFuturesUrl + "/fapi/v1/order", true, HttpMethod.Post, query);
         if (res == null) return false;
@@ -653,7 +674,7 @@ internal class BnbConnector : Connector
         if (e.PropertyName == nameof(SocketManager.Connected))
         {
             Connection = SocketManager.Connected ? ConnectionState.Connected : ConnectionState.Disconnected;
-            AddInfo(Connection.ToString(), !ReconnectTime);
+            Task.Run(() => AddInfo(Connection.ToString(), !ReconnectTime));
         }
     }
 }

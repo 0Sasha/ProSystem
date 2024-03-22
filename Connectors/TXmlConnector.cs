@@ -375,7 +375,7 @@ internal class TXmlConnector : Connector
     }
 
     public override bool PriceIsNormal(double price, double average, double deviation) =>
-        Math.Abs(average - price) < deviation * 15;
+        Math.Abs(average - price) < deviation * 20;
 
     public override bool SecurityIsBidding(Security security)
     {
@@ -405,7 +405,7 @@ internal class TXmlConnector : Connector
         }
 
         if (security.InitReqLong < 100 || security.InitReqShort < 100 ||
-            security.Deposit < 100 || security.InitReqLong < security.Deposit / 2)
+            security.Deposit < 100 || security.InitReqLong < security.Deposit / 7)
         {
             AddInfo(security.Seccode + ": reqs are out of norm: " +
                 security.InitReqLong + "/" + security.InitReqShort + " SellDep: " + security.Deposit, true, true);
